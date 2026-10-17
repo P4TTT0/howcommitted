@@ -10,7 +10,10 @@ type PlayerCardProps = {
   onStart: () => void;
 };
 
-/** The found developer as a large card; pressing it starts, like "Play". */
+/**
+ * The found developer as a poster card: the avatar fills the card's width and
+ * the name sits under it. Pressing it starts, like "Play".
+ */
 export function PlayerCard({ user, disabled, onStart }: PlayerCardProps) {
   const name = user.name ?? user.login;
   return (
@@ -19,7 +22,7 @@ export function PlayerCard({ user, disabled, onStart }: PlayerCardProps) {
       onClick={onStart}
       aria-disabled={disabled}
       aria-label={`Play @${user.login}`}
-      className={`player-wipe flex w-full flex-col items-start gap-[clamp(8px,2dvh,20px)] border-2 border-ink p-[clamp(10px,2dvh,20px)] text-left not-aria-disabled:hover:bg-ink not-aria-disabled:hover:text-paper aria-disabled:cursor-wait ${pressable} ${focusRing}`}
+      className={`player-wipe flex w-full flex-col items-stretch gap-[clamp(8px,1.6dvh,16px)] border-2 border-ink p-[clamp(8px,1.4dvh,14px)] text-left not-aria-disabled:hover:bg-ink not-aria-disabled:hover:text-paper aria-disabled:cursor-wait ${pressable} ${focusRing}`}
     >
       {/* biome-ignore lint/performance/noImgElement: a remote avatar needs no optimizer */}
       <img
@@ -27,7 +30,7 @@ export function PlayerCard({ user, disabled, onStart }: PlayerCardProps) {
         alt=""
         width={240}
         height={240}
-        className="aspect-square w-[clamp(120px,22dvh,240px)] bg-paper object-cover"
+        className="aspect-square w-full bg-paper object-cover"
       />
       <span className="block w-full min-w-0">
         <span
