@@ -1,0 +1,498 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createBreaker } from "./breaker";
+import { createCache } from "./cache";
+import { createLock } from "./lock";
+import {
+  GENERATION_DEADLINE_MS,
+  getPreview,
+  getProfile,
+  type ProfileDeps,
+  WAIT_MAX_MS,
+  WAIT_MIN_MS,
+} from "./profile";
+import { createTestStore } from "./test-store";
+
+const NOW = new Date("2026-10-16T12:00:00Z");
+
+const rateLimit = {
+  cost: 1,
+  remaining: 4900,
+  limit: 5000,
+  resetAt: "2026-10-16T13:00:00Z",
+};
+
+const userBody = (years: number[]) => ({
+  data: {
+    rateLimit,
+    user: {
+      login: "ada",
+      name: "Ada",
+      avatarUrl: "https://avatars.example/ada",
+      createdAt: "2019-01-01T00:00:00Z",
+      contributionsCollection: { contributionYears: years },
+    },
+  },
+});
+
+const yearBody = (commits: number) => ({
+  data: {
+    rateLimit,
+    user: {
+      contributionsCollection: {
+        totalCommitContributions: commits,
+        totalPullRequestContributions: 0,
+        totalPullRequestReviewContributions: 0,
+        totalIssueContributions: 0,
+        restrictedContributionsCount: 0,
+        commitContributionsByRepository: [
+          {
+            contributions: {
+              nodes: [
+                { occurredAt: "2025-02-01T00:00:00Z", commitCount: commits },
+              ],
+            },
+          },
+        ],
+        contributionCalendar: {
+          weeks: [
+            {
+              contributionDays: [
+                { date: "2025-02-01", contributionCount: commits, weekday: 6 },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  },
+});
+
+const reposBody = (hasNextPage = false) => ({
+  data: {
+    rateLimit,
+    user: {
+      repositories: {
+        pageInfo: { hasNextPage, endCursor: hasNextPage ? "c" : null },
+        nodes: [
+          {
+            name: "engine",
+            createdAt: "2020-01-01T00:00:00Z",
+            stargazerCount: 12,
+            languages: { edges: [{ size: 10, node: { name: "Rust" } }] },
+          },
+        ],
+      },
+    },
+  },
+});
+
+const rateLimited = {
+  data: { rateLimit },
+  errors: [{ type: "RATE_LIMITED" }],
+};
+
+type Handler = (kind: "Preview" | "Year" | "Repos") => unknown;
+
+/** Routes fetch calls by the GraphQL operation name and counts them. */
+function stubGithub(handler: Handler) {
+  const calls = { Preview: 0, Year: 0, Repos: 0 };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init: RequestInit) => {
+      const { query } = JSON.parse(String(init.body)) as { query: string };
+      const kind = (["Preview", "Year", "Repos"] as const).find((k) =>
+        query.includes(`query ${k}(`),
+      ) as keyof typeof calls;
+      calls[kind]++;
+      return new Response(JSON.stringify(handler(kind)));
+    }),
+  );
+  return calls;
+}
+
+function setup(overrides: Partial<ProfileDeps> = {}) {
+  const { store, values } = createTestStore();
+  const deps: ProfileDeps = {
+    getToken: () => "token",
+    cache: createCache(store, ""),
+    breaker: createBreaker(store, ""),
+    lock: createLock(store, ""),
+    now: () => NOW,
+    sleep: async () => {},
+    ...overrides,
+  };
+  return { deps, values };
+}
+
+/** User with years 2025 and 2024; the current year (2026) is added by the service. */
+const happyPath: Handler = (kind) =>
+  kind === "Preview"
+    ? userBody([2025, 2024])
+    : kind === "Year"
+      ? yearBody(3)
+      : reposBody();
+
+const loggedEvents = (info: { mock: { calls: unknown[][] } }) =>
+  info.mock.calls.map((call) => JSON.parse(String(call[0])));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("getProfile", () => {
+  it("generates a cold profile, then serves it from cache", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps } = setup();
+
+    const first = await getProfile("ada", deps);
+    expect(first).toMatchObject({ status: "ok", source: "fresh" });
+    if (first.status !== "ok") return;
+    expect(first.profile.years.map((y) => y.year)).toEqual([2024, 2025, 2026]);
+    expect(first.profile.years[0]?.reconciliation.matches).toBe(true);
+    expect(first.profile.repos[0]?.name).toBe("engine");
+    expect(first.reposTruncated).toBe(false);
+    expect(calls).toEqual({ Preview: 1, Year: 3, Repos: 1 });
+
+    const second = await getProfile("ADA", deps);
+    expect(second).toMatchObject({ status: "ok", source: "cache" });
+    expect(calls).toEqual({ Preview: 1, Year: 3, Repos: 1 });
+  });
+
+  it("fetches the current year when the cached years do not include it", async () => {
+    const calls = stubGithub((kind) =>
+      kind === "Preview" ? userBody([2025]) : happyPath(kind),
+    );
+    const result = await getProfile("ada", setup().deps);
+    expect(result.status).toBe("ok");
+    expect(calls.Year).toBe(2);
+  });
+
+  it("flags truncated repository lists", async () => {
+    stubGithub((kind) =>
+      kind === "Repos" ? reposBody(true) : happyPath(kind),
+    );
+    const result = await getProfile("ada", setup().deps);
+    expect(result).toMatchObject({ status: "ok", reposTruncated: true });
+  });
+
+  it("serves only cache when the circuit breaker is open", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps } = setup();
+    await deps.breaker.record({ ...rateLimit, remaining: 100 }, NOW);
+
+    expect(await getProfile("ada", deps)).toEqual({
+      status: "degraded",
+      reason: "circuit_open",
+    });
+    expect(calls.Year).toBe(0);
+  });
+
+  it("negative-caches unknown users", async () => {
+    const calls = stubGithub(() => ({ data: { rateLimit, user: null } }));
+    const { deps } = setup();
+    expect(await getProfile("ghost", deps)).toEqual({ status: "not_found" });
+    expect(await getProfile("ghost", deps)).toEqual({ status: "not_found" });
+    expect(calls.Preview).toBe(1);
+  });
+
+  it("keeps years that succeeded, opens the breaker and records a short failure marker", async () => {
+    let yearCalls = 0;
+    stubGithub((kind) => {
+      if (kind === "Year") {
+        yearCalls++;
+        return yearCalls === 2 ? rateLimited : yearBody(3);
+      }
+      return happyPath(kind);
+    });
+    const { deps, values } = setup();
+    const result = await getProfile("ada", deps);
+    expect(result).toMatchObject({ status: "rate_limited" });
+    expect(await deps.breaker.isOpen(NOW)).toBe(true);
+
+    // Inside the cooldown a retry gets the recorded failure without calling GitHub.
+    const calls = stubGithub(happyPath);
+    expect(await getProfile("ada", deps)).toMatchObject({
+      status: "rate_limited",
+    });
+    expect(calls.Year).toBe(0);
+
+    // Once the cooldown and the rate limit window are over, only the missing year is paid for.
+    values.delete(deps.cache.key("failed", "ada"));
+    values.delete("v1:budget:server");
+    expect(await getProfile("ada", deps)).toMatchObject({ status: "ok" });
+    expect(calls.Year).toBe(1);
+  });
+
+  it("stops launching years after the first rate limit", async () => {
+    let yearCalls = 0;
+    const calls = stubGithub((kind) => {
+      if (kind === "Preview") {
+        return userBody(Array.from({ length: 12 }, (_, i) => 2025 - i));
+      }
+      if (kind === "Year") return yearCalls++ === 0 ? rateLimited : yearBody(1);
+      return reposBody();
+    });
+    const result = await getProfile("ada", setup().deps);
+    expect(result).toMatchObject({ status: "rate_limited" });
+    expect(calls.Year).toBeLessThanOrEqual(6);
+    expect(calls.Repos).toBe(0);
+  });
+
+  it("maps the overall deadline to a timeout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () =>
+              reject(
+                Object.assign(new Error("aborted"), { name: "TimeoutError" }),
+              ),
+            );
+          }),
+      ),
+    );
+    const result = await getProfile(
+      "ada",
+      setup({ deadlineMs: 5, minBudgetMs: 0 }).deps,
+    );
+    expect(result).toEqual({ status: "timeout" });
+    expect(GENERATION_DEADLINE_MS).toBeLessThan(60_000);
+  });
+
+  it("coalesces concurrent cold requests into a single fetch", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps } = setup();
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => getProfile("ada", deps)),
+    );
+    expect(results.every((r) => r.status === "ok")).toBe(true);
+    expect(calls).toEqual({ Preview: 1, Year: 3, Repos: 1 });
+  });
+
+  it("makes waiters return the leader's failure instead of retrying", async () => {
+    const calls = stubGithub((kind) =>
+      kind === "Year" ? rateLimited : happyPath(kind),
+    );
+    const { deps } = setup();
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () => getProfile("ada", deps)),
+    );
+    expect(results.every((r) => r.status === "rate_limited")).toBe(true);
+    expect(calls.Year).toBe(3);
+  });
+
+  it("polls with jittered backoff and gives up with degraded/busy", async () => {
+    stubGithub(happyPath);
+    const { deps } = setup();
+    await deps.lock.acquire("ada");
+    let clock = NOW.getTime();
+    const sleeps: number[] = [];
+    const result = await getProfile("ada", {
+      ...deps,
+      random: () => 0.5,
+      now: () => new Date(clock),
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        clock += GENERATION_DEADLINE_MS / 4;
+      },
+    });
+    expect(result).toEqual({ status: "degraded", reason: "busy" });
+    expect(sleeps.length).toBeGreaterThan(1);
+    for (const ms of sleeps) {
+      expect(ms).toBeGreaterThanOrEqual(WAIT_MIN_MS);
+      expect(ms).toBeLessThanOrEqual(WAIT_MAX_MS);
+    }
+  });
+
+  it("fails closed with store_down when the lock or breaker cannot be reached", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps } = setup();
+    const lockDown = {
+      ...deps,
+      lock: {
+        acquire: async () => {
+          throw new Error("redis down");
+        },
+      },
+    };
+    expect(await getProfile("ada", lockDown)).toEqual({
+      status: "degraded",
+      reason: "store_down",
+    });
+
+    const breakerDown = {
+      ...deps,
+      breaker: {
+        ...deps.breaker,
+        isOpen: async () => {
+          throw new Error("redis down");
+        },
+      },
+    };
+    expect(await getProfile("ada", breakerDown)).toEqual({
+      status: "degraded",
+      reason: "store_down",
+    });
+    expect(calls).toEqual({ Preview: 0, Year: 0, Repos: 0 });
+  });
+
+  it("treats cache read errors as misses and never loses a good result to write or unlock errors", async () => {
+    stubGithub(happyPath);
+    const { deps } = setup();
+    const broken: ProfileDeps = {
+      ...deps,
+      cache: {
+        ...deps.cache,
+        getUser: async () => {
+          throw new Error("read failed");
+        },
+        setYear: async () => {
+          throw new Error("write failed");
+        },
+        setRepos: async () => {
+          throw new Error("write failed");
+        },
+      },
+      lock: {
+        acquire: async () => async () => {
+          throw new Error("unlock failed");
+        },
+      },
+    };
+    const result = await getProfile("ada", broken);
+    expect(result).toMatchObject({ status: "ok", source: "fresh" });
+  });
+
+  it("serves a stale current year and refreshes it after the response", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps } = setup();
+    await getProfile("ada", deps);
+    expect(calls.Year).toBe(3);
+
+    const tasks: (() => Promise<void>)[] = [];
+    const later = new Date(NOW.getTime() + 7 * 60 * 60 * 1000);
+    const stale: ProfileDeps = {
+      ...deps,
+      now: () => later,
+      scheduleRefresh: (task) => tasks.push(task),
+    };
+    expect(await getProfile("ada", stale)).toMatchObject({
+      status: "ok",
+      source: "cache",
+    });
+    expect(calls.Year).toBe(3);
+    expect(tasks).toHaveLength(1);
+
+    await tasks[0]?.();
+    expect(calls.Year).toBe(4);
+
+    // Fresh again: no further refresh is scheduled.
+    await getProfile("ada", stale);
+    expect(tasks).toHaveLength(1);
+  });
+
+  it("refetches a year that ended after it was cached, together with the new year", async () => {
+    const calls = stubGithub((kind) =>
+      kind === "Preview" ? userBody([2026, 2025, 2024]) : happyPath(kind),
+    );
+    const { deps } = setup({ now: () => new Date("2026-12-31T23:00:00Z") });
+    await getProfile("ada", deps);
+    expect(calls.Year).toBe(3);
+
+    const newYear: ProfileDeps = {
+      ...deps,
+      now: () => new Date("2027-01-01T01:00:00Z"),
+    };
+    expect(await getProfile("ada", newYear)).toMatchObject({
+      status: "ok",
+      source: "fresh",
+    });
+    // 2027 is new and 2026 went stale; 2025 and 2024 stay cached.
+    expect(calls.Year).toBe(5);
+    expect(await getProfile("ada", newYear)).toMatchObject({ source: "cache" });
+    expect(calls.Year).toBe(5);
+  });
+
+  it("backs off from refreshes after a failed refresh", async () => {
+    stubGithub(happyPath);
+    const { deps } = setup();
+    await getProfile("ada", deps);
+
+    const tasks: (() => Promise<void>)[] = [];
+    const stale: ProfileDeps = {
+      ...deps,
+      now: () => new Date(NOW.getTime() + 7 * 60 * 60 * 1000),
+      scheduleRefresh: (task) => tasks.push(task),
+    };
+    await getProfile("ada", stale);
+    expect(tasks).toHaveLength(1);
+
+    stubGithub((kind) =>
+      kind === "Year" ? { errors: [{ message: "boom" }] } : happyPath(kind),
+    );
+    await tasks[0]?.();
+
+    // The failed refresh left a marker: stale data keeps being served quietly.
+    expect(await getProfile("ada", stale)).toMatchObject({ source: "cache" });
+    expect(tasks).toHaveLength(1);
+  });
+
+  it("does not start a fetch when the lock is won with almost no budget left", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps, values } = setup();
+    const held = await deps.lock.acquire("ada");
+    let clock = NOW.getTime();
+    const result = await getProfile("ada", {
+      ...deps,
+      now: () => new Date(clock),
+      sleep: async () => {
+        clock += GENERATION_DEADLINE_MS - 2_000;
+        await held?.();
+      },
+    });
+    expect(result).toEqual({ status: "degraded", reason: "busy" });
+    expect(calls).toEqual({ Preview: 0, Year: 0, Repos: 0 });
+    expect(values.has(deps.cache.key("failed", "ada"))).toBe(false);
+  });
+
+  it("logs one structured line per generation with cost and remaining budget", async () => {
+    stubGithub(happyPath);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    await getProfile("Ada", setup().deps);
+    const line = loggedEvents(info).find((l) => l.event === "generation");
+    expect(line).toMatchObject({
+      login: "ada",
+      status: "ok",
+      source: "fresh",
+      years: 3,
+      remaining: 4900,
+      cost: 5,
+    });
+    expect(typeof line.ms).toBe("number");
+  });
+});
+
+describe("getPreview", () => {
+  it("fetches once and then serves the cached preview", async () => {
+    const calls = stubGithub(() => userBody([2025]));
+    const { deps } = setup();
+    expect(await getPreview("ada", deps)).toMatchObject({
+      status: "ok",
+      user: { login: "ada" },
+    });
+    await getPreview("ada", deps);
+    expect(calls.Preview).toBe(1);
+  });
+
+  it("maps timeouts without throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("gateway", { status: 502 })),
+    );
+    expect(await getPreview("ada", setup().deps)).toEqual({
+      status: "timeout",
+    });
+  });
+});
