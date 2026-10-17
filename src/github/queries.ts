@@ -23,25 +23,57 @@ query Preview($login: String!) {
   }
 }`;
 
-const YEAR_QUERY = `
-query Year($login: String!, $from: DateTime!, $to: DateTime!) {
+/**
+ * GitHub returns at most 100 day-nodes per repository per contributions window,
+ * so a repo with commits on more than 100 days in a year would be under-counted.
+ * Totals and the calendar come from one full-year window; the per-repo daily
+ * commits come from four quarter windows (at most 92 days each).
+ */
+export type QuarterWindow = { from: string; to: string };
+
+export function quarterWindows(year: number): QuarterWindow[] {
+  const ends = ["03-31", "06-30", "09-30", "12-31"];
+  const starts = ["01-01", "04-01", "07-01", "10-01"];
+  return starts.map((start, i) => ({
+    from: `${year}-${start}T00:00:00Z`,
+    to: `${year}-${ends[i]}T23:59:59Z`,
+  }));
+}
+
+const QUARTER_FIELDS = `{
+    commitContributionsByRepository(maxRepositories: 100) {
+      contributions(first: 100) { nodes { occurredAt commitCount } }
+    }
+  }`;
+
+function buildYearQuery(quarterCount: number): string {
+  const vars = Array.from(
+    { length: quarterCount },
+    (_, i) => `, $q${i + 1}From: DateTime!, $q${i + 1}To: DateTime!`,
+  ).join("");
+  const quarters = Array.from(
+    { length: quarterCount },
+    (_, i) =>
+      `  q${i + 1}: contributionsCollection(from: $q${i + 1}From, to: $q${i + 1}To) ${QUARTER_FIELDS}`,
+  ).join("\n");
+  return `
+query Year($login: String!, $from: DateTime!, $to: DateTime!${vars}) {
   ${RATE_LIMIT_FIELDS}
   user(login: $login) {
-    contributionsCollection(from: $from, to: $to) {
+    year: contributionsCollection(from: $from, to: $to) {
       totalCommitContributions
       totalPullRequestContributions
       totalPullRequestReviewContributions
       totalIssueContributions
       restrictedContributionsCount
-      commitContributionsByRepository(maxRepositories: 100) {
-        contributions(first: 100) { nodes { occurredAt commitCount } }
-      }
       contributionCalendar {
         weeks { contributionDays { date contributionCount weekday } }
       }
     }
+${quarters}
   }
 }`;
+}
 
 const REPOS_QUERY = `
 query Repos($login: String!, $after: String) {
@@ -77,30 +109,35 @@ type PreviewData = {
   } | null;
 };
 
-type YearData = {
-  user: {
-    contributionsCollection: {
-      totalCommitContributions: number;
-      totalPullRequestContributions: number;
-      totalPullRequestReviewContributions: number;
-      totalIssueContributions: number;
-      restrictedContributionsCount: number;
-      commitContributionsByRepository: {
-        contributions: {
-          nodes: { occurredAt: string; commitCount: number }[] | null;
-        };
-      }[];
-      contributionCalendar: {
-        weeks: {
-          contributionDays: {
-            date: string;
-            contributionCount: number;
-            weekday: number;
-          }[];
-        }[];
-      };
+type QuarterData = {
+  commitContributionsByRepository: {
+    contributions: {
+      nodes: { occurredAt: string; commitCount: number }[] | null;
     };
-  } | null;
+  }[];
+};
+
+type YearData = {
+  user:
+    | ({
+        year: {
+          totalCommitContributions: number;
+          totalPullRequestContributions: number;
+          totalPullRequestReviewContributions: number;
+          totalIssueContributions: number;
+          restrictedContributionsCount: number;
+          contributionCalendar: {
+            weeks: {
+              contributionDays: {
+                date: string;
+                contributionCount: number;
+                weekday: number;
+              }[];
+            }[];
+          };
+        };
+      } & Partial<Record<`q${number}`, QuarterData | null>>)
+    | null;
 };
 
 type ReposData = {
@@ -150,28 +187,46 @@ export async function fetchUserPreview(
   };
 }
 
-/** One contribution year (GitHub allows spans of at most one year). 1 point. */
+/**
+ * One contribution year (GitHub allows spans of at most one year). One request,
+ * 1 point: the full-year window plus one window per quarter that has started.
+ */
 export async function fetchYear(
   token: string,
   login: string,
   year: number,
   signal?: AbortSignal,
+  now: Date = new Date(),
 ): Promise<GraphqlResult<YearSummary>> {
+  const quarters = quarterWindows(year).filter(
+    (q) => new Date(q.from).getTime() <= now.getTime(),
+  );
+  const variables: Record<string, string> = {
+    login,
+    from: `${year}-01-01T00:00:00Z`,
+    to: `${year}-12-31T23:59:59Z`,
+  };
+  quarters.forEach((q, i) => {
+    variables[`q${i + 1}From`] = q.from;
+    variables[`q${i + 1}To`] = q.to;
+  });
   const result = await githubGraphql<YearData>(
     token,
-    YEAR_QUERY,
-    {
-      login,
-      from: `${year}-01-01T00:00:00Z`,
-      to: `${year}-12-31T23:59:59Z`,
-    },
+    buildYearQuery(quarters.length),
+    variables,
     signal,
   );
   if (!result.ok) return result;
-  const collection = result.data.user?.contributionsCollection;
-  if (!collection) {
+  const user = result.data.user;
+  const collection = user?.year;
+  if (!user || !collection) {
     return { ok: false, error: NOT_FOUND, rateLimit: result.rateLimit };
   }
+  const commitContributionsByRepo = quarters.flatMap((_, i) =>
+    (user[`q${i + 1}`]?.commitContributionsByRepository ?? []).map(
+      (repo) => repo.contributions.nodes ?? [],
+    ),
+  );
   return {
     ok: true,
     rateLimit: result.rateLimit,
@@ -184,9 +239,7 @@ export async function fetchYear(
         issues: collection.totalIssueContributions,
         privateContributions: collection.restrictedContributionsCount,
       },
-      commitContributionsByRepo: collection.commitContributionsByRepository.map(
-        (repo) => repo.contributions.nodes ?? [],
-      ),
+      commitContributionsByRepo,
       calendar: collection.contributionCalendar.weeks.flatMap((week) =>
         week.contributionDays.map((d) => ({
           date: d.date,

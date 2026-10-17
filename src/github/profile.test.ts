@@ -39,21 +39,12 @@ const yearBody = (commits: number) => ({
   data: {
     rateLimit,
     user: {
-      contributionsCollection: {
+      year: {
         totalCommitContributions: commits,
         totalPullRequestContributions: 0,
         totalPullRequestReviewContributions: 0,
         totalIssueContributions: 0,
         restrictedContributionsCount: 0,
-        commitContributionsByRepository: [
-          {
-            contributions: {
-              nodes: [
-                { occurredAt: "2025-02-01T00:00:00Z", commitCount: commits },
-              ],
-            },
-          },
-        ],
         contributionCalendar: {
           weeks: [
             {
@@ -64,6 +55,20 @@ const yearBody = (commits: number) => ({
           ],
         },
       },
+      q1: {
+        commitContributionsByRepository: [
+          {
+            contributions: {
+              nodes: [
+                { occurredAt: "2025-02-01T00:00:00Z", commitCount: commits },
+              ],
+            },
+          },
+        ],
+      },
+      q2: { commitContributionsByRepository: [] },
+      q3: { commitContributionsByRepository: [] },
+      q4: { commitContributionsByRepository: [] },
     },
   },
 });

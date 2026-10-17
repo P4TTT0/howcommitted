@@ -59,7 +59,7 @@ GitHub GraphQL with a server token. Costs measured live in October 2026 against 
 | Step | Query | Cost | Time |
 |------|-------|------|------|
 | Preview | `user(login){login name avatarUrl createdAt contributionsCollection{contributionYears}}`. Exact lookup, no search API | 1 point | ~0.6 s |
-| Contributions | One request per contribution year, in parallel (concurrency cap ~6): totals (commits, PRs, reviews, issues, restricted/private count) plus `commitContributionsByRepository(maxRepositories:100){contributions(first:100){nodes{occurredAt commitCount}}}`, summed by date for true commits per day | 1 point each | ~1.8 s each |
+| Contributions | One request per contribution year, in parallel (concurrency cap ~6): totals (commits, PRs, reviews, issues, restricted/private count) and the calendar from a full-year window, plus, from four quarter windows, `commitContributionsByRepository(maxRepositories:100){contributions(first:100){nodes{occurredAt commitCount}}}`, summed by date for true commits per day | 1 point each | ~1.8 s each |
 | Repos | `repositories(ownerAffiliations:OWNER, isFork:false, orderBy CREATED_AT, first:100)`, paginated, with `createdAt`, `stargazerCount`, `languages(first:10 by SIZE)` | 1 point | ~2.2 s |
 
 For the measured year (2023), summed daily commits matched `totalCommitContributions` exactly (4,458).
@@ -71,6 +71,7 @@ Profile cost is about contribution years + 2 points, so about 280 uncached profi
 - A single 16-year query timed out (502 after about 11 s). GitHub kills requests over 10 s and deducts extra points. Hence one request per year.
 - `contributionsCollection` `from`/`to` spans at most 1 year.
 - `contributionCalendar` counts all contribution types (2023 example: calendar 4,924 vs commits 4,458). Never label it as commits.
+- Per-repo daily nodes cap at 100 per `contributionsCollection` window, so a repo with commits on more than 100 days in a year was under-counted (torvalds 2024: 888 summed vs 2,888 official). Each year is therefore fetched as 4 quarters in one query (same 1-point cost), with totals and calendar from a full-year alias.
 - `maxRepositories` caps at 100 repos per year. Compare summed daily commits against the official total; if they differ, show the real total with a notice.
 - Private contributions appear only if the user enabled sharing them. Show as "+N private"; never invent their dates.
 

@@ -6,6 +6,8 @@ import {
   MAX_REPO_PAGES,
 } from "./queries";
 
+const NOW = new Date("2026-10-16T12:00:00Z");
+
 const rateLimit = {
   cost: 1,
   remaining: 4990,
@@ -67,49 +69,51 @@ describe("fetchUserPreview", () => {
 });
 
 describe("fetchYear", () => {
+  const empty = { commitContributionsByRepository: [] };
+  const totals = (commits: number) => ({
+    totalCommitContributions: commits,
+    totalPullRequestContributions: 2,
+    totalPullRequestReviewContributions: 1,
+    totalIssueContributions: 3,
+    restrictedContributionsCount: 9,
+    contributionCalendar: {
+      weeks: [
+        {
+          contributionDays: [
+            { date: "2023-05-01", contributionCount: 7, weekday: 1 },
+            { date: "2023-05-02", contributionCount: 4, weekday: 2 },
+          ],
+        },
+      ],
+    },
+  });
+  const repo = (nodes: { occurredAt: string; commitCount: number }[]) => ({
+    contributions: { nodes },
+  });
   const yearBody = {
     data: {
       rateLimit,
       user: {
-        contributionsCollection: {
-          totalCommitContributions: 6,
-          totalPullRequestContributions: 2,
-          totalPullRequestReviewContributions: 1,
-          totalIssueContributions: 3,
-          restrictedContributionsCount: 9,
+        year: totals(6),
+        q1: empty,
+        q2: {
           commitContributionsByRepository: [
-            {
-              contributions: {
-                nodes: [
-                  { occurredAt: "2023-05-01T00:00:00Z", commitCount: 2 },
-                  { occurredAt: "2023-05-02T00:00:00Z", commitCount: 1 },
-                ],
-              },
-            },
-            {
-              contributions: {
-                nodes: [{ occurredAt: "2023-05-01T00:00:00Z", commitCount: 3 }],
-              },
-            },
+            repo([
+              { occurredAt: "2023-05-01T00:00:00Z", commitCount: 2 },
+              { occurredAt: "2023-05-02T00:00:00Z", commitCount: 1 },
+            ]),
+            repo([{ occurredAt: "2023-05-01T00:00:00Z", commitCount: 3 }]),
           ],
-          contributionCalendar: {
-            weeks: [
-              {
-                contributionDays: [
-                  { date: "2023-05-01", contributionCount: 7, weekday: 1 },
-                  { date: "2023-05-02", contributionCount: 4, weekday: 2 },
-                ],
-              },
-            ],
-          },
         },
+        q3: empty,
+        q4: empty,
       },
     },
   };
 
   it("sums daily commits, reconciles with the official total and keeps the calendar", async () => {
     const fetchMock = stubFetchSequence(yearBody);
-    const result = await fetchYear("t", "a", 2023);
+    const result = await fetchYear("t", "a", 2023, undefined, NOW);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.dailyCommits).toEqual([
@@ -128,7 +132,83 @@ describe("fetchYear", () => {
       login: "a",
       from: "2023-01-01T00:00:00Z",
       to: "2023-12-31T23:59:59Z",
+      q1From: "2023-01-01T00:00:00Z",
+      q1To: "2023-03-31T23:59:59Z",
+      q2From: "2023-04-01T00:00:00Z",
+      q2To: "2023-06-30T23:59:59Z",
+      q3From: "2023-07-01T00:00:00Z",
+      q3To: "2023-09-30T23:59:59Z",
+      q4From: "2023-10-01T00:00:00Z",
+      q4To: "2023-12-31T23:59:59Z",
     });
+  });
+
+  it("requests one full-year window and four quarter windows in one query", async () => {
+    const fetchMock = stubFetchSequence(yearBody);
+    await fetchYear("t", "a", 2023, undefined, NOW);
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const query = String(JSON.parse(String(init.body)).query);
+    expect(query).toContain(
+      "year: contributionsCollection(from: $from, to: $to)",
+    );
+    for (const q of ["q1", "q2", "q3", "q4"]) {
+      expect(query).toContain(
+        `${q}: contributionsCollection(from: $${q}From, to: $${q}To)`,
+      );
+    }
+    expect(query.match(/commitContributionsByRepository/g)).toHaveLength(4);
+    expect(query.match(/contributionCalendar/g)).toHaveLength(1);
+  });
+
+  it("counts a repo with 150 commit days spread over the year (beyond the 100-node cap)", async () => {
+    // 150 distinct days: 50 each in Q1..Q3. A single window would cap at 100.
+    const days = (startMonth: number, count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        occurredAt: new Date(Date.UTC(2023, startMonth, 1 + i)).toISOString(),
+        commitCount: 2,
+      }));
+    stubFetchSequence({
+      data: {
+        rateLimit,
+        user: {
+          year: totals(300),
+          q1: { commitContributionsByRepository: [repo(days(0, 50))] },
+          q2: { commitContributionsByRepository: [repo(days(3, 50))] },
+          q3: { commitContributionsByRepository: [repo(days(6, 50))] },
+          q4: empty,
+        },
+      },
+    });
+    const result = await fetchYear("t", "a", 2023, undefined, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.dailyCommits).toHaveLength(150);
+    expect(result.data.reconciliation).toEqual({
+      summed: 300,
+      official: 300,
+      difference: 0,
+      matches: true,
+    });
+  });
+
+  it("skips quarters that have not started yet in the current year", async () => {
+    const fetchMock = stubFetchSequence({
+      data: {
+        rateLimit,
+        user: { year: totals(0), q1: empty, q2: empty, q3: empty },
+      },
+    });
+    const result = await fetchYear(
+      "t",
+      "a",
+      2026,
+      undefined,
+      new Date("2026-08-01T00:00:00Z"),
+    );
+    expect(result.ok).toBe(true);
+    const vars = sentVariables(fetchMock, 0);
+    expect(vars.q3From).toBe("2026-07-01T00:00:00Z");
+    expect(vars.q4From).toBeUndefined();
   });
 });
 
