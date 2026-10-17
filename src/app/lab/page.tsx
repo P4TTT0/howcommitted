@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { isLabEnabled } from "@/features/timeline/labGate";
 import { Timeline } from "@/features/timeline/Timeline";
 
 export const metadata: Metadata = {
@@ -10,8 +11,8 @@ export const metadata: Metadata = {
 // Read per request so the check follows the deployment, not the build.
 export const dynamic = "force-dynamic";
 
-/** Playback lab: available locally and in Vercel previews, never in production. */
+/** Playback lab: available locally and in Vercel previews, closed otherwise. */
 export default function LabPage() {
-  if (process.env.VERCEL_ENV === "production") notFound();
+  if (!isLabEnabled(process.env)) notFound();
   return <Timeline />;
 }
