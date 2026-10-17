@@ -28,4 +28,8 @@ Files were trimmed, converted to mono, peak-normalized and faded out. Nothing el
 
 | Files | Original | Role |
 |-------|----------|------|
-| `chip-1`, `chip-2`, `chip-3` | `chip-lay-1`, `chip-lay-2`, `chip-lay-3` | Quiet transient under each note |
+| `chip-1`, `chip-2`, `chip-3` | `chip-lay-1`, `chip-lay-2`, `chip-lay-3` | Chips kit ticks; quiet transient in the marimba kit |
+| `payoff-thud` | `chips-collide-1` | Chips kit payoff and year accent, pitched down |
+| `payoff-rattle` | `chips-handle-5` | Chips kit payoff layer, pitched down |
+
+The bubble kit uses no samples; it is synthesized.

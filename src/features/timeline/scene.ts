@@ -3,6 +3,7 @@ import { cumulativeAt } from "@/playback/aggregate";
 import { PlaybackClock } from "@/playback/clock";
 import { semitonesForDegree } from "@/playback/pitch";
 import { SoundEngine } from "@/playback/sound/engine";
+import type { KitId } from "@/playback/sound/registry";
 import { CHART_WIDTH, topPercent } from "./chart";
 import {
   BPM,
@@ -24,6 +25,8 @@ import {
 export type Scene = {
   clock: PlaybackClock;
   setMuted(muted: boolean): void;
+  /** Swaps the sound kit on the fly; hits during the swap are skipped. */
+  setKit(kit: KitId): Promise<void>;
   dispose(): void;
 };
 
@@ -31,6 +34,7 @@ export type SceneOptions = {
   root: HTMLElement;
   plan: Plan;
   muted: boolean;
+  kit: KitId;
   reducedMotion: boolean;
 };
 
@@ -49,11 +53,14 @@ function find<T extends Element>(root: HTMLElement, selector: string): T {
 export async function createScene({
   root,
   plan,
-  muted,
+  muted: initialMuted,
+  kit,
   reducedMotion,
 }: SceneOptions): Promise<Scene> {
   const clock = new PlaybackClock({ duration: TOTAL_SECONDS, bpm: BPM });
   let engine: SoundEngine | null = null;
+  let muted = initialMuted;
+  let swap = 0;
   let timeline: gsap.core.Timeline | null = null;
 
   // Anything half-built is torn down, including Transport events, on failure.
@@ -62,7 +69,7 @@ export async function createScene({
 
     // Sound is optional: if the samples fail to load the scene still plays.
     try {
-      engine = await SoundEngine.load("marimba");
+      engine = await SoundEngine.load(kit);
       engine.setMuted(muted);
     } catch {
       engine = null;
@@ -86,8 +93,29 @@ export async function createScene({
 
   return {
     clock,
-    setMuted: (next) => engine?.setMuted(next),
+    setMuted(next) {
+      muted = next;
+      engine?.setMuted(next);
+    },
+    async setKit(next) {
+      const ticket = ++swap;
+      let loaded: SoundEngine;
+      try {
+        loaded = await SoundEngine.load(next);
+      } catch {
+        return; // keep the current kit if the new one fails to load
+      }
+      if (ticket !== swap) {
+        loaded.dispose();
+        return;
+      }
+      const previous = engine;
+      engine = loaded;
+      previous?.dispose(); // clears the global mute, so reapply it below
+      loaded.setMuted(muted);
+    },
     dispose() {
+      swap += 1; // a pending kit swap must not outlive the scene
       stopDriving();
       stopRendering();
       built.kill();
