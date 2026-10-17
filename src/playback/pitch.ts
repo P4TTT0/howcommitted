@@ -5,6 +5,7 @@
  */
 
 const PENTATONIC = [0, 2, 4, 7, 9] as const;
+const DEFAULT_MAX_DEGREE = 10;
 
 export type PitchOptions = {
   /** Highest scale degree reached; the pitch holds there. */
@@ -16,11 +17,55 @@ export type PitchOptions = {
 /** Scale degree for a run that has accumulated `accumulated` commits. */
 export function degreeForAccumulation(
   accumulated: number,
-  { maxDegree = 10, accumulationForMax = 900 }: PitchOptions = {},
+  {
+    maxDegree = DEFAULT_MAX_DEGREE,
+    accumulationForMax = 900,
+  }: PitchOptions = {},
 ): number {
   if (accumulated <= 0) return 0;
   const ratio = Math.sqrt(accumulated / accumulationForMax);
   return Math.min(maxDegree, Math.floor(ratio * maxDegree));
+}
+
+/**
+ * Like `degreeForAccumulation`, but climbing from a starting `register`
+ * (a scale degree) instead of the root. Reaches the top degree at the same
+ * accumulation, so a run that starts higher simply climbs less far.
+ */
+export function degreeInRegister(
+  accumulated: number,
+  register: number,
+  options: PitchOptions = {},
+): number {
+  const max = options.maxDegree ?? DEFAULT_MAX_DEGREE;
+  const start = Math.min(max, Math.max(0, register));
+  return (
+    start +
+    degreeForAccumulation(accumulated, { ...options, maxDegree: max - start })
+  );
+}
+
+/** Rotates the restart point so consecutive runs never repeat a contour. */
+const REGISTER_ROTATION = [0, 1, -1, 2] as const;
+/** Fraction of the previous peak a new run restarts from. */
+export const RESTART_RATIO = 0.5;
+/** Restarts stay at least this far below the top so there is room to climb. */
+const MIN_CLIMB_DEGREES = 3;
+
+/**
+ * Where a new run starts. Instead of dropping to the root (which makes every
+ * restart sound the same) it keeps part of the previous register and rotates
+ * a little by run number, so momentum carries across payoffs and gaps.
+ */
+export function restartRegister(
+  previousPeak: number,
+  run: number,
+  maxDegree = DEFAULT_MAX_DEGREE,
+): number {
+  const base =
+    Math.round(previousPeak * RESTART_RATIO) +
+    (REGISTER_ROTATION[run % REGISTER_ROTATION.length] ?? 0);
+  return Math.min(maxDegree - MIN_CLIMB_DEGREES, Math.max(0, base));
 }
 
 /** Semitones above the root for a pentatonic scale degree. */

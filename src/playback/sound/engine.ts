@@ -23,6 +23,9 @@ const PAYOFF_FILES = ["payoff-thud.ogg", "payoff-rattle.ogg"] as const;
 
 const TICK_VOICE_LIMIT = 6;
 const PAYOFF_VOICE_LIMIT = 4;
+const ACCENT_VOICE_LIMIT = 2;
+const ACCENT_SEMITONES = -5;
+const ACCENT_DB = -11;
 /** Tick pitch offset so the climb starts a little below the sample root. */
 const TICK_BASE_SEMITONES = -4;
 const TICK_BASE_DB = -9;
@@ -48,7 +51,8 @@ export class SoundEngine {
   private readonly limiter: Tone.Limiter;
   private readonly tickVoices: Tone.ToneBufferSource[] = [];
   private readonly payoffVoices: Tone.ToneBufferSource[] = [];
-  private nextTick = 0;
+  private readonly accentVoices: Tone.ToneBufferSource[] = [];
+  private lastTick = -1;
 
   private constructor(
     private readonly buffers: Tone.ToneAudioBuffers,
@@ -77,8 +81,7 @@ export class SoundEngine {
   }
 
   playTick({ time, semitones, intensity }: TickHit): void {
-    const file = TICK_FILES[this.nextTick % TICK_FILES.length] ?? TICK_FILES[0];
-    this.nextTick += 1;
+    const file = this.pickTick();
     const variation = microVariation(this.random);
     this.play(this.tickVoices, TICK_VOICE_LIMIT, file, {
       time,
@@ -108,16 +111,38 @@ export class SoundEngine {
     }
   }
 
+  /** A soft, low marker so a year change is heard, not just seen. */
+  playAccent(time: number): void {
+    this.play(this.accentVoices, ACCENT_VOICE_LIMIT, PAYOFF_FILES[0], {
+      time,
+      rate: rateForSemitones(ACCENT_SEMITONES),
+      db: ACCENT_DB,
+    });
+  }
+
   dispose(): void {
-    for (const voice of [...this.tickVoices, ...this.payoffVoices]) {
+    for (const voice of [
+      ...this.tickVoices,
+      ...this.payoffVoices,
+      ...this.accentVoices,
+    ]) {
       voice.dispose();
     }
     this.tickVoices.length = 0;
     this.payoffVoices.length = 0;
+    this.accentVoices.length = 0;
     this.limiter.dispose();
     this.buffers.dispose();
     // The destination is global; do not leave it muted for the next engine.
     Tone.getDestination().mute = false;
+  }
+
+  /** Random tick sample that never repeats the previous one. */
+  private pickTick(): string {
+    let index = Math.floor(this.random() * TICK_FILES.length);
+    if (index === this.lastTick) index = (index + 1) % TICK_FILES.length;
+    this.lastTick = index;
+    return TICK_FILES[index] ?? TICK_FILES[0];
   }
 
   private play(

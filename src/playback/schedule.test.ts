@@ -74,6 +74,19 @@ describe("buildTickSlots", () => {
     expect(slots.map((slot) => slot.runAccumulated)).toEqual([2, 5, 4]);
   });
 
+  it("carries pitch across a run restart instead of dropping to the root", () => {
+    const counts = Array.from({ length: 140 }, (_, i) =>
+      i % 7 === 0 ? 20 : 0,
+    );
+    const slots = slotsFor(counts, { resetTimes: [5] });
+    const before = slots.filter((slot) => slot.time <= 5);
+    const after = slots.filter((slot) => slot.time > 5);
+    const peak = Math.max(...before.map((slot) => slot.degree));
+    expect(peak).toBeGreaterThan(0);
+    expect(after[0]?.degree).toBeGreaterThanOrEqual(Math.floor(peak / 2) - 1);
+    expect(after[0]?.degree).toBeLessThanOrEqual(peak);
+  });
+
   it("starts a new run after a payoff time", () => {
     const counts = Array.from({ length: 42 }, (_, i) => (i % 7 === 0 ? 1 : 0));
     const slots = slotsFor(counts, { resetTimes: [4] });

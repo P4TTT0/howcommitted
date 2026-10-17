@@ -3,6 +3,7 @@ import {
   type DailyCommits,
   type WeeklyCommits,
 } from "./aggregate";
+import { degreeInRegister, restartRegister } from "./pitch";
 
 /** One audible hit: every week that lands on the same grid cell merged. */
 export type TickSlot = {
@@ -16,6 +17,8 @@ export type TickSlot = {
   run: number;
   /** Commits accumulated inside the run, including this slot. */
   runAccumulated: number;
+  /** Pentatonic scale degree to play (see pitch.ts). */
+  degree: number;
   /** 0..1 loudness hint relative to the busiest slot. */
   intensity: number;
 };
@@ -70,6 +73,8 @@ export function buildTickSlots(
   let run = 0;
   let total = 0;
   let runAccumulated = 0;
+  let register = 0;
+  let degree = 0;
   let previousWeek = Number.NEGATIVE_INFINITY;
   let previousTime = Number.NEGATIVE_INFINITY;
 
@@ -82,15 +87,19 @@ export function buildTickSlots(
     if (slots.length > 0 && (quietWeeks >= runGapWeeks || crossedReset)) {
       run += 1;
       runAccumulated = 0;
+      // Restart from the current register rather than the root.
+      register = restartRegister(degree, run);
     }
     total += count;
     runAccumulated += count;
+    degree = degreeInRegister(runAccumulated, register);
     slots.push({
       time,
       count,
       total,
       run,
       runAccumulated,
+      degree,
       intensity: Math.sqrt(count / maxCount),
     });
     previousWeek = lastWeek;
