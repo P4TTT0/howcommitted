@@ -25,4 +25,15 @@ describe("chart paths", () => {
     expect(from?.progress).toBe(to?.progress);
     expect((to?.total ?? 0) - (from?.total ?? 0)).toBe(50);
   });
+
+  it("accumulates steps that land on the same day instead of dropping one", () => {
+    const plan = buildPlan(days, [
+      { year: 2023, dayIndex: 13, amount: 50 },
+      { year: 2024, dayIndex: 13, amount: 7 },
+    ]);
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0]?.amount).toBe(57);
+    expect(plan.total).toBe(28 + 57);
+    expect(plan.cumulative.at(-1)).toBe(28 + 57);
+  });
 });

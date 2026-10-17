@@ -171,10 +171,17 @@ export function buildPlan(
   days: DailyCommits[],
   stepInputs: readonly StepInput[] = [],
 ): Plan {
-  const inputs = stepInputs.filter(
-    (input) =>
-      input.amount !== 0 && input.dayIndex >= 0 && input.dayIndex < days.length,
-  );
+  // Steps that land on the same day add up: no commit is ever dropped.
+  const merged = new Map<number, StepInput>();
+  for (const input of stepInputs) {
+    if (input.dayIndex < 0 || input.dayIndex >= days.length) continue;
+    const earlier = merged.get(input.dayIndex);
+    merged.set(input.dayIndex, {
+      ...input,
+      amount: (earlier?.amount ?? 0) + input.amount,
+    });
+  }
+  const inputs = [...merged.values()].filter((input) => input.amount !== 0);
   const stepAmounts = new Map(
     inputs.map((input) => [input.dayIndex, input.amount]),
   );
