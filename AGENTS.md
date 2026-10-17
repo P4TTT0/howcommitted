@@ -63,6 +63,19 @@ Brand **Committed**, domain **howcommitted.com**, repo `P4TTT0/howcommitted`. Al
 - Spec-driven planning only for big pieces (playback engine, GitHub data pipeline).
 - No custom subagents, MCP servers, or complex hooks.
 
+## Verification levels
+
+Match the verification to the change. CI runs the full suite on every push, so never run it twice for a small change.
+
+| Level | When | Run locally |
+|-------|------|-------------|
+| Iteration | Small UI, copy or style tweaks while iterating on a Vercel preview | `pnpm lint`, `pnpm typecheck`, and only the unit tests next to the files you touched (`pnpm vitest run <paths>`). No local build, no local e2e, no screenshots: CI and the preview cover them. |
+| Full | New features, data, quota, auth or security changes, and before marking a PR ready | `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm test:e2e` |
+
+- Update e2e specs when behavior changes, even at the Iteration level; CI runs them.
+- For small changes, start a fresh, focused agent session instead of continuing a long one: a long history is re-processed on every turn.
+- Fresh-context reviews are for Full-level changes, not for iteration tweaks.
+
 ## Links
 
 [README](README.md) · [Product](docs/product.md) · [Design](docs/design.md) · [Architecture](docs/architecture.md) · [Contributing](CONTRIBUTING.md)
