@@ -1,14 +1,14 @@
 # Committed
 
-Your commit history as an audio-visual animation, with the satisfaction of an incremental game.
+Your contribution history as an audio-visual experience, with the satisfaction of an incremental game.
 
-Committed turns a GitHub commit history into a chronological animation: every commit adds up, every streak climbs, every milestone pops. It is an experience, not a professional metrics dashboard and not a narrative. Sound is addictive and satisfying (sample-based, incremental, Balatro-like); visuals are poster-grade. Enter one GitHub username to see a solo run, or add up to five to compare rhythms in versus mode.
+Committed turns a GitHub contribution history into a chronological animation: every contribution adds up, every streak climbs, every milestone pops. It is an experience, not a professional metrics dashboard and not a narrative. Sound is addictive and satisfying (sample-based, incremental, Balatro-like); visuals are poster-grade. Enter one GitHub username to see a solo run, or add up to five to compare rhythms in versus mode.
 
 Site: howcommitted.com
 
 ## Philosophy
 
-**COMMITS != PRODUCTIVITY.** Committed shows rhythm and habits, never value. Versus is a game, not a job ranking. Full statement: [docs/product.md](docs/product.md#core-principle).
+**CONTRIBUTIONS != PRODUCTIVITY.** Committed shows rhythm and habits, never value. Versus is a game, not a job ranking. Full statement: [docs/product.md](docs/product.md#core-principle).
 
 ## Status
 
