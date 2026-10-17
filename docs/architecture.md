@@ -1,6 +1,6 @@
 # Architecture
 
-Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). Application code under `domain/`, `github/`, `playback/`, `features/` and `ui/` is not implemented yet.
+Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented; `playback/`, `features/` and the pages are not yet.
 
 ## Stack
 
@@ -24,7 +24,8 @@ src/app/              Thin Next routes only
   page.tsx            Landing
   [...users]/page.tsx /torvalds = solo, /a/b/c = versus
   [...users]/opengraph-image.tsx
-  api/                Route handlers (planned: api/history/[user]/route.ts)
+  api/user/[login]/       Exact-login preview, rate limited per IP
+  api/history/[login]/    Full profile history (cache, coalescing, quota)
 src/domain/           Pure TS types and metrics
 src/github/           Server-only GraphQL client, queries, cache
 src/playback/         One clock driving GSAP and Tone.js (sound/ inside)
@@ -88,7 +89,7 @@ Upstash Redis, with a versioned key prefix.
 |------|-----|--------|
 | User preview | 24 h | Changes rarely, cheap to refresh |
 | Past years | 30 days | The past does not change |
-| Current year | 6 h | Still changing |
+| Current year | 6 h fresh, kept 7 days | Still changing. After 6 h it is served stale and refreshed after the response (`after()`); the current year is also fetched when the cached preview does not list it. A year cached before it ended is refreshed after Jan 1, and a failed refresh pauses refreshes for 5 min |
 | Repos | 24 h | New repos are infrequent |
 | "User not found" | 1 h | Negative cache |
 
@@ -98,15 +99,22 @@ Key format (a prefix bump is a full invalidation):
 - `v1:year:{login}:{year}`
 - `v1:repos:{login}`
 
+Logins are lowercased in keys. Supporting keys: `v1:missing:{login}` (negative cache, 1 h), `v1:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v1:user:{login}`).
+
 ## Quota and rate limits
 
 - Cached profiles are free and unlimited for everyone.
-- Anonymous visitors get 2 cold (uncached) generations per day, tracked by cookie and IP with `@upstash/ratelimit`. Only after that is the GitHub sign-in prompt shown, never upfront.
+- Anonymous visitors get 2 cold generations per day. A generation is cold only when no year and no repos are cached (a cached preview does not count, so preview then history is still charged); completing partial data or refreshing a year is free. A failed generation refunds the run, except for unknown users, so probing logins is not free. Each identity is charged first and checked after, and everything is rolled back when either is over its limit, so concurrent requests cannot exceed the limit. Cold attempts are also limited per IP per minute. Only after the runs are used is the GitHub sign-in prompt shown, never upfront.
+- Identity: the signed `hc_visitor` cookie (HMAC with `QUOTA_COOKIE_SECRET`, at least 32 characters) plus the client IP. The IP comes from `x-real-ip`, then `x-vercel-forwarded-for`, then `x-forwarded-for`, validated as an IP. IPv6 clients are keyed by their /64. Requests with no usable IP count against the cookie only for cold runs and share stricter preview and cold-attempt limits. Visitors behind a shared IP (offices, CGNAT) share its daily runs. The header trust above assumes Vercel; self-hosting needs a trusted proxy that sets `x-real-ip` itself.
 - The cookie and IP quota is a soft gate (bypassable by clearing cookies or using a VPN). The global circuit breaker is the hard gate.
 - Signed-in visitors use their own token (5,000 points/hour each). Profiles they fetch populate the shared cache.
-- Global circuit breaker: when the server token's remaining points drop below 20%, anonymous cold generations stop (cache only, plus the sign-in prompt).
-- Request coalescing: a Redis lock ensures simultaneous requests for the same uncached profile trigger one fetch.
-- Per-IP rate limit on preview lookups.
+- Global circuit breaker: when the server token's remaining points drop below 20%, anonymous cold generations and uncached previews stop (cache only, plus the sign-in prompt).
+- The breaker reads `rateLimit { cost remaining limit resetAt }` from every GitHub response, keeps the lowest value reported per window, and opens at once on a rate limit error (reset time from GitHub, or 60 s). It closes again once the reported window resets. Open and close transitions are logged.
+- Request coalescing: a Redis lock ensures simultaneous requests for the same uncached profile trigger one fetch. Other requests poll the lock with 0.5 to 2 s jittered backoff, then read the cache (or the leader's failure, kept for 30 s so nobody retries a failing upstream). One 50 s deadline covers waiting and fetching; past it, or with under 5 s left when a waiter wins the lock, they answer `degraded` (503). `maxDuration` of the history route is 60 s.
+- A cold generation stops launching years and aborts in-flight requests on the first rate limit or timeout. Years that already landed stay cached, so a retry only pays for the rest.
+- Per-IP rate limit on preview lookups (30 per minute).
+- Results are typed and never thrown to the route: `login_required` (401), `degraded` (503, reasons `circuit_open`, `busy`, `store_down`), `rate_limited` (429), `timeout` (504), `upstream_error` (502), `not_found` (404). Redis failures fail closed for cold generations (`store_down`); cache read errors count as misses and cache write errors never lose a good result.
+- The history response also carries `reposTruncated` when the owner has more repositories than the 10 pages we read. Each generation logs one JSON line (status, source, years, ms, remaining, cost).
 - When degraded, show a playful message (for example "GitHub needs a breather"). Nothing breaks.
 - Never pool tokens from multiple accounts; it violates GitHub terms.
 

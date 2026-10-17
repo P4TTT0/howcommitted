@@ -13,6 +13,8 @@ import {
   fetchYear,
   type ReposResult,
 } from "./queries";
+import type { ColdCharge } from "./quota";
+import type { Visitor } from "./visitor";
 
 /** Parallel year requests. Keeps us well under GitHub's secondary limits. */
 export const YEAR_CONCURRENCY = 6;
@@ -25,7 +27,10 @@ export const WAIT_MIN_MS = 500;
 export const WAIT_MAX_MS = 2_000;
 const WAIT_BASE_MS = 1_000;
 
-export type PreviewResult = { status: "ok"; user: UserProfile } | Failure;
+export type PreviewResult =
+  | { status: "ok"; user: UserProfile }
+  | Failure
+  | { status: "degraded"; reason: "circuit_open" | "store_down" };
 
 export type ProfileResult =
   | {
@@ -36,6 +41,7 @@ export type ProfileResult =
       reposTruncated: boolean;
     }
   | Failure
+  | { status: "login_required"; reason: "quota_exhausted" }
   | {
       status: "degraded";
       reason: "circuit_open" | "busy" | "store_down";
@@ -47,6 +53,11 @@ export type ProfileDeps = {
   cache: Cache;
   breaker: Breaker;
   lock: Lock;
+  /**
+   * Charges one anonymous cold generation. Resolves null when the visitor has
+   * no free runs left.
+   */
+  chargeColdGeneration: (visitor: Visitor) => Promise<ColdCharge | null>;
   /**
    * Runs a task after the response is sent (for example Next.js `after`). Used
    * to refresh a stale current year. Without it, stale data is served as is.
@@ -173,21 +184,33 @@ export async function getPreview(
   login: string,
   deps: ProfileDeps,
 ): Promise<PreviewResult> {
-  return loadUser(login, createContext(deps), newTally());
-}
-
-async function loadUser(
-  login: string,
-  ctx: Context,
-  tally: Tally,
-): Promise<PreviewResult> {
-  const { cache } = ctx.deps;
+  const ctx = createContext(deps);
+  const { cache, breaker } = deps;
   if (await orElse("isMissing", () => cache.isMissing(login), false)) {
     return { status: "not_found" };
   }
   const cached = await orElse("getUser", () => cache.getUser(login), null);
   if (cached) return { status: "ok", user: cached };
 
+  // A cache miss costs a GitHub point: stop spending when the budget is low.
+  try {
+    if (await mustSucceed(() => breaker.isOpen(ctx.now()))) {
+      return { status: "degraded", reason: "circuit_open" };
+    }
+  } catch (error) {
+    if (!(error instanceof StoreDownError)) throw error;
+    return { status: "degraded", reason: "store_down" };
+  }
+  return fetchUser(login, ctx, newTally());
+}
+
+/** Fetches the preview from GitHub and caches it. */
+async function fetchUser(
+  login: string,
+  ctx: Context,
+  tally: Tally,
+): Promise<{ status: "ok"; user: UserProfile } | Failure> {
+  const { cache } = ctx.deps;
   const result = await fetchAndRecord(ctx, tally, () =>
     fetchUserPreview(ctx.deps.getToken(), login, ctx.signal),
   );
@@ -281,6 +304,7 @@ async function lookup(login: string, ctx: Context): Promise<Lookup> {
  */
 export async function getProfile(
   login: string,
+  visitor: Visitor,
   deps: ProfileDeps,
 ): Promise<ProfileResult> {
   const ctx = createContext(deps);
@@ -306,7 +330,7 @@ export async function getProfile(
         ) {
           return { status: "degraded", reason: "busy" };
         }
-        return await generate(login, ctx);
+        return await generate(login, visitor, ctx);
       } finally {
         // A failed release must never replace a good result; the lock TTL heals it.
         await orElse("unlock", release, undefined);
@@ -324,12 +348,16 @@ function waitDelay(attempt: number, random: () => number): number {
   return WAIT_MIN_MS + random() * (ceiling - WAIT_MIN_MS);
 }
 
-async function generate(login: string, ctx: Context): Promise<ProfileResult> {
+async function generate(
+  login: string,
+  visitor: Visitor,
+  ctx: Context,
+): Promise<ProfileResult> {
   const startedAt = ctx.now().getTime();
   const tally = newTally();
   let result: ProfileResult;
   try {
-    result = await generateCold(login, ctx, tally);
+    result = await generateCold(login, visitor, ctx, tally);
   } catch (error) {
     if (!(error instanceof StoreDownError)) throw error;
     logEvent("store_error", { op: "gate", message: error.message });
@@ -349,6 +377,7 @@ async function generate(login: string, ctx: Context): Promise<ProfileResult> {
 
 async function generateCold(
   login: string,
+  visitor: Visitor,
   ctx: Context,
   tally: Tally,
 ): Promise<ProfileResult> {
@@ -370,11 +399,36 @@ async function generateCold(
     return { status: "degraded", reason: "circuit_open" };
   }
 
-  const outcome = await fetchMissing(login, ctx, tally, snapshot);
+  // Only a profile with no history cached at all is a new cold generation.
+  // The preview route caches the user for free, so the user does not count.
+  // Completing partial data or refreshing a year is free for the visitor.
+  const charge = hasHistoryCached(snapshot)
+    ? null
+    : await mustSucceed(() => ctx.deps.chargeColdGeneration(visitor));
+  if (!hasHistoryCached(snapshot) && !charge) {
+    return { status: "login_required", reason: "quota_exhausted" };
+  }
+
+  const refund = () =>
+    charge
+      ? orElse("refund", () => charge.refund(), undefined)
+      : Promise.resolve();
+
+  let outcome: Fetched;
+  try {
+    outcome = await fetchMissing(login, ctx, tally, snapshot);
+  } catch (error) {
+    // For example a missing GitHub token: the visitor must not lose a run.
+    await refund();
+    throw error;
+  }
   if ("failure" in outcome) {
     const { failure } = outcome;
-    // Unknown users already have the longer negative cache.
+    // A failed generation hands the run back, except for unknown users:
+    // refunding those would make probing logins free.
+    // Unknown users already have the longer negative cache instead of a marker.
     if (failure.status !== "not_found") {
+      await refund();
       await orElse(
         "setFailure",
         () => cache.setFailure(login, failure),
@@ -388,6 +442,10 @@ async function generateCold(
 
 type Fetched = Complete | { failure: Failure };
 
+function hasHistoryCached(snapshot: Snapshot): boolean {
+  return snapshot.years.size > 0 || snapshot.repos !== null;
+}
+
 async function fetchMissing(
   login: string,
   ctx: Context,
@@ -396,7 +454,7 @@ async function fetchMissing(
 ): Promise<Fetched> {
   let user = snapshot.user;
   if (!user) {
-    const preview = await loadUser(login, ctx, tally);
+    const preview = await fetchUser(login, ctx, tally);
     if (preview.status !== "ok") return { failure: preview };
     user = preview.user;
   }
