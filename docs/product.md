@@ -20,7 +20,7 @@ CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 
 1. **Landing.** The question "How committed is @[username]?" with the input inside the sentence. Exact-username lookup with a clickable avatar preview row, debounced (see [design.md](design.md#landing)).
 2. **Add developers.** A "+ vs" control adds more search columns, up to 5 developers. One developer is solo; two or more is versus. There is no mode toggle.
-3. **Start.** A "Listen" button (or the preview row). On a direct visit to `/{login}` the start button is the big "How Committed?". The click is the user gesture that also unlocks audio, then it navigates to `/{login}`.
+3. **Start.** A "Play" button (or the preview row). On a direct visit to `/{login}` the start button is the big "Play". The click is the user gesture that also unlocks audio, then it navigates to `/{login}`.
 4. **Fetch on intent, not on preview.** The preview lookup is the only request while typing. The history is fetched on that click (or on the start button of a direct visit to `/{login}`), never before, to protect the anonymous quota of 2 cold generations a day. Loading is a designed moment, not a spinner.
 5. **Scenes.** The animation plays through the scenes below.
 6. **Final poster.** Actions: Share, Challenge someone (adds a user and goes to versus), Replay.

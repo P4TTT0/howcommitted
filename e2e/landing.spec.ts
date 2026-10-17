@@ -55,11 +55,11 @@ test("the whole preview row starts the experience", async ({ page }) => {
   await expect(page).toHaveURL(/\/ada$/);
 });
 
-test("Listen has a pointer, and Enter starts when a user is found", async ({
+test("Play has a pointer, and Enter starts when a user is found", async ({
   page,
 }) => {
   await page.goto("/");
-  const listen = page.getByRole("button", { name: "Listen", exact: true });
+  const listen = page.getByRole("button", { name: /^Play( @\w+)?$/ });
   await expect(listen).toHaveAttribute("aria-disabled", "true");
 
   const input = page.getByLabel("GitHub username");
@@ -125,11 +125,11 @@ test("the layout holds on a portrait phone", async ({ page }) => {
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test("the disabled Listen stays legible: no opacity, dashed, same size", async ({
+test("the disabled Play stays legible: no opacity, dashed, same size", async ({
   page,
 }) => {
   await page.goto("/");
-  const listen = page.getByRole("button", { name: "Listen", exact: true });
+  const listen = page.getByRole("button", { name: /^Play( @\w+)?$/ });
   await expect(listen).toHaveAttribute("aria-disabled", "true");
   await expect(listen).toHaveCSS("opacity", "1");
   await expect(listen).toHaveCSS("border-top-style", "dashed");

@@ -208,8 +208,9 @@ export function Search() {
           tone="ink"
           size="cta"
           aria-disabled={!found || starting}
+          aria-label={found ? `Play @${found.login}` : undefined}
         >
-          Listen
+          Play
         </StartButton>
         <p className="max-w-[48ch] font-mono text-[15px] leading-relaxed">
           Type a GitHub username. Their contribution history plays as sound and

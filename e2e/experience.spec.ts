@@ -62,9 +62,10 @@ async function mockApi(
 }
 
 const startButton = (page: Page) =>
-  page.getByRole("button", { name: "How Committed?" });
+  page.getByRole("button", { name: "Play", exact: true });
+/** The landing call to action: "Play", or "Play @login" once a user is found. */
 const listenButton = (page: Page) =>
-  page.getByRole("button", { name: "Listen", exact: true });
+  page.getByRole("button", { name: /^Play( @\w+)?$/ });
 
 test("search shows a preview, then the click opens the experience", async ({
   page,

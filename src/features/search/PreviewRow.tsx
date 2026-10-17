@@ -7,7 +7,7 @@ type PreviewRowProps = {
   onStart: () => void;
 };
 
-/** The found user as one compact row; pressing it starts, like "Listen". */
+/** The found user as one compact row; pressing it starts, like "Play". */
 export function PreviewRow({ user, disabled, onStart }: PreviewRowProps) {
   return (
     <button
