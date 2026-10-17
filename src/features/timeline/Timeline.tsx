@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ClockStatus } from "@/playback/clock";
 import { CHART_HEIGHT, CHART_WIDTH, linePath } from "./chart";
-import { generateFakeProfile } from "./fakeProfile";
 import {
   blockForYearIndex,
-  buildPlan,
   displayedYearIndex,
+  type Plan,
   yearReveals,
 } from "./plan";
 import { createScene, formatCount, type Scene } from "./scene";
@@ -17,8 +16,31 @@ type Phase = "start" | "loading" | "running";
 const controlClass =
   "min-h-11 min-w-11 border-2 border-ink px-2 py-2 sm:px-3 font-mono text-xs uppercase focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 aria-pressed:bg-ink aria-pressed:text-paper";
 
-export function Timeline() {
-  const plan = useMemo(() => buildPlan(generateFakeProfile()), []);
+export type TimelineProps = {
+  plan: Plan;
+  /** Shown under the start button. */
+  caption: string;
+  /** Start as soon as mounted. Only valid after a user gesture unlocked audio. */
+  autoStart?: boolean;
+  /** Shown in place of the start button while an auto start is loading. */
+  starting?: ReactNode;
+  /** Small honest note shown under the chart. */
+  note?: string | null;
+  /** Content for the end state; shown over the chart when playback ends. */
+  renderEnd?: (actions: { replay(): void }) => ReactNode;
+};
+
+/** At most this many year labels fit on the axis of a phone. */
+const MAX_YEAR_LABELS = 8;
+
+export function Timeline({
+  plan,
+  caption,
+  autoStart = false,
+  starting,
+  note,
+  renderEnd,
+}: TimelineProps) {
   const path = useMemo(() => linePath(plan), [plan]);
   const rootRef = useRef<HTMLElement>(null);
   const sceneRef = useRef<Scene | null>(null);
@@ -27,6 +49,7 @@ export function Timeline() {
   const [status, setStatus] = useState<ClockStatus>("idle");
   const [muted, setMuted] = useState(false);
   const [failed, setFailed] = useState(false);
+  const autoStartedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -36,6 +59,13 @@ export function Timeline() {
       sceneRef.current = null;
     };
   }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: begin runs once, on mount
+  useEffect(() => {
+    if (!autoStart || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    void begin();
+  }, [autoStart]);
 
   async function begin() {
     const root = rootRef.current;
@@ -77,6 +107,7 @@ export function Timeline() {
   const reveals = useMemo(() => yearReveals(plan), [plan]);
   const firstYear = plan.years[0]?.year ?? 0;
   const lastYear = plan.years.at(-1)?.year ?? firstYear;
+  const labelEvery = Math.ceil(plan.years.length / MAX_YEAR_LABELS);
   const chartLabel = `Cumulative commits from ${firstYear} to ${lastYear}, ${formatCount(plan.total)} in total`;
 
   return (
@@ -163,16 +194,24 @@ export function Timeline() {
             ))}
           </div>
           <div className="relative h-5 font-mono text-[10px]">
-            {plan.years.map((span) => (
-              <span
-                key={span.year}
-                className="absolute top-1"
-                style={{ left: `${span.startProgress * 100}%` }}
-              >
-                {span.year}
-              </span>
-            ))}
+            {plan.years.map((span, index) =>
+              index % labelEvery === 0 ? (
+                <span
+                  key={span.year}
+                  className="absolute top-1"
+                  style={{ left: `${span.startProgress * 100}%` }}
+                >
+                  {span.year}
+                </span>
+              ) : null,
+            )}
           </div>
+          {note && <p className="font-mono text-[10px] leading-4">{note}</p>}
+          {status === "ended" && renderEnd && (
+            <div className="absolute inset-0 z-40 overflow-y-auto bg-paper">
+              {renderEnd({ replay: () => clock?.restart() })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -212,19 +251,23 @@ export function Timeline() {
 
       {phase !== "running" && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-paper p-4 pb-20">
-          <button
-            type="button"
-            onClick={begin}
-            disabled={phase === "loading"}
-            className="bg-block-ultramarine px-[0.4em] py-[0.25em] text-center font-display text-[min(18vw,24dvh)] font-black uppercase leading-[0.85] text-paper focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-ink"
-          >
-            How Committed?
-          </button>
-          <p className="max-w-prose text-center font-mono text-xs">
-            {phase === "loading"
-              ? "Loading sound"
-              : `Lab. Generated profile, ${plan.years.length} years of commits. Turn sound on.`}
-          </p>
+          {autoStart && !failed ? (
+            starting
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={begin}
+                disabled={phase === "loading"}
+                className="bg-block-ultramarine px-[0.4em] py-[0.25em] text-center font-display text-[min(18vw,24dvh)] font-black uppercase leading-[0.85] text-paper focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-ink"
+              >
+                How Committed?
+              </button>
+              <p className="max-w-prose text-center font-mono text-xs">
+                {phase === "loading" ? "Loading sound" : caption}
+              </p>
+            </>
+          )}
           {failed && (
             <p role="alert" className="font-mono text-xs">
               Playback could not start. Try again.

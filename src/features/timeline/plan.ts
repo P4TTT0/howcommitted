@@ -26,6 +26,28 @@ export const GRID_SECONDS = 60 / BPM / 4;
 export const MILESTONE_STEP = 1000;
 /** ...except the first, which comes early so the payoff lands sooner. */
 export const MILESTONE_FIRST = 500;
+/** Step payoffs are capped so floods never crowd the drawing window. */
+export const MAX_STEP_MILESTONES = 12;
+
+/**
+ * Payoff spacing for a history of `total` commits: every 1,000 (the first at
+ * 500), widened through 2,000, 5,000, 10,000... for very large histories so
+ * the number of floods stays bounded.
+ */
+export function milestoneSchedule(total: number): {
+  step: number;
+  first: number;
+} {
+  if (total / MILESTONE_STEP <= MAX_STEP_MILESTONES) {
+    return { step: MILESTONE_STEP, first: MILESTONE_FIRST };
+  }
+  for (let magnitude = MILESTONE_STEP; ; magnitude *= 10) {
+    for (const factor of [2, 5, 10]) {
+      const step = magnitude * factor;
+      if (total / step <= MAX_STEP_MILESTONES) return { step, first: step / 2 };
+    }
+  }
+}
 
 /** Quiet weeks in a row that end a run; holidays should not. */
 export const RUN_GAP_WEEKS = 6;
@@ -72,11 +94,13 @@ export function blockForYearIndex(index: number) {
 /** Everything the scene needs, derived once from the daily history. */
 export function buildPlan(days: DailyCommits[]): Plan {
   const cumulative = cumulativeByDay(days);
+  const total = cumulative[cumulative.length - 1] ?? 0;
+  const schedule = milestoneSchedule(total);
   const milestones = findMilestones(days, {
     duration: DRAW_SECONDS,
     grid: GRID_SECONDS,
-    step: MILESTONE_STEP,
-    first: MILESTONE_FIRST,
+    step: schedule.step,
+    first: schedule.first,
     minGapToFinal: 1.5,
   });
   const slots = buildTickSlots(aggregateWeekly(days), weekSpan(days), {
@@ -93,13 +117,12 @@ export function buildPlan(days: DailyCommits[]): Plan {
       total: cumulative[day - 1] ?? 0,
     });
   }
-  const last = cumulative[cumulative.length - 1] ?? 0;
-  if (days.length % 7 !== 0) linePoints.push({ progress: 1, total: last });
+  if (days.length % 7 !== 0) linePoints.push({ progress: 1, total });
 
   return {
     days,
     cumulative,
-    total: last,
+    total,
     years: yearSpans(days),
     slots,
     milestones,
