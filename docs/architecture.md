@@ -1,6 +1,6 @@
 # Architecture
 
-Nothing here is implemented yet.
+Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). Application code under `domain/`, `github/`, `playback/`, `features/` and `ui/` is not implemented yet.
 
 ## Stack
 
@@ -32,9 +32,9 @@ src/features/         timeline, stats, versus
 src/ui/               Shared presentational components
 public/sounds/        .ogg with .mp3 fallback
 e2e/                  Playwright
-.github/              workflows/ci.yml, ISSUE_TEMPLATE, pull_request_template.md (planned)
-.env.example          Required env vars (planned)
-biome.json            Lint and format config (planned)
+.github/              workflows/ci.yml, pull_request_template.md, ISSUE_TEMPLATE (planned)
+.env.example          Required env vars
+biome.json            Lint and format config
 LICENSE               MIT
 ```
 

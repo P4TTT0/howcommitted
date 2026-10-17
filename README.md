@@ -12,11 +12,22 @@ Site: howcommitted.com
 
 ## Status
 
-Design phase. There is no code yet; the repository currently contains only documentation.
+Scaffolded. The app builds with design tokens, fonts and CI in place; there are no features yet.
 
 ## Stack
 
 Next.js (App Router) and TypeScript on Vercel, Upstash Redis cache, d3-scale/d3-shape for math, SVG/Canvas, GSAP for animation, Tone.js for audio, Tailwind CSS v4, pnpm, Biome, Vitest, Playwright. Rationale in [docs/architecture.md](docs/architecture.md).
+
+## Development
+
+Requires Node 22 (see `.nvmrc`) and pnpm.
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Other commands are listed in [AGENTS.md](AGENTS.md#commands). Copy `.env.example` to `.env.local` for the GitHub and Upstash variables.
 
 ## Documentation
 

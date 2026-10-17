@@ -8,7 +8,19 @@ COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value. Canonic
 
 ## Project state
 
-Design phase. No code exists yet. Do not scaffold beyond what a task asks for.
+Scaffolded: tooling, design tokens and CI exist; no features yet. Do not scaffold beyond what a task asks for.
+
+## Commands
+
+```bash
+pnpm install       # install dependencies
+pnpm dev           # start the dev server
+pnpm lint          # Biome check
+pnpm format        # Biome check with fixes
+pnpm typecheck     # tsc --noEmit
+pnpm test          # Vitest
+pnpm test:e2e      # Playwright (builds and starts the app)
+```
 
 ## Structure rules
 
