@@ -29,6 +29,29 @@ export function cookieSecret(): string {
   return secret;
 }
 
+/**
+ * Encrypts the sign-in session and OAuth state cookies (AES-256-GCM key is
+ * derived from it). Separate from the visitor cookie secret on purpose.
+ */
+export function authCookieSecret(): string {
+  const secret = required("AUTH_COOKIE_SECRET");
+  if (secret.length < MIN_COOKIE_SECRET_LENGTH) {
+    throw new ConfigError(
+      "AUTH_COOKIE_SECRET",
+      `must be at least ${MIN_COOKIE_SECRET_LENGTH} characters`,
+    );
+  }
+  return secret;
+}
+
+/** The "Sign in with GitHub" OAuth app. It requests no scopes: public data only. */
+export function githubOAuthApp(): { clientId: string; clientSecret: string } {
+  return {
+    clientId: required("GITHUB_OAUTH_CLIENT_ID"),
+    clientSecret: required("GITHUB_OAUTH_CLIENT_SECRET"),
+  };
+}
+
 export function githubToken(): string {
   return required("GITHUB_TOKEN");
 }
