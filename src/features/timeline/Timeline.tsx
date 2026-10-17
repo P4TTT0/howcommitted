@@ -2,6 +2,8 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ClockStatus } from "@/playback/clock";
+import { ScreenMain } from "@/ui/ScreenMain";
+import { Controls } from "./Controls";
 import { CHART_HEIGHT, CHART_WIDTH, linePath } from "./chart";
 import {
   blockForYearIndex,
@@ -9,12 +11,8 @@ import {
   type Plan,
   yearReveals,
 } from "./plan";
+import { StartGate, type StartPhase } from "./StartGate";
 import { createScene, formatCount, type Scene } from "./scene";
-
-type Phase = "start" | "loading" | "running";
-
-const controlClass =
-  "min-h-11 min-w-11 border-2 border-ink px-2 py-2 sm:px-3 font-mono text-xs uppercase focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 aria-pressed:bg-ink aria-pressed:text-paper";
 
 export type TimelineProps = {
   plan: Plan;
@@ -48,7 +46,7 @@ export function Timeline({
   const rootRef = useRef<HTMLElement>(null);
   const sceneRef = useRef<Scene | null>(null);
   const mountedRef = useRef(true);
-  const [phase, setPhase] = useState<Phase>("start");
+  const [phase, setPhase] = useState<StartPhase>("start");
   const [status, setStatus] = useState<ClockStatus>("idle");
   const [muted, setMuted] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -114,11 +112,12 @@ export function Timeline({
   const chartLabel = `Cumulative commits from ${firstYear} to ${lastYear}, ${formatCount(plan.total)} in total`;
 
   return (
-    <main
-      ref={rootRef}
-      className="relative h-dvh w-full overflow-hidden bg-paper text-ink"
-    >
-      {title && <h1 className="sr-only">{title}</h1>}
+    <ScreenMain ref={rootRef}>
+      {title && (
+        <h1 className="sr-only" tabIndex={-1}>
+          {title}
+        </h1>
+      )}
       <div className="absolute inset-0">
         <section
           data-role="block"
@@ -197,7 +196,7 @@ export function Timeline({
               />
             ))}
           </div>
-          <div className="relative h-5 font-mono text-[10px]">
+          <div className="relative h-5 font-mono text-xs">
             {plan.years.map((span, index) =>
               index % labelEvery === 0 ? (
                 <span
@@ -210,7 +209,7 @@ export function Timeline({
               ) : null,
             )}
           </div>
-          {note && <p className="font-mono text-[10px] leading-4">{note}</p>}
+          {note && <p className="font-mono text-xs leading-4">{note}</p>}
           {status === "ended" && renderEnd && (
             <div className="absolute inset-0 z-40 overflow-y-auto bg-paper">
               {renderEnd({ replay: () => clock?.restart() })}
@@ -254,68 +253,22 @@ export function Timeline({
       </p>
 
       {phase !== "running" && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-paper p-4 pb-20">
-          {autoStart && !failed ? (
-            starting
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={begin}
-                disabled={phase === "loading"}
-                className="bg-block-ultramarine px-[0.4em] py-[0.25em] text-center font-display text-[min(18vw,24dvh)] font-black uppercase leading-[0.85] text-paper focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-ink"
-              >
-                How Committed?
-              </button>
-              <p className="max-w-prose text-center font-mono text-xs">
-                {phase === "loading" ? "Loading sound" : caption}
-              </p>
-            </>
-          )}
-          {failed && (
-            <p role="alert" className="font-mono text-xs">
-              Playback could not start. Try again.
-            </p>
-          )}
-        </div>
+        <StartGate
+          phase={phase}
+          autoStart={autoStart}
+          failed={failed}
+          starting={starting}
+          caption={caption}
+          onBegin={begin}
+        />
       )}
 
-      <div className="absolute inset-x-0 bottom-0 z-50 flex h-14 items-center gap-2 border-t-2 border-ink bg-paper px-3 sm:px-4">
-        <button
-          type="button"
-          className={controlClass}
-          disabled={status !== "playing" && status !== "paused"}
-          onClick={() =>
-            status === "playing" ? clock?.pause() : clock?.resume()
-          }
-        >
-          {status === "paused" ? "Resume" : "Pause"}
-        </button>
-        <button
-          type="button"
-          className={controlClass}
-          disabled={status !== "playing" && status !== "paused"}
-          onClick={() => clock?.skip()}
-        >
-          Skip
-        </button>
-        <button
-          type="button"
-          className={controlClass}
-          disabled={status === "idle"}
-          onClick={() => clock?.restart()}
-        >
-          Replay
-        </button>
-        <button
-          type="button"
-          className={`${controlClass} ml-auto`}
-          aria-pressed={muted}
-          onClick={toggleMute}
-        >
-          Mute
-        </button>
-      </div>
-    </main>
+      <Controls
+        status={status}
+        muted={muted}
+        clock={clock}
+        onToggleMute={toggleMute}
+      />
+    </ScreenMain>
   );
 }

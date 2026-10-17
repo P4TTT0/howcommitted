@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { makeHistory, makeYear, steadyDays } from "./historyFixture";
+import {
+  makeHistory,
+  makeYear,
+  steadyDays,
+} from "@/test-support/historyFixture";
 import {
   distribute,
   incompleteDetailNote,
@@ -36,10 +40,19 @@ describe("milestoneSchedule", () => {
     expect(milestoneSchedule(8_000)).toEqual({ step: 1000, first: 500 });
   });
 
+  it("handles an empty history", () => {
+    expect(milestoneSchedule(0)).toEqual({ step: 1000, first: 500 });
+  });
+
+  it("switches exactly above 12 step milestones", () => {
+    expect(milestoneSchedule(12_000)).toEqual({ step: 1000, first: 500 });
+    expect(milestoneSchedule(12_001)).toEqual({ step: 2000, first: 1000 });
+  });
+
   it("widens the step so large profiles stay bounded", () => {
-    const { step } = milestoneSchedule(30_000);
-    expect(step).toBeGreaterThan(1000);
-    expect(30_000 / step).toBeLessThanOrEqual(MAX_STEP_MILESTONES);
+    expect(milestoneSchedule(30_000)).toEqual({ step: 5000, first: 2500 });
+    const { step } = milestoneSchedule(250_000);
+    expect(250_000 / step).toBeLessThanOrEqual(MAX_STEP_MILESTONES);
   });
 });
 
@@ -120,6 +133,8 @@ describe("planFromHistory", () => {
     const noYears = planFromHistory(makeHistory("ghost", []), TODAY);
     expect(noYears.plan.total).toBe(0);
     expect(noYears.plan.days).toEqual([]);
+    expect(noYears.firstYear).toBeNull();
+    expect(noYears.lastYear).toBeNull();
   });
 
   it("includes quiet years between active ones", () => {

@@ -9,8 +9,9 @@ export type HistoryPlan = {
   plan: Plan;
   /** Official yearly commit totals, oldest first. */
   yearBlocks: YearBlock[];
-  firstYear: number;
-  lastYear: number;
+  /** Null when the history has no years at all. */
+  firstYear: number | null;
+  lastYear: number | null;
   /** Years whose daily detail does not add up to the official total. */
   incompleteYears: number[];
   /** Honest note about incomplete daily detail, or null. */
@@ -80,8 +81,8 @@ export function planFromHistory(
     return {
       plan: buildPlan([]),
       yearBlocks,
-      firstYear: 0,
-      lastYear: 0,
+      firstYear: null,
+      lastYear: null,
       incompleteYears: [],
       note: null,
     };
