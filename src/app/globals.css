@@ -29,6 +29,20 @@ body {
   font-family: var(--font-mono);
 }
 
+@layer base {
+  /* Anything you can press looks pressable. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
 /* Loading moment: the first block wipes in, the baseline starts to draw. */
 @keyframes wipe-in {
   from {
