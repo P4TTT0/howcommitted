@@ -65,7 +65,7 @@ const startButton = (page: Page) =>
   page.getByRole("button", { name: "Play", exact: true });
 /** The landing call to action: "Play", or "Play @login" once a user is found. */
 const listenButton = (page: Page) =>
-  page.getByRole("button", { name: /^Play( @\w+)?$/ });
+  page.getByRole("button", { name: /^Play( @\w+)?$/ }).first();
 
 test("search shows a preview, then the click opens the experience", async ({
   page,

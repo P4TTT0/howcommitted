@@ -15,7 +15,9 @@ The landing is the question, "How committed is @[username]?", set as a Signal ye
 - "Play" (with a small play triangle) is the one call to action, with a one-line description beside it. It is the only filled element when active, so it reads as the thing to press. Disabled (no user yet) it is transparent with a dashed ink border: same size, full contrast, no opacity.
 - Signature: top-right "Made by @P4TTT0", GitHub and LinkedIn links, and a cumulative line that draws itself once along the bottom (static under reduced motion).
 - Every button and link has a pointer, a hover (flip to Ultramarine or Ink), a pressed state and the shared focus ring, from `src/ui/classes.ts`.
-- Room is kept under the sentence for the versus row, which arrives with the versus stage.
+- Two layouts. On landscape screens at least 1024px wide, the landing is two columns: the question, "Play" and the description on the left, and the found developer on the right as a large card (square avatar, name in Big Shoulders, `@login` and active years in Martian Mono). The whole card is a button that starts like "Play", and it wipes in from the left. The right column is the home of the player(s): the versus rivals will join it. It stays empty until someone is found. On phones, portrait tablets and short landscape screens the layout stays stacked, with the compact preview row under the question.
+- The landing never scrolls, at any size: type is sized from width and height, and the bottom line gives way first.
+- The versus rivals row is not built yet; it will join the right column (`PlayerColumn`) with the versus stage.
 
 ## Typography
 

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant wide (@media (min-width: 1024px) and (orientation: landscape));
+
 @theme {
   --color-paper: #f3f1ec;
   --color-ink: #141414;
@@ -99,5 +101,12 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .signature-line {
     animation: none;
+  }
+}
+
+/* The found developer's card wipes in from the left, like the year blocks. */
+@media (prefers-reduced-motion: no-preference) {
+  .player-wipe {
+    animation: wipe-in 0.3s cubic-bezier(0.23, 1, 0.32, 1) both;
   }
 }

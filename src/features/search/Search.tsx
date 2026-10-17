@@ -20,8 +20,11 @@ import {
   lookupLogin,
   lookupMessage,
 } from "./lookup";
+import { PlayerCard } from "./PlayerCard";
+import { PlayerColumn } from "./PlayerColumn";
 import { PreviewRow } from "./PreviewRow";
 import { useTypingPlaceholder } from "./useTypingPlaceholder";
+import { useWideLayout } from "./useWideLayout";
 
 const NUDGE = "Type a GitHub username first.";
 
@@ -45,6 +48,7 @@ export function Search() {
   const { text: placeholder, example } = useTypingPlaceholder(
     value === "" && !focused,
   );
+  const wide = useWideLayout();
   const sizerRef = useRef<HTMLSpanElement>(null);
   const [fieldWidth, setFieldWidth] = useState<number | null>(null);
 
@@ -128,99 +132,113 @@ export function Search() {
     <form
       onSubmit={onSubmit}
       noValidate
-      className="flex flex-col gap-[clamp(10px,3dvh,28px)]"
+      className="flex flex-col wide:flex-row wide:items-center wide:justify-between wide:gap-[4vw]"
     >
-      <div className="font-display text-[clamp(40px,min(12vw,16dvh),200px)] font-black uppercase leading-[0.86] max-sm:text-[max(24px,min(15.5vw,9dvh))]">
-        <label id="ask-how" htmlFor="login" className="block whitespace-nowrap">
-          <span className="max-sm:block">How</span>{" "}
-          <span className="max-sm:block">committed</span>
-        </label>
-        <span id="ask-rest" className="sr-only">
-          is GitHub username
-        </span>
-        <span className="flex max-w-full items-baseline max-sm:text-[0.55em]">
-          <span aria-hidden="true">is&nbsp;@</span>
-          <span
-            style={fieldWidth === null ? undefined : { width: fieldWidth }}
-            className="inline-grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] items-baseline motion-safe:transition-[width] motion-safe:duration-250 motion-safe:ease-out"
+      <div className="flex min-w-0 flex-col gap-[clamp(10px,3dvh,28px)]">
+        <div className="font-display text-[clamp(40px,min(12vw,16dvh),200px)] wide:text-[clamp(40px,min(7.5vw,16dvh),200px)] font-black uppercase leading-[0.86] max-sm:text-[max(24px,min(15.5vw,9dvh))]">
+          <label
+            id="ask-how"
+            htmlFor="login"
+            className="block whitespace-nowrap"
           >
-            {/* Sizer: the field is as wide as what it shows, like part of the sentence. */}
-            <span
-              ref={sizerRef}
-              aria-hidden="true"
-              className="invisible w-max col-start-1 row-start-1 whitespace-pre pr-[0.04em]"
-            >
-              {sizer}
-            </span>
-            <input
-              id="login"
-              name="login"
-              type="text"
-              value={value}
-              onChange={(event) => {
-                setValue(event.target.value);
-                setNudge(false);
-              }}
-              onFocus={() => {
-                setFocused(true);
-                warmUpAudio();
-              }}
-              onBlur={() => setFocused(false)}
-              placeholder={placeholder}
-              aria-labelledby="ask-how ask-rest"
-              aria-describedby="lookup-status"
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              className="col-start-1 row-start-1 w-0 min-w-full rounded-none border-0 border-b-[length:min(0.07em,8px)] border-ink bg-transparent p-0 font-[inherit] uppercase text-[inherit] caret-block-ultramarine outline-none placeholder:text-ink placeholder:opacity-40 focus:border-block-ultramarine focus:shadow-[0_3px_0_0_var(--color-block-ultramarine)]"
-            />
+            <span className="max-sm:block">How</span>{" "}
+            <span className="max-sm:block">committed</span>
+          </label>
+          <span id="ask-rest" className="sr-only">
+            is GitHub username
           </span>
-          <span aria-hidden="true">?</span>
-        </span>
-      </div>
-
-      <div className="min-h-14 font-mono text-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* The live region stays outside the button; it is read, not shown, when found. */}
-          <p
-            id="lookup-status"
-            role="status"
-            className={found ? "sr-only" : "flex min-h-14 items-center"}
-          >
-            {found ? `Found @${found.login}` : statusText}
-          </p>
-          {found ? (
-            <PreviewRow user={found} disabled={starting} onStart={start} />
-          ) : (
-            canRetry(state) && (
-              <button
-                type="button"
-                onClick={() => setAttempt((count) => count + 1)}
-                className={`${actionClass} min-h-11`}
+          <span className="flex max-w-full items-baseline max-sm:text-[0.55em]">
+            <span aria-hidden="true">is&nbsp;@</span>
+            <span
+              style={fieldWidth === null ? undefined : { width: fieldWidth }}
+              className="inline-grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] items-baseline motion-safe:transition-[width] motion-safe:duration-250 motion-safe:ease-out"
+            >
+              {/* Sizer: the field is as wide as what it shows, like part of the sentence. */}
+              <span
+                ref={sizerRef}
+                aria-hidden="true"
+                className="invisible w-max col-start-1 row-start-1 whitespace-pre pr-[0.04em]"
               >
-                Try again
-              </button>
-            )
-          )}
+                {sizer}
+              </span>
+              <input
+                id="login"
+                name="login"
+                type="text"
+                value={value}
+                onChange={(event) => {
+                  setValue(event.target.value);
+                  setNudge(false);
+                }}
+                onFocus={() => {
+                  setFocused(true);
+                  warmUpAudio();
+                }}
+                onBlur={() => setFocused(false)}
+                placeholder={placeholder}
+                aria-labelledby="ask-how ask-rest"
+                aria-describedby="lookup-status"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="col-start-1 row-start-1 w-0 min-w-full rounded-none border-0 border-b-[length:min(0.07em,8px)] border-ink bg-transparent p-0 font-[inherit] uppercase text-[inherit] caret-block-ultramarine outline-none placeholder:text-ink placeholder:opacity-40 focus:border-block-ultramarine focus:shadow-[0_3px_0_0_var(--color-block-ultramarine)]"
+              />
+            </span>
+            <span aria-hidden="true">?</span>
+          </span>
+        </div>
+
+        <div className={`font-mono text-sm ${found && wide ? "" : "min-h-14"}`}>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* The live region stays outside the button; it is read, not shown, when found. */}
+            <p
+              id="lookup-status"
+              role="status"
+              className={found ? "sr-only" : "flex min-h-14 items-center"}
+            >
+              {found ? `Found @${found.login}` : statusText}
+            </p>
+            {found ? (
+              wide ? null : (
+                <PreviewRow user={found} disabled={starting} onStart={start} />
+              )
+            ) : (
+              canRetry(state) && (
+                <button
+                  type="button"
+                  onClick={() => setAttempt((count) => count + 1)}
+                  className={`${actionClass} min-h-11`}
+                >
+                  Try again
+                </button>
+              )
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          <StartButton
+            type="submit"
+            tone="ink"
+            size="cta"
+            aria-disabled={!found || starting}
+            aria-label={found ? `Play @${found.login}` : undefined}
+          >
+            Play
+          </StartButton>
+          <p className="max-w-[48ch] font-mono text-[15px] leading-relaxed">
+            Type a GitHub username. Their contribution history plays as sound
+            and motion, year by year. Headphones on.
+          </p>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-        <StartButton
-          type="submit"
-          tone="ink"
-          size="cta"
-          aria-disabled={!found || starting}
-          aria-label={found ? `Play @${found.login}` : undefined}
-        >
-          Play
-        </StartButton>
-        <p className="max-w-[48ch] font-mono text-[15px] leading-relaxed">
-          Type a GitHub username. Their contribution history plays as sound and
-          motion, year by year. Headphones on.
-        </p>
-      </div>
+      <PlayerColumn>
+        {found && wide && (
+          <PlayerCard user={found} disabled={starting} onStart={start} />
+        )}
+      </PlayerColumn>
     </form>
   );
 }

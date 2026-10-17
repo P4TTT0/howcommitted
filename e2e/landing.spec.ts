@@ -42,7 +42,7 @@ test("typing a username finds the user in a clickable row", async ({
 }) => {
   await page.goto("/");
   await page.getByLabel("GitHub username").fill("ada");
-  const row = page.getByRole("button", { name: /Ada Lovelace/ });
+  const row = page.locator("button:visible", { hasText: "Ada Lovelace" });
   await expect(row).toBeVisible();
   await expect(row).toContainText("@ada · Active 2022–2024");
   await expect(row).toHaveCSS("cursor", "pointer");
@@ -51,7 +51,7 @@ test("typing a username finds the user in a clickable row", async ({
 test("the whole preview row starts the experience", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("GitHub username").fill("ada");
-  await page.getByRole("button", { name: /Ada Lovelace/ }).click();
+  await page.locator("button:visible", { hasText: "Ada Lovelace" }).click();
   await expect(page).toHaveURL(/\/ada$/);
 });
 
@@ -59,7 +59,7 @@ test("Play has a pointer, and Enter starts when a user is found", async ({
   page,
 }) => {
   await page.goto("/");
-  const listen = page.getByRole("button", { name: /^Play( @\w+)?$/ });
+  const listen = page.getByRole("button", { name: /^Play( @\w+)?$/ }).first();
   await expect(listen).toHaveAttribute("aria-disabled", "true");
 
   const input = page.getByLabel("GitHub username");
@@ -129,7 +129,7 @@ test("the disabled Play stays legible: no opacity, dashed, same size", async ({
   page,
 }) => {
   await page.goto("/");
-  const listen = page.getByRole("button", { name: /^Play( @\w+)?$/ });
+  const listen = page.getByRole("button", { name: /^Play( @\w+)?$/ }).first();
   await expect(listen).toHaveAttribute("aria-disabled", "true");
   await expect(listen).toHaveCSS("opacity", "1");
   await expect(listen).toHaveCSS("border-top-style", "dashed");
@@ -192,7 +192,7 @@ for (const [width, height] of VIEWPORTS) {
       if (state === "found") {
         await page.getByLabel("GitHub username").fill("sindresorhus");
         await expect(
-          page.getByRole("button", { name: /Sindre Sorhus/ }),
+          page.locator("button:visible", { hasText: "Sindre Sorhus" }),
         ).toBeVisible();
       }
 
@@ -207,12 +207,14 @@ for (const [width, height] of VIEWPORTS) {
       // Nothing is clipped: every part sits fully inside the viewport.
       const targets = [
         page.locator("form"),
-        page.getByRole("button", { name: /^Play( @\w+)?$/ }),
+        page.getByRole("button", { name: /^Play( @\w+)?$/ }).first(),
         page.getByRole("heading", { level: 1 }),
         page.getByText("Type a GitHub username.", { exact: false }),
       ];
       if (state === "found") {
-        targets.push(page.getByRole("button", { name: /Sindre Sorhus/ }));
+        targets.push(
+          page.locator("button:visible", { hasText: "Sindre Sorhus" }),
+        );
       }
       for (const target of targets) {
         const box = await target.boundingBox();
@@ -225,3 +227,49 @@ for (const [width, height] of VIEWPORTS) {
     });
   }
 }
+
+test("on a wide landscape screen the found developer is a card on the right", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1536, height: 730 });
+  await page.goto("/");
+  await page.getByLabel("GitHub username").fill("ada");
+  const card = page
+    .getByRole("button", { name: "Play @ada", exact: false })
+    .last();
+  await expect(card).toContainText("Ada Lovelace");
+  await expect(card).toContainText("@ada · Active 2022–2024");
+  const box = await card.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0) / 2).toBeGreaterThan(1536 / 2);
+  await expect(card).toHaveCSS("cursor", "pointer");
+  await card.click();
+  await expect(page).toHaveURL(/\/ada$/);
+});
+
+test("the right column stays empty until a user is found", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 730 });
+  await page.goto("/");
+  await expect(page.locator("button:visible", { hasText: "@" })).toHaveCount(0);
+  await page.getByLabel("GitHub username").fill("ada");
+  await expect(
+    page.locator("button:visible", { hasText: "Ada Lovelace" }),
+  ).toHaveCount(1);
+});
+
+test("on a portrait screen the compact row stays under the question", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto("/");
+  await page.getByLabel("GitHub username").fill("ada");
+  const row = page.locator("button:visible", { hasText: "Ada Lovelace" });
+  await expect(row).toBeVisible();
+  const [rowBox, inputBox] = await Promise.all([
+    row.boundingBox(),
+    page.getByLabel("GitHub username").boundingBox(),
+  ]);
+  expect(rowBox?.y ?? 0).toBeGreaterThan(
+    (inputBox?.y ?? 0) + (inputBox?.height ?? 0),
+  );
+  expect(rowBox?.x ?? 9999).toBeLessThan(100);
+});
