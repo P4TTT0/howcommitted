@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { makeHistory, makeYear, steadyDays } from "../timeline/historyFixture";
+import {
+  makeHistory,
+  makeYear,
+  steadyDays,
+} from "@/test-support/historyFixture";
 import { failureCopy, interpretHistory } from "./historyResult";
 
 const history = makeHistory("ada", [makeYear(2024, steadyDays(2024, 2))]);
+const wrap = (value: unknown) => ({ source: "cache", history: value });
 
 describe("interpretHistory", () => {
   it("reads a successful payload", () => {
@@ -21,15 +26,51 @@ describe("interpretHistory", () => {
     );
   });
 
+  it("rejects payloads whose years the scene could not read", () => {
+    const bad = [
+      { ...history, years: [{ year: 2024 }] },
+      {
+        ...history,
+        years: [{ ...history.years[0], dailyCommits: [{ date: 1 }] }],
+      },
+      {
+        ...history,
+        years: [{ ...history.years[0], totals: { commits: "many" } }],
+      },
+      { ...history, years: [{ ...history.years[0], reconciliation: null }] },
+      { ...history, yearBlocks: [{ year: 2024 }] },
+      { ...history, totals: {} },
+      { ...history, user: { login: "ada" } },
+    ];
+    for (const value of bad) {
+      expect(interpretHistory(200, wrap(value)).kind).toBe("server");
+    }
+  });
+
   it("maps each API status to a failure", () => {
     expect(interpretHistory(404, null).kind).toBe("not_found");
     expect(interpretHistory(401, null).kind).toBe("login_required");
     expect(interpretHistory(400, null).kind).toBe("invalid");
-    expect(interpretHistory(429, null).kind).toBe("breather");
-    expect(interpretHistory(503, null).kind).toBe("breather");
     expect(interpretHistory(502, null).kind).toBe("upstream");
     expect(interpretHistory(504, null).kind).toBe("upstream");
     expect(interpretHistory(500, null).kind).toBe("server");
+  });
+
+  it("blames GitHub only when GitHub is the cause", () => {
+    expect(interpretHistory(429, null).kind).toBe("breather");
+    const circuit = { error: { code: "degraded", reason: "circuit_open" } };
+    expect(interpretHistory(503, circuit).kind).toBe("breather");
+    const busy = { error: { code: "degraded", reason: "busy" } };
+    expect(interpretHistory(503, busy).kind).toBe("busy");
+    const store = { error: { code: "degraded", reason: "store_down" } };
+    expect(interpretHistory(503, store).kind).toBe("busy");
+  });
+
+  it("keeps Retry-After for the message", () => {
+    expect(interpretHistory(429, null, "180")).toEqual({
+      kind: "breather",
+      retryAfterSeconds: 180,
+    });
   });
 });
 
@@ -48,9 +89,24 @@ describe("failureCopy", () => {
     });
   });
 
+  it("words waits in minutes and keeps GitHub out of our own limits", () => {
+    expect(
+      failureCopy({ kind: "breather", retryAfterSeconds: null }, "ada").message,
+    ).toBe("GitHub needs a breather. Try again in a minute.");
+    expect(
+      failureCopy({ kind: "busy", retryAfterSeconds: 300 }, "ada").message,
+    ).toBe("Too many requests right now. Try again in 5 minutes.");
+    expect(failureCopy({ kind: "network" }, "ada").message).toBe(
+      "Could not reach Committed. Check your connection.",
+    );
+  });
+
   it("offers a retry when waiting can help", () => {
-    expect(failureCopy({ kind: "breather" }, "ada").retry).toBe(true);
-    expect(failureCopy({ kind: "upstream" }, "ada").retry).toBe(true);
-    expect(failureCopy({ kind: "server" }, "ada").retry).toBe(true);
+    for (const kind of ["upstream", "server", "network"] as const) {
+      expect(failureCopy({ kind }, "ada").retry).toBe(true);
+    }
+    expect(
+      failureCopy({ kind: "breather", retryAfterSeconds: null }, "ada").retry,
+    ).toBe(true);
   });
 });

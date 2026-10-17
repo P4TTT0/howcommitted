@@ -1,22 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isValidLogin } from "@/domain/login";
 import { Experience } from "@/features/experience/Experience";
+import { parseSoloLogin } from "@/features/experience/parseSoloLogin";
 
 type Props = { params: Promise<{ users: string[] }> };
 
-/** One segment is the solo experience; versus (several) comes later. */
 async function soloLogin(params: Props["params"]): Promise<string> {
   const { users } = await params;
-  const [segment] = users;
-  if (users.length !== 1 || segment === undefined) notFound();
-  let login: string;
-  try {
-    login = decodeURIComponent(segment);
-  } catch {
-    notFound();
-  }
-  if (!isValidLogin(login)) notFound();
+  const login = parseSoloLogin(users);
+  if (login === null) notFound();
   return login;
 }
 
@@ -26,5 +18,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function UserPage({ params }: Props) {
-  return <Experience login={await soloLogin(params)} />;
+  const login = await soloLogin(params);
+  // The key remounts the experience when the login changes, so state from one
+  // profile can never leak into another.
+  return <Experience key={login} login={login} />;
 }

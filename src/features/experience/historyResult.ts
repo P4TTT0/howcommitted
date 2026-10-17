@@ -1,28 +1,75 @@
 import type { History } from "@/domain/history";
+import {
+  isGithubBreather,
+  parseRetryAfter,
+  readApiError,
+  waitPhrase,
+} from "@/features/apiErrors";
 
 export type HistoryFailure =
   | { kind: "invalid" }
   | { kind: "not_found" }
   /** Anonymous runs for today are used up. */
   | { kind: "login_required" }
-  /** Rate limited or degraded: waiting a little fixes it. */
-  | { kind: "breather" }
+  /** GitHub itself is rate limited or the global circuit is open. */
+  | { kind: "breather"; retryAfterSeconds: number | null }
+  /** Our own limits or a busy server: waiting a little fixes it. */
+  | { kind: "busy"; retryAfterSeconds: number | null }
   /** GitHub errored or timed out. */
   | { kind: "upstream" }
+  /** The request never reached the server. */
+  | { kind: "network" }
   | { kind: "server" };
 
 export type HistoryOutcome =
   | { kind: "ok"; history: History; reposTruncated: boolean }
   | HistoryFailure;
 
-function isHistory(value: unknown): value is History {
-  if (typeof value !== "object" || value === null) return false;
-  const history = value as Record<string, unknown>;
-  const user = history.user as Record<string, unknown> | null | undefined;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+const isNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+function isDailyCommits(value: unknown): boolean {
   return (
-    typeof user?.login === "string" &&
-    Array.isArray(history.years) &&
-    Array.isArray(history.yearBlocks)
+    isRecord(value) && typeof value.date === "string" && isNumber(value.commits)
+  );
+}
+
+function isHistoryYear(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const { totals, dailyCommits, reconciliation } = value;
+  return (
+    isNumber(value.year) &&
+    isRecord(totals) &&
+    isNumber(totals.commits) &&
+    Array.isArray(dailyCommits) &&
+    dailyCommits.every(isDailyCommits) &&
+    isRecord(reconciliation) &&
+    typeof reconciliation.matches === "boolean"
+  );
+}
+
+function isYearBlock(value: unknown): boolean {
+  return isRecord(value) && isNumber(value.year) && isNumber(value.commits);
+}
+
+/** Checks everything the experience reads, so a bad payload never reaches it. */
+function isHistory(value: unknown): value is History {
+  if (!isRecord(value)) return false;
+  const { user, years, yearBlocks, totals } = value;
+  return (
+    isRecord(user) &&
+    typeof user.login === "string" &&
+    typeof user.createdAt === "string" &&
+    Array.isArray(years) &&
+    years.every(isHistoryYear) &&
+    Array.isArray(yearBlocks) &&
+    yearBlocks.every(isYearBlock) &&
+    isRecord(totals) &&
+    isNumber(totals.commits)
   );
 }
 
@@ -30,12 +77,10 @@ function isHistory(value: unknown): value is History {
 export function interpretHistory(
   status: number,
   body: unknown,
+  retryAfter: string | null = null,
 ): HistoryOutcome {
   if (status === 200) {
-    const payload = body as {
-      history?: unknown;
-      reposTruncated?: unknown;
-    } | null;
+    const payload = isRecord(body) ? body : null;
     if (payload && isHistory(payload.history)) {
       return {
         kind: "ok",
@@ -48,7 +93,13 @@ export function interpretHistory(
   if (status === 400) return { kind: "invalid" };
   if (status === 404) return { kind: "not_found" };
   if (status === 401) return { kind: "login_required" };
-  if (status === 429 || status === 503) return { kind: "breather" };
+  if (status === 429 || status === 503) {
+    const retryAfterSeconds = parseRetryAfter(retryAfter);
+    const { reason } = readApiError(body);
+    return isGithubBreather(status, reason)
+      ? { kind: "breather", retryAfterSeconds }
+      : { kind: "busy", retryAfterSeconds };
+  }
   if (status === 502 || status === 504) return { kind: "upstream" };
   return { kind: "server" };
 }
@@ -76,12 +127,22 @@ export function failureCopy(
       };
     case "breather":
       return {
-        message: "GitHub needs a breather. Try again in a minute.",
+        message: `GitHub needs a breather. Try again in ${waitPhrase(failure.retryAfterSeconds)}.`,
+        retry: true,
+      };
+    case "busy":
+      return {
+        message: `Too many requests right now. Try again in ${waitPhrase(failure.retryAfterSeconds)}.`,
         retry: true,
       };
     case "upstream":
       return {
         message: "GitHub did not answer well. Try again in a moment.",
+        retry: true,
+      };
+    case "network":
+      return {
+        message: "Could not reach Committed. Check your connection.",
         retry: true,
       };
     case "server":

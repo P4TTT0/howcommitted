@@ -1,19 +1,32 @@
 import type { ReactNode } from "react";
 
-/** Shared look of the screens around the scene: a color block with the login. */
+/**
+ * Login size by character count (the "@" counts). Big Shoulders is for display
+ * sizes only, so past the last step the login drops to Martian Mono.
+ */
+const LOGIN_SIZE_STEPS = [
+  { maxCharacters: 6, vw: 22 },
+  { maxCharacters: 9, vw: 17 },
+  { maxCharacters: 12, vw: 12 },
+] as const;
 
-export const actionClass =
-  "inline-flex min-h-11 min-w-11 items-center justify-center border-2 border-ink px-4 font-mono text-xs uppercase focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-ink";
+const DISPLAY_LOGIN_CLASS =
+  "font-display font-black uppercase leading-[0.8] [overflow-wrap:anywhere]";
+const SMALL_LOGIN_CLASS =
+  "font-mono text-2xl font-bold leading-tight [overflow-wrap:anywhere]";
 
-/** Fluid size for the login: long names wrap, so they get a smaller size. */
-function loginSize(login: string): string {
-  const characters = login.length + 1; // the "@" counts
-  let vw = 6;
-  if (characters <= 6) vw = 22;
-  else if (characters <= 9) vw = 17;
-  else if (characters <= 12) vw = 12;
-  else if (characters <= 18) vw = 8;
-  return `min(${vw}vw, 24dvh)`;
+/** Typography for the login heading: display and fluid when short, mono when long. */
+export function loginTypography(login: string): {
+  className: string;
+  fontSize?: string;
+} {
+  const characters = login.length + 1;
+  const step = LOGIN_SIZE_STEPS.find((s) => characters <= s.maxCharacters);
+  if (!step) return { className: SMALL_LOGIN_CLASS };
+  return {
+    className: DISPLAY_LOGIN_CLASS,
+    fontSize: `min(${step.vw}vw, 24dvh)`,
+  };
 }
 
 export function Poster({
@@ -35,14 +48,17 @@ export function Poster({
   const Title = heading ? "h1" : "p";
   const colors =
     tone === "block" ? "bg-block-ultramarine text-paper" : "bg-ink text-paper";
+  const { className, fontSize } = loginTypography(login);
   return (
     <div className="absolute inset-0 flex flex-col bg-paper text-ink">
       <header
         className={`flex h-[42dvh] shrink-0 items-end p-4 ${colors} ${wipe ? "loading-block" : ""}`}
       >
         <Title
-          className="font-display font-black uppercase leading-[0.8] [overflow-wrap:anywhere]"
-          style={{ fontSize: loginSize(login) }}
+          // Focus target after each screen change; not a tab stop.
+          tabIndex={heading ? -1 : undefined}
+          className={`${className} outline-none`}
+          style={{ fontSize }}
         >
           @{login}
         </Title>
@@ -57,7 +73,8 @@ export function Poster({
 /**
  * Loading is part of the experience: the first color block lands and the
  * baseline of the line starts to draw. Progress is unknown, so the baseline
- * approaches but never reaches the end.
+ * approaches but never reaches the end. Announcements come from the page's
+ * persistent live region, not from this component.
  */
 export function LoadingMoment({
   login,
@@ -70,9 +87,7 @@ export function LoadingMoment({
 }) {
   return (
     <Poster login={login} heading={heading} wipe>
-      <p role="status" className="font-mono text-xs">
-        {label}
-      </p>
+      <p className="font-mono text-xs">{label}</p>
       <div className="loading-baseline mt-auto h-3 w-full bg-ink" />
     </Poster>
   );

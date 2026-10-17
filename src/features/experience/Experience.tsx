@@ -8,6 +8,9 @@ import {
 } from "@/features/timeline/historyPlan";
 import { Timeline } from "@/features/timeline/Timeline";
 import { isAudioUnlocked, unlockAudio } from "@/playback/unlock";
+import { actionClass } from "@/ui/classes";
+import { ScreenMain } from "@/ui/ScreenMain";
+import { StartButton } from "@/ui/StartButton";
 import { EndCard } from "./EndCard";
 import {
   failureCopy,
@@ -15,7 +18,8 @@ import {
   type HistoryOutcome,
   interpretHistory,
 } from "./historyResult";
-import { actionClass, LoadingMoment, Poster } from "./Poster";
+import { consumeIntent } from "./intent";
+import { LoadingMoment, Poster } from "./Poster";
 
 type Phase =
   | { name: "init" }
@@ -23,54 +27,101 @@ type Phase =
   | { name: "loading" }
   | { name: "failed"; failure: HistoryFailure }
   | { name: "empty"; login: string }
-  | { name: "scene"; login: string; model: HistoryPlan };
+  | {
+      name: "scene";
+      login: string;
+      model: HistoryPlan;
+      firstYear: number;
+      lastYear: number;
+    };
 
 async function fetchHistory(login: string): Promise<HistoryOutcome> {
   try {
     const response = await fetch(`/api/history/${encodeURIComponent(login)}`);
     const body: unknown = await response.json().catch(() => null);
-    return interpretHistory(response.status, body);
+    return interpretHistory(
+      response.status,
+      body,
+      response.headers.get("retry-after"),
+    );
   } catch {
-    return { kind: "server" };
+    return { kind: "network" };
+  }
+}
+
+/** Maps a fetched history to the next screen; a bad payload degrades, never throws. */
+function sceneOrEmpty(outcome: HistoryOutcome & { kind: "ok" }): Phase {
+  try {
+    const model = planFromHistory(outcome.history);
+    const login = outcome.history.user.login;
+    const { firstYear, lastYear } = model;
+    if (model.plan.total === 0 || firstYear === null || lastYear === null) {
+      return { name: "empty", login };
+    }
+    return { name: "scene", login, model, firstYear, lastYear };
+  } catch {
+    return { name: "failed", failure: { kind: "server" } };
+  }
+}
+
+/** The one polite announcement for each screen, spoken from a persistent region. */
+function announcement(phase: Phase, login: string): string {
+  switch (phase.name) {
+    case "init":
+      return "";
+    case "gate":
+      return "Press How Committed? to start.";
+    case "loading":
+      return "Reading the public commit history.";
+    case "failed":
+      return failureCopy(phase.failure, login).message;
+    case "empty":
+      return `No public commits found for @${phase.login}. Nothing to play yet.`;
+    case "scene":
+      return `Starting @${phase.login}.`;
   }
 }
 
 /**
  * The solo experience for one login. The history is fetched on intent, never
- * before: right after the landing click (audio already unlocked), or after
- * the start button on a direct visit. Anonymous cold runs are scarce, so
- * merely opening a link must not spend one.
+ * before: right after the landing click (which recorded a one-shot intent), or
+ * after the start button on any other arrival (shared link, reload, back or
+ * forward). Anonymous cold runs are scarce, so merely opening a link must not
+ * spend one.
  */
 export function Experience({ login }: { login: string }) {
   const [phase, setPhase] = useState<Phase>({ name: "init" });
+  const rootRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
-  const autoStartedRef = useRef(false);
+  const decidedRef = useRef(false);
+  const inFlightRef = useRef(false);
 
   async function begin() {
+    // One request at a time: a double click or a retry mid-flight is a no-op.
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setPhase({ name: "loading" });
-    const outcome = await fetchHistory(login);
-    if (!mountedRef.current) return;
-    if (outcome.kind !== "ok") {
-      setPhase({ name: "failed", failure: outcome });
-      return;
+    try {
+      const outcome = await fetchHistory(login);
+      if (!mountedRef.current) return;
+      setPhase(
+        outcome.kind === "ok"
+          ? sceneOrEmpty(outcome)
+          : { name: "failed", failure: outcome },
+      );
+    } finally {
+      inFlightRef.current = false;
     }
-    const model = planFromHistory(outcome.history);
-    const shown = outcome.history.user.login;
-    setPhase(
-      model.plan.total === 0
-        ? { name: "empty", login: shown }
-        : { name: "scene", login: shown, model },
-    );
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: decide once, on mount
   useEffect(() => {
     mountedRef.current = true;
-    if (!autoStartedRef.current) {
-      autoStartedRef.current = true;
-      // Arrived from the landing click: audio is already unlocked, so go.
-      // A shared link or reload is locked and waits for its own click.
-      if (isAudioUnlocked()) void begin();
+    if (!decidedRef.current) {
+      decidedRef.current = true;
+      // Only the landing click starts on its own, and only with audio unlocked.
+      // Everything else waits for its own click.
+      if (consumeIntent(login) && isAudioUnlocked()) void begin();
       else setPhase({ name: "gate" });
     }
     return () => {
@@ -78,60 +129,65 @@ export function Experience({ login }: { login: string }) {
     };
   }, []);
 
+  // Each screen change moves focus to its heading so assistive tech follows.
+  useEffect(() => {
+    if (phase.name === "init") return;
+    rootRef.current?.querySelector<HTMLElement>("h1")?.focus();
+  }, [phase.name]);
+
   /** Click handler: unlocks audio synchronously, then fetches. */
   function start() {
     void unlockAudio();
     void begin();
   }
 
+  return (
+    <div ref={rootRef}>
+      <p role="status" aria-live="polite" className="sr-only">
+        {announcement(phase, login)}
+      </p>
+      {screen(phase, login, start)}
+    </div>
+  );
+}
+
+function screen(phase: Phase, login: string, start: () => void) {
   switch (phase.name) {
     case "init":
       return (
-        <main className="relative h-dvh w-full">
-          <Poster login={login}>
-            <span className="sr-only" role="status">
-              Getting ready
-            </span>
-          </Poster>
-        </main>
+        <ScreenMain>
+          <Poster login={login}>{null}</Poster>
+        </ScreenMain>
       );
 
     case "gate":
       return (
-        <main className="relative h-dvh w-full">
+        <ScreenMain>
           <Poster login={login}>
-            <button
-              type="button"
-              onClick={start}
-              className="bg-ink px-[0.4em] py-[0.25em] text-center font-display text-[min(13vw,14dvh)] font-black uppercase leading-[0.85] text-paper focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-ink"
-            >
-              How Committed?
-            </button>
+            <StartButton tone="ink" onClick={start} />
             <p className="font-mono text-xs">
               Turn sound on. The history loads when you press start.
             </p>
           </Poster>
-        </main>
+        </ScreenMain>
       );
 
     case "loading":
       return (
-        <main className="relative h-dvh w-full">
+        <ScreenMain>
           <LoadingMoment
             login={login}
             label="Reading the public commit history"
           />
-        </main>
+        </ScreenMain>
       );
 
     case "failed": {
       const copy = failureCopy(phase.failure, login);
       return (
-        <main className="relative h-dvh w-full">
+        <ScreenMain>
           <Poster login={login} tone="ink">
-            <p role="alert" className="font-mono text-sm">
-              {copy.message}
-            </p>
+            <p className="font-mono text-sm">{copy.message}</p>
             <div className="flex flex-wrap gap-2">
               {copy.retry && (
                 <button
@@ -147,15 +203,15 @@ export function Experience({ login }: { login: string }) {
               </Link>
             </div>
           </Poster>
-        </main>
+        </ScreenMain>
       );
     }
 
     case "empty":
       return (
-        <main className="relative h-dvh w-full">
+        <ScreenMain>
           <Poster login={phase.login} tone="ink">
-            <p role="status" className="font-mono text-sm">
+            <p className="font-mono text-sm">
               No public commits found for @{phase.login}. Nothing to play yet.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -164,7 +220,7 @@ export function Experience({ login }: { login: string }) {
               </Link>
             </div>
           </Poster>
-        </main>
+        </ScreenMain>
       );
 
     case "scene": {
@@ -187,8 +243,8 @@ export function Experience({ login }: { login: string }) {
             <EndCard
               login={phase.login}
               total={model.plan.total}
-              firstYear={model.firstYear}
-              lastYear={model.lastYear}
+              firstYear={phase.firstYear}
+              lastYear={phase.lastYear}
               yearBlocks={model.yearBlocks}
               note={model.note}
               onReplay={replay}
