@@ -129,7 +129,7 @@ async function mustSucceed<T>(run: () => Promise<T>): Promise<T> {
 
 const STORE_DOWN: ProfileResult = { status: "degraded", reason: "store_down" };
 
-function yearsNeeded(user: UserProfile, now: Date): number[] {
+export function yearsNeeded(user: UserProfile, now: Date): number[] {
   // The cached preview can predate the current year's first contribution.
   return [...new Set([...user.contributionYears, now.getUTCFullYear()])].sort(
     (a, b) => b - a,

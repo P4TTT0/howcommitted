@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Big_Shoulders, Martian_Mono } from "next/font/google";
+import { resolveSiteOrigin } from "@/og/origin";
 import "./globals.css";
 
 const bigShoulders = Big_Shoulders({
@@ -12,9 +13,14 @@ const martianMono = Martian_Mono({
   variable: "--font-martian-mono",
 });
 
+const description = "Your contribution history as an audio-visual experience.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(resolveSiteOrigin(process.env)),
   title: "Committed",
-  description: "Your contribution history as an audio-visual experience.",
+  description,
+  openGraph: { title: "Committed", description, siteName: "Committed" },
+  twitter: { card: "summary_large_image", title: "Committed", description },
 };
 
 export default function RootLayout({
