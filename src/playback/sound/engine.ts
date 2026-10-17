@@ -24,11 +24,14 @@ const PAYOFF_FILES = ["payoff-thud", "payoff-rattle"] as const;
 const TICK_VOICE_LIMIT = 6;
 const PAYOFF_VOICE_LIMIT = 4;
 const ACCENT_VOICE_LIMIT = 2;
+const MARKER_VOICE_LIMIT = 2;
 /** Tick pitch offset so the climb starts a little below the sample root. */
 const TICK_BASE_SEMITONES = -4;
 const TICK_BASE_DB = -9;
 const PAYOFF_BASE_DB = -2;
 const ACCENT = { semitones: -5, db: -11 };
+/** Softer and higher than a payoff, so it reads as a different kind of event. */
+const UNATTRIBUTED = { semitones: 3, db: -8 };
 const LIMITER_DB = -1;
 
 export type TickHit = {
@@ -51,6 +54,7 @@ export class SoundEngine {
     tick: [] as Pool,
     payoff: [] as Pool,
     accent: [] as Pool,
+    marker: [] as Pool,
   };
   private lastTick = -1;
 
@@ -121,6 +125,21 @@ export class SoundEngine {
       this.limiter,
       this.buffers.get(PAYOFF_FILES[0]),
       { time, rate: rateForSemitones(ACCENT.semitones), db: ACCENT.db },
+    );
+  }
+
+  /** The step for commits not attributed to a day: one soft, distinct thud. */
+  playUnattributed(time: number): void {
+    playSample(
+      this.pools.marker,
+      MARKER_VOICE_LIMIT,
+      this.limiter,
+      this.buffers.get(PAYOFF_FILES[0]),
+      {
+        time,
+        rate: rateForSemitones(UNATTRIBUTED.semitones),
+        db: UNATTRIBUTED.db,
+      },
     );
   }
 

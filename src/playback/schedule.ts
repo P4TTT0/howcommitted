@@ -114,6 +114,14 @@ export type MilestoneOptions = {
   first?: number;
   /** Step milestones this close to the final one (seconds) are dropped. */
   minGapToFinal: number;
+  /**
+   * Running total after each day, when it is not just the sum of `days`
+   * (for example when unattributed steps are added). A threshold crossed on
+   * a step day fires at that day.
+   */
+  cumulative?: readonly number[];
+  /** Index of the day the final payoff lands on; defaults to the last day with commits. */
+  lastActiveDay?: number;
 };
 
 /**
@@ -122,9 +130,17 @@ export type MilestoneOptions = {
  */
 export function findMilestones(
   days: readonly DailyCommits[],
-  { duration, grid, step, first = step, minGapToFinal }: MilestoneOptions,
+  {
+    duration,
+    grid,
+    step,
+    first = step,
+    minGapToFinal,
+    cumulative: given,
+    lastActiveDay,
+  }: MilestoneOptions,
 ): Milestone[] {
-  const cumulative = cumulativeByDay(days);
+  const cumulative = given ?? cumulativeByDay(days);
   const total = cumulative[cumulative.length - 1] ?? 0;
   if (total <= 0) return [];
   const dayCount = days.length;
@@ -132,7 +148,9 @@ export function findMilestones(
   const timeAfterDay = (index: number) =>
     quantizeUp(((index + 1) / dayCount) * duration, grid);
 
-  const finalTime = timeAfterDay(days.findLastIndex((day) => day.commits > 0));
+  const finalTime = timeAfterDay(
+    lastActiveDay ?? days.findLastIndex((day) => day.commits > 0),
+  );
   const milestones: Milestone[] = [];
 
   let nextValue = first;

@@ -4,11 +4,13 @@ import { PlaybackClock } from "@/playback/clock";
 import { semitonesForDegree } from "@/playback/pitch";
 import { SoundEngine } from "@/playback/sound/engine";
 import { CHART_WIDTH, topPercent } from "./chart";
+import { formatCount } from "./format";
 import {
   BPM,
   DRAW_SECONDS,
   FLOOD,
   type Plan,
+  stepCueTimes,
   TOTAL_SECONDS,
   YEAR_WIPE_SECONDS,
   yearReveals,
@@ -34,11 +36,7 @@ export type SceneOptions = {
   reducedMotion: boolean;
 };
 
-const numberFormat = new Intl.NumberFormat("en-US");
-
-export function formatCount(value: number): string {
-  return numberFormat.format(value);
-}
+export { formatCount };
 
 function find<T extends Element>(root: HTMLElement, selector: string): T {
   const element = root.querySelector<T>(selector);
@@ -119,6 +117,9 @@ function scheduleSound(
   for (const reveal of yearReveals(plan).slice(1)) {
     clock.at(reveal.time, (time) => getEngine()?.playAccent(time));
   }
+  for (const time of stepCueTimes(plan)) {
+    clock.at(time, (at) => getEngine()?.playUnattributed(at));
+  }
 }
 
 /** Each year's block wipes in from the left with a decisive, no-bounce ease. */
@@ -187,6 +188,13 @@ function createRenderer(root: HTMLElement, plan: Plan) {
   const totals = [...root.querySelectorAll<HTMLElement>('[data-role="total"]')];
   const clip = find<SVGRectElement>(root, '[data-role="clip"]');
   const head = find<HTMLElement>(root, '[data-role="head"]');
+  const labels = [
+    ...root.querySelectorAll<HTMLElement>("[data-step-label]"),
+  ].map((element) => ({
+    element,
+    at: Number(element.dataset.stepLabel),
+    shown: false,
+  }));
   let lastTotal = Number.NaN;
 
   return (seconds: number) => {
@@ -198,6 +206,16 @@ function createRenderer(root: HTMLElement, plan: Plan) {
       lastTotal = rounded;
       const text = formatCount(rounded);
       for (const total of totals) total.textContent = text;
+    }
+
+    // A step label appears the instant the line reaches its step (also with
+    // reduced motion: it is a switch, not an animation).
+    for (const label of labels) {
+      const shown = progress >= label.at;
+      if (shown !== label.shown) {
+        label.shown = shown;
+        label.element.dataset.visible = String(shown);
+      }
     }
 
     clip.setAttribute("width", String(progress * CHART_WIDTH));

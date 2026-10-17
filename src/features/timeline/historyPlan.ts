@@ -1,9 +1,17 @@
 import type { History } from "@/domain/history";
 import type { DailyCommits } from "@/domain/types";
 import type { YearBlock } from "@/domain/year-summary";
-import { buildPlan, type Plan } from "./plan";
+import { formatCount } from "./format";
+import { buildPlan, type Plan, type StepInput } from "./plan";
 
 const MS_PER_DAY = 86_400_000;
+
+/** A year where the real daily commits and the official total disagree. */
+export type YearGap = {
+  year: number;
+  /** Official total minus the real daily commits placed on that year. */
+  unattributed: number;
+};
 
 export type HistoryPlan = {
   plan: Plan;
@@ -13,6 +21,8 @@ export type HistoryPlan = {
   firstYear: number | null;
   lastYear: number | null;
   /** Years whose daily detail does not add up to the official total. */
+  gaps: YearGap[];
+  /** The years of `gaps`. */
   incompleteYears: number[];
   /** Honest note about incomplete daily detail, or null. */
   note: string | null;
@@ -30,35 +40,24 @@ function sum(values: readonly number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
-/**
- * Splits `target` into whole numbers proportional to `weights` (largest
- * remainder), so the parts add up exactly. All-zero weights spread evenly.
- */
-export function distribute(
-  weights: readonly number[],
-  target: number,
-): number[] {
-  if (target <= 0 || weights.length === 0) return weights.map(() => 0);
-  const weighted = sum(weights) > 0;
-  const shares = weighted ? weights : weights.map(() => 1);
-  const denominator = sum(shares);
-  const exact = shares.map((share) => (share * target) / denominator);
-  const parts = exact.map(Math.floor);
-  const order = exact
-    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
-    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
-  const remainder = target - sum(parts);
-  for (let k = 0; k < remainder; k += 1) {
-    const slot = order[k];
-    if (slot) parts[slot.index] = (parts[slot.index] ?? 0) + 1;
+export function incompleteDetailNote(gaps: readonly YearGap[]): string | null {
+  const [gap] = gaps;
+  if (!gap) return null;
+  if (gaps.length > 1) {
+    return `Daily detail incomplete for ${gaps.length} years; yearly totals are exact.`;
   }
-  return parts;
-}
-
-export function incompleteDetailNote(years: readonly number[]): string | null {
-  if (years.length === 0) return null;
-  const where = years.length <= 3 ? years.join(", ") : `${years.length} years`;
-  return `Daily detail incomplete for ${where}; totals are exact.`;
+  if (gap.unattributed > 0) {
+    const commits =
+      gap.unattributed === 1
+        ? "1 commit"
+        : `${formatCount(gap.unattributed)} commits`;
+    const verb = gap.unattributed === 1 ? "is" : "are";
+    return `${commits} in ${gap.year} ${verb} not attributed to a day; yearly totals are exact.`;
+  }
+  if (gap.unattributed < 0) {
+    return `Daily detail for ${gap.year} exceeds its yearly total by ${formatCount(-gap.unattributed)}; yearly totals are exact.`;
+  }
+  return `Daily detail incomplete for ${gap.year}; yearly totals are exact.`;
 }
 
 /**
@@ -66,9 +65,11 @@ export function incompleteDetailNote(years: readonly number[]): string | null {
  *
  * The line is drawn over every calendar day from the first active year (or
  * the account's creation) to the last, with quiet days as zeros. The official
- * yearly totals are the truth: when a year's summed daily commits fall short,
- * its days are scaled up proportionally so the counter ends on the official
- * number, and the plan reports the year so the UI can say so.
+ * yearly totals are the truth for the counter and the year blocks, while the
+ * days carry only real daily commits. Whatever a year's official total has
+ * beyond them becomes one explicit step at the end of that year (see
+ * UnattributedStep): never spread across days, never scaled. Days beyond the
+ * official total are never scaled down either; the year is flagged instead.
  */
 export function planFromHistory(
   history: History,
@@ -83,6 +84,7 @@ export function planFromHistory(
       yearBlocks,
       firstYear: null,
       lastYear: null,
+      gaps: [],
       incompleteYears: [],
       note: null,
     };
@@ -119,7 +121,8 @@ export function planFromHistory(
   }
 
   const days: DailyCommits[] = [];
-  const incompleteYears: number[] = [];
+  const steps: StepInput[] = [];
+  const gaps: YearGap[] = [];
   for (let year = first.year; year <= last.year; year += 1) {
     const entry = byYear.get(year);
     const counts = new Map(
@@ -130,21 +133,29 @@ export function planFromHistory(
     const dates: string[] = [];
     for (let ms = from; ms <= to; ms += MS_PER_DAY) dates.push(isoDay(ms));
 
-    let commits = dates.map((date) => counts.get(date) ?? 0);
-    const official = entry?.totals.commits ?? 0;
-    if (sum(commits) !== official) commits = distribute(commits, official);
-    if (entry && !entry.reconciliation.matches) incompleteYears.push(year);
-    dates.forEach((date, index) => {
+    // Real commits only. Entries dated outside the range are not placed.
+    const commits = dates.map((date) => counts.get(date) ?? 0);
+    for (const [index, date] of dates.entries()) {
       days.push({ date, commits: commits[index] ?? 0 });
-    });
+    }
+
+    // The plan's own comparison decides, not only the API's reconciliation.
+    const unattributed = (entry?.totals.commits ?? 0) - sum(commits);
+    if (unattributed !== 0 && days.length > 0) {
+      steps.push({ year, dayIndex: days.length - 1, amount: unattributed });
+    }
+    if (unattributed !== 0 || (entry && !entry.reconciliation.matches)) {
+      gaps.push({ year, unattributed });
+    }
   }
 
   return {
-    plan: buildPlan(days),
+    plan: buildPlan(days, steps),
     yearBlocks,
     firstYear: first.year,
     lastYear: last.year,
-    incompleteYears,
-    note: incompleteDetailNote(incompleteYears),
+    gaps,
+    incompleteYears: gaps.map((gap) => gap.year),
+    note: incompleteDetailNote(gaps),
   };
 }

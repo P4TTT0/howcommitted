@@ -4,11 +4,19 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ClockStatus } from "@/playback/clock";
 import { ScreenMain } from "@/ui/ScreenMain";
 import { Controls } from "./Controls";
-import { CHART_HEIGHT, CHART_WIDTH, linePath } from "./chart";
+import {
+  CHART_HEIGHT,
+  CHART_WIDTH,
+  linePath,
+  stepLabelPosition,
+  stepPath,
+} from "./chart";
 import {
   blockForYearIndex,
   displayedYearIndex,
+  labelledSteps,
   type Plan,
+  stepLabel,
   yearReveals,
 } from "./plan";
 import { StartGate, type StartPhase } from "./StartGate";
@@ -43,6 +51,8 @@ export function Timeline({
   renderEnd,
 }: TimelineProps) {
   const path = useMemo(() => linePath(plan), [plan]);
+  const dashedPath = useMemo(() => stepPath(plan), [plan]);
+  const labels = useMemo(() => labelledSteps(plan.steps), [plan]);
   const rootRef = useRef<HTMLElement>(null);
   const sceneRef = useRef<Scene | null>(null);
   const mountedRef = useRef(true);
@@ -182,7 +192,35 @@ export function Timeline({
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
               />
+              {/* Commits no day carries: dashed, so it reads as not a day. */}
+              <path
+                d={dashedPath}
+                clipPath="url(#reveal)"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="5"
+                strokeDasharray="12 10"
+                vectorEffect="non-scaling-stroke"
+              />
             </svg>
+            {labels.map((step) => {
+              const { leftPercent, topPercent } = stepLabelPosition(plan, step);
+              return (
+                <span
+                  key={step.year}
+                  data-step-label={step.progress}
+                  data-visible="false"
+                  className="invisible absolute max-w-[55%] bg-paper px-1 font-mono text-xs data-[visible=true]:visible"
+                  style={{
+                    left: `${leftPercent}%`,
+                    top: `${topPercent}%`,
+                    transform: `translate(${leftPercent > 55 ? "-100%" : "0"}, -50%)`,
+                  }}
+                >
+                  {stepLabel(step)}
+                </span>
+              );
+            })}
             <span
               data-role="head"
               className="absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink"

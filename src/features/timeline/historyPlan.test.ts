@@ -4,36 +4,16 @@ import {
   makeYear,
   steadyDays,
 } from "@/test-support/historyFixture";
-import {
-  distribute,
-  incompleteDetailNote,
-  planFromHistory,
-} from "./historyPlan";
+import { incompleteDetailNote, planFromHistory } from "./historyPlan";
 import {
   DRAW_SECONDS,
   GRID_SECONDS,
   MAX_STEP_MILESTONES,
   milestoneSchedule,
+  stepCueTimes,
 } from "./plan";
 
 const TODAY = new Date("2026-10-17T12:00:00Z");
-
-describe("distribute", () => {
-  it("adds up exactly and follows the weights", () => {
-    const parts = distribute([1, 2, 0, 1], 10);
-    expect(parts.reduce((a, b) => a + b, 0)).toBe(10);
-    expect(parts[2]).toBe(0);
-    expect(parts[1]).toBeGreaterThan(parts[0] ?? 0);
-  });
-
-  it("spreads evenly when there are no weights", () => {
-    expect(distribute([0, 0, 0], 7)).toEqual([3, 2, 2]);
-  });
-
-  it("returns zeros for a zero target", () => {
-    expect(distribute([1, 1], 0)).toEqual([0, 0]);
-  });
-});
 
 describe("milestoneSchedule", () => {
   it("keeps 1,000 steps with an early first payoff for normal profiles", () => {
@@ -61,12 +41,28 @@ describe("incompleteDetailNote", () => {
     expect(incompleteDetailNote([])).toBeNull();
   });
 
-  it("names the years, then counts them", () => {
-    expect(incompleteDetailNote([2019])).toBe(
-      "Daily detail incomplete for 2019; totals are exact.",
+  it("says how many commits a single year left unattributed", () => {
+    expect(incompleteDetailNote([{ year: 2019, unattributed: 1880 }])).toBe(
+      "1,880 commits in 2019 are not attributed to a day; yearly totals are exact.",
     );
-    expect(incompleteDetailNote([2015, 2016, 2017, 2018])).toBe(
-      "Daily detail incomplete for 4 years; totals are exact.",
+    expect(incompleteDetailNote([{ year: 2019, unattributed: 1 }])).toBe(
+      "1 commit in 2019 is not attributed to a day; yearly totals are exact.",
+    );
+  });
+
+  it("flags daily detail above the yearly total, or a bare mismatch", () => {
+    expect(incompleteDetailNote([{ year: 2019, unattributed: -5 }])).toBe(
+      "Daily detail for 2019 exceeds its yearly total by 5; yearly totals are exact.",
+    );
+    expect(incompleteDetailNote([{ year: 2019, unattributed: 0 }])).toBe(
+      "Daily detail incomplete for 2019; yearly totals are exact.",
+    );
+  });
+
+  it("counts several years instead of listing them", () => {
+    const gaps = [2015, 2016, 2017].map((year) => ({ year, unattributed: 3 }));
+    expect(incompleteDetailNote(gaps)).toBe(
+      "Daily detail incomplete for 3 years; yearly totals are exact.",
     );
   });
 });
@@ -99,26 +95,121 @@ describe("planFromHistory", () => {
     expect(plan.total).toBe(history.totals.commits);
   });
 
-  it("scales a year with incomplete daily detail to its official total and says so", () => {
+  const dailySum = (plan: { days: { commits: number }[] }) =>
+    plan.days.reduce((total, day) => total + day.commits, 0);
+
+  it("shows missing commits as one explicit step at the end of the year", () => {
     const truncated = makeYear(2019, steadyDays(2019, 1), 2000);
     const history = makeHistory("ada", [
       makeYear(2018, steadyDays(2018, 2)),
       truncated,
     ]);
     const result = planFromHistory(history, TODAY);
+    const { plan } = result;
     expect(truncated.reconciliation.matches).toBe(false);
+
+    // Days stay real: 122 commits on the days of 2019, nothing invented.
+    const daysOf2019 = plan.days.filter((d) => d.date.startsWith("2019"));
+    expect(daysOf2019.reduce((t, d) => t + d.commits, 0)).toBe(
+      truncated.reconciliation.summed,
+    );
+
+    const [step] = plan.steps;
+    expect(plan.steps).toHaveLength(1);
+    expect(step?.year).toBe(2019);
+    expect(step?.amount).toBe(2000 - truncated.reconciliation.summed);
+    expect(plan.days[step?.dayIndex ?? 0]?.date).toBe("2019-12-31");
+    expect(step?.to).toBe((step?.from ?? 0) + (step?.amount ?? 0));
+
     expect(result.incompleteYears).toEqual([2019]);
     expect(result.note).toBe(
-      "Daily detail incomplete for 2019; totals are exact.",
+      "1,878 commits in 2019 are not attributed to a day; yearly totals are exact.",
     );
-    expect(result.plan.total).toBe(history.totals.commits);
+    expect(plan.total).toBe(history.totals.commits);
+    expect(plan.cumulative.at(-1)).toBe(history.totals.commits);
   });
 
-  it("spreads a year with official commits but no daily detail", () => {
+  it("never scales down when daily detail exceeds the yearly total", () => {
+    const over = makeYear(2020, steadyDays(2020, 2), 100);
+    const history = makeHistory("ada", [over]);
+    const result = planFromHistory(history, TODAY);
+    expect(dailySum(result.plan)).toBe(over.reconciliation.summed);
+    const [step] = result.plan.steps;
+    expect(step?.amount).toBe(100 - over.reconciliation.summed);
+    expect(result.plan.total).toBe(100);
+    expect(result.plan.cumulative.at(-1)).toBe(100);
+    expect(result.incompleteYears).toEqual([2020]);
+    expect(result.note).toContain("exceeds its yearly total");
+    // A step that takes commits away is never celebrated with a cue.
+    expect(stepCueTimes(result.plan)).toEqual([]);
+  });
+
+  it("makes a year with no daily detail one unattributed step, not a ramp", () => {
     const history = makeHistory("ada", [makeYear(2020, [], 365)]);
     const result = planFromHistory(history, TODAY);
+    expect(dailySum(result.plan)).toBe(0);
+    expect(result.plan.steps).toHaveLength(1);
+    expect(result.plan.steps[0]?.amount).toBe(365);
+    expect(result.plan.slots).toEqual([]);
     expect(result.plan.total).toBe(365);
     expect(result.incompleteYears).toEqual([2020]);
+  });
+
+  it("notices a mismatch the API reconciliation missed", () => {
+    // Reconciliation says the year matches, yet one entry is dated outside
+    // the year and cannot be placed on any of its days.
+    const stray = makeYear(2020, [
+      { date: "2020-03-01", commits: 2 },
+      { date: "2021-01-05", commits: 3 },
+    ]);
+    expect(stray.reconciliation.matches).toBe(true);
+    const result = planFromHistory(makeHistory("ada", [stray]), TODAY);
+    expect(result.plan.steps[0]?.amount).toBe(3);
+    expect(result.incompleteYears).toEqual([2020]);
+    expect(result.note).toBe(
+      "3 commits in 2020 are not attributed to a day; yearly totals are exact.",
+    );
+    expect(result.plan.total).toBe(5);
+  });
+
+  it("plays one soft cue per growing step, on the grid", () => {
+    const history = makeHistory("ada", [
+      makeYear(2018, steadyDays(2018, 1), 500),
+      makeYear(2019, steadyDays(2019, 1), 100),
+      makeYear(2020, steadyDays(2020, 1), 600),
+    ]);
+    const { plan } = planFromHistory(history, TODAY);
+    const growing = plan.steps.filter((step) => step.amount > 0);
+    expect(growing).toHaveLength(2);
+    const times = stepCueTimes(plan);
+    const payoffs = new Set(plan.milestones.map((m) => m.time));
+    expect(times.length).toBe(
+      growing.filter((s) => !payoffs.has(s.time)).length,
+    );
+    expect(new Set(times).size).toBe(times.length);
+    for (const time of times) {
+      expect(
+        Math.abs(time / GRID_SECONDS - Math.round(time / GRID_SECONDS)),
+      ).toBeLessThan(1e-6);
+    }
+  });
+
+  it("fires a milestone crossed inside a step at the step", () => {
+    const history = makeHistory("ada", [
+      makeYear(2020, [{ date: "2020-02-01", commits: 10 }], 2600),
+      makeYear(2021, steadyDays(2021, 1)),
+    ]);
+    const { plan } = planFromHistory(history, TODAY);
+    const step = plan.steps[0];
+    const crossed = plan.milestones.filter((m) => m.kind === "step");
+    expect(crossed.length).toBeGreaterThan(0);
+    expect(crossed[0]?.time).toBe(step?.time);
+  });
+
+  it("spreads nothing across the year when the whole year is one step", () => {
+    const history = makeHistory("ada", [makeYear(2020, [], 365)]);
+    const { plan } = planFromHistory(history, TODAY);
+    expect(plan.days.every((day) => day.commits === 0)).toBe(true);
   });
 
   it("has an empty plan for zero contributions", () => {
