@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import type { YearBlock } from "@/domain/year-summary";
+import { formatCount } from "@/features/timeline/format";
 import { blockForYearIndex } from "@/features/timeline/plan";
-import { formatCount } from "@/features/timeline/scene";
 import { actionClass } from "@/ui/classes";
 
 export const PRINCIPLE =
