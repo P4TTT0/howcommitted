@@ -36,6 +36,8 @@ export function RivalsRow({ main, rivals, onChange }: RivalsRowProps) {
   const [state, setState] = useState<LookupState>({ kind: "idle" });
   const [note, setNote] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  const removeRefs = useRef(new Map<string, HTMLButtonElement>());
   const full = 1 + rivals.length >= MAX_DEVELOPERS;
 
   useEffect(() => {
@@ -99,11 +101,18 @@ export function RivalsRow({ main, rivals, onChange }: RivalsRowProps) {
     }
     onChange([...rivals, state.user]);
     close();
+    // The input is gone: keep the keyboard on this row. When the lineup is
+    // now full "+ vs" is gone too, so land on the newest pill's remove.
+    const newest = state.user.login.toLowerCase();
+    setTimeout(() => {
+      (addRef.current ?? removeRefs.current.get(newest))?.focus();
+    }, 0);
   }
 
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === "Enter") {
       event.preventDefault();
+      if (event.nativeEvent.isComposing) return;
       commit();
     } else if (event.key === "Escape") {
       event.preventDefault();
@@ -146,9 +155,22 @@ export function RivalsRow({ main, rivals, onChange }: RivalsRowProps) {
             <button
               type="button"
               aria-label={`Remove @${rival.login}`}
-              onClick={() =>
-                onChange(rivals.filter((other) => other !== rival))
-              }
+              ref={(node) => {
+                const key = rival.login.toLowerCase();
+                if (node) removeRefs.current.set(key, node);
+                else removeRefs.current.delete(key);
+              }}
+              onClick={() => {
+                onChange(rivals.filter((other) => other !== rival));
+                // Next pill's remove button, else "+ vs".
+                const next = rivals[index + 1];
+                setTimeout(() => {
+                  (next
+                    ? removeRefs.current.get(next.login.toLowerCase())
+                    : addRef.current
+                  )?.focus();
+                }, 0);
+              }}
               className={`inline-flex size-7 items-center justify-center hover:bg-ink wide:size-9 hover:text-paper ${pressable} ${focusRing}`}
             >
               <span aria-hidden="true">×</span>
@@ -159,6 +181,7 @@ export function RivalsRow({ main, rivals, onChange }: RivalsRowProps) {
           <li>
             <button
               type="button"
+              ref={addRef}
               onClick={() => setOpen(true)}
               className={`${actionClass} min-h-9`}
             >
