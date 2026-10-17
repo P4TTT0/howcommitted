@@ -7,6 +7,11 @@ export const PLACEHOLDER_NAMES = [
   "yyx990803",
 ] as const;
 
+/** The widest example, used to size the idle field. */
+export const LONGEST_PLACEHOLDER: string = PLACEHOLDER_NAMES.reduce((a, b) =>
+  b.length > a.length ? b : a,
+);
+
 /** One typed letter per tick. */
 export const PLACEHOLDER_TICK_MS = 140;
 

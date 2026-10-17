@@ -8,11 +8,9 @@ export function SignatureLine() {
       viewBox="0 0 1440 160"
       preserveAspectRatio="none"
       aria-hidden="true"
-      className="mt-8 block h-28 w-full"
+      className="signature-line mt-8 block h-28 w-full"
     >
       <polyline
-        className="signature-line"
-        pathLength={1}
         points={POINTS}
         fill="none"
         stroke="currentColor"

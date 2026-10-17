@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { PLACEHOLDER_TICK_MS, placeholderFor } from "./placeholder";
+import {
+  PLACEHOLDER_NAMES,
+  PLACEHOLDER_TICK_MS,
+  placeholderFor,
+} from "./placeholder";
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -17,7 +21,8 @@ export function useTypingPlaceholder(active: boolean): string {
       setTick(null);
       return;
     }
-    setTick(0);
+    // Start on the finished first name, so nothing collapses after hydration.
+    setTick(PLACEHOLDER_NAMES[0].length - 1);
     const timer = setInterval(
       () => setTick((current) => (current ?? 0) + 1),
       PLACEHOLDER_TICK_MS,

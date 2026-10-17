@@ -15,6 +15,7 @@ import {
   lookupMessage,
 } from "./lookup";
 import { PreviewRow } from "./PreviewRow";
+import { LONGEST_PLACEHOLDER, STATIC_PLACEHOLDER } from "./placeholder";
 import { useTypingPlaceholder } from "./useTypingPlaceholder";
 
 const NUDGE = "Type a GitHub username first.";
@@ -24,7 +25,7 @@ function warmUpAudio() {
 }
 
 /**
- * The landing question: "How committed is @[input]?". Debounced exact-username lookup with a preview. debounced exact-username lookup with a preview. Only the
+ * The landing question: "How committed is @[input]?". Debounced exact-username lookup with a preview. Only the
  * preview is fetched here; the history waits for the click (fetch on intent),
  * which also unlocks audio before navigating to the experience.
  */
@@ -99,24 +100,28 @@ export function Search() {
     nudge && state.kind === "idle"
       ? NUDGE
       : lookupMessage(state as Exclude<LookupState, { kind: "found" }>);
+  // Empty and idle: reserve the longest example so "?" does not jump per tick.
+  const sizer = value || (focused ? STATIC_PLACEHOLDER : LONGEST_PLACEHOLDER);
+
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-7">
-      <div className="font-display text-[clamp(40px,12vw,200px)] font-black uppercase leading-[0.86]">
+      <div className="font-display text-[clamp(40px,12vw,200px)] font-black uppercase leading-[0.86] max-sm:text-[15.5vw]">
         <label id="ask-how" htmlFor="login" className="block whitespace-nowrap">
-          How committed
+          <span className="max-sm:block">How</span>{" "}
+          <span className="max-sm:block">committed</span>
         </label>
         <span id="ask-rest" className="sr-only">
           is GitHub username
         </span>
-        <span className="flex max-w-full items-baseline gap-[0.2em]">
+        <span className="flex max-w-full items-baseline max-sm:text-[0.55em]">
           <span aria-hidden="true">is&nbsp;@</span>
           <span className="inline-grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] items-baseline">
             {/* Sizer: the field is as wide as what it shows, like part of the sentence. */}
             <span
               aria-hidden="true"
-              className="invisible col-start-1 row-start-1 whitespace-pre pr-[0.05em]"
+              className="invisible col-start-1 row-start-1 whitespace-pre pr-[0.04em]"
             >
-              {value || placeholder || "m"}
+              {sizer}
             </span>
             <input
               id="login"
@@ -139,24 +144,27 @@ export function Search() {
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              className="col-start-1 row-start-1 w-0 min-w-full rounded-none border-0 border-b-[0.07em] border-ink bg-transparent p-0 font-[inherit] uppercase text-[inherit] caret-block-ultramarine outline-none placeholder:text-ink placeholder:opacity-40 focus:border-block-ultramarine"
+              className="col-start-1 row-start-1 w-0 min-w-full rounded-none border-0 border-b-[0.07em] border-ink bg-transparent p-0 font-[inherit] uppercase text-[inherit] caret-block-ultramarine outline-none placeholder:text-ink placeholder:opacity-40 focus:border-block-ultramarine focus:shadow-[0_0.05em_0_0_var(--color-block-ultramarine)]"
             />
           </span>
           <span aria-hidden="true">?</span>
         </span>
       </div>
 
-      <div
-        id="lookup-status"
-        role="status"
-        className="min-h-14 font-mono text-sm"
-      >
-        {state.kind === "found" ? (
-          <PreviewRow user={state.user} disabled={starting} onStart={start} />
-        ) : (
-          <div className="flex min-h-14 flex-wrap items-center gap-3">
-            <p>{statusText}</p>
-            {canRetry(state) && (
+      <div className="min-h-14 font-mono text-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* The live region stays outside the button; it is read, not shown, when found. */}
+          <p
+            id="lookup-status"
+            role="status"
+            className={found ? "sr-only" : "flex min-h-14 items-center"}
+          >
+            {found ? `Found @${found.login}` : statusText}
+          </p>
+          {found ? (
+            <PreviewRow user={found} disabled={starting} onStart={start} />
+          ) : (
+            canRetry(state) && (
               <button
                 type="button"
                 onClick={() => setAttempt((count) => count + 1)}
@@ -164,9 +172,9 @@ export function Search() {
               >
                 Try again
               </button>
-            )}
-          </div>
-        )}
+            )
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4">

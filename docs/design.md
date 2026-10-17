@@ -8,12 +8,12 @@ Flat color blocks, giant kinetic typography, numbers as protagonists. It avoids 
 
 The landing is the question, "How committed is @[username]?", set as a Signal yellow poster. The question is the brand: there is no giant title above it, only a small "Committed" wordmark top-left.
 
-- The username input sits inside the sentence. It inherits the display font, has no box, only an ink bottom border that turns Ultramarine on focus. The visible label is the sentence itself ("How committed"), and the accessible name continues it ("is GitHub username").
-- Two intentional lines: "How committed" never breaks, "is @name?" wraps only as a whole.
+- The username input sits inside the sentence. It inherits the display font, has no box, only an ink bottom border that turns Ultramarine and thicker on focus (never color alone). The visible label is the sentence itself ("How committed"), and the accessible name continues it ("is GitHub username").
+- Two intentional lines on desktop ("How committed" / "is @name?"), three on phones ("How" / "committed" / "is @name?", the last at 0.55em). Words never break by accident.
 - The empty field types example usernames, one letter at a time. It stops on focus or typing and stays static under `prefers-reduced-motion`.
 - Lookup states are one compact Martian Mono line under the sentence. A found user is a single pressable row (avatar, name, `@login`, active years) that starts the experience like the main button.
-- "Listen" is the one call to action, with a one-line description beside it. It is the only filled element, so it reads as the thing to press.
-- Signature: top-right "Made by @P4TTT0", GitHub and LinkedIn links, and a cumulative line that draws itself along the bottom (static under reduced motion).
+- "Listen" is the one call to action, with a one-line description beside it. It is the only filled element when active, so it reads as the thing to press. Disabled (no user yet) it is transparent with a dashed ink border: same size, full contrast, no opacity.
+- Signature: top-right "Made by @P4TTT0", GitHub and LinkedIn links, and a cumulative line that draws itself once along the bottom (static under reduced motion).
 - Every button and link has a pointer, a hover (flip to Ultramarine or Ink), a pressed state and the shared focus ring, from `src/ui/classes.ts`.
 - Room is kept under the sentence for the versus row, which arrives with the versus stage.
 

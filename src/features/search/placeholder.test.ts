@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  LONGEST_PLACEHOLDER,
   PLACEHOLDER_NAMES,
   placeholderAt,
   placeholderFor,
@@ -49,5 +50,11 @@ describe("placeholderFor", () => {
 
   it("follows the cycle while the animation runs", () => {
     expect(placeholderFor(0)).toBe("t");
+  });
+});
+
+describe("LONGEST_PLACEHOLDER", () => {
+  it("is the widest example", () => {
+    expect(LONGEST_PLACEHOLDER).toBe("sindresorhus");
   });
 });
