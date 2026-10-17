@@ -12,10 +12,18 @@
  * - Year accent: the thud, pitched down, quiet.
  * - Voice limit: each group caps simultaneous voices; past it the oldest is
  *   cut.
+ * - Speed: samples are never resampled for speed (that would pitch-shift the
+ *   chips off the scale). Ticks only arrive sooner; above 1x they also get a
+ *   little quieter, because twice the hits per second read as louder.
  */
 
 import * as Tone from "tone";
-import { microVariation, rateForCents, rateForSemitones } from "../pitch";
+import {
+  microVariation,
+  rateForCents,
+  rateForSemitones,
+  tickDbForSpeed,
+} from "../pitch";
 import { disposePools, loadSamples, type Pool, playSample } from "./samples";
 
 const TICK_FILES = ["chip-1", "chip-2", "chip-3"] as const;
@@ -33,7 +41,6 @@ const ACCENT = { semitones: -5, db: -11 };
 /** Softer and higher than a payoff, so it reads as a different kind of event. */
 const UNATTRIBUTED = { semitones: 3, db: -8 };
 const LIMITER_DB = -1;
-
 export type TickHit = {
   /** Audio time from the Transport callback. */
   time: number;
@@ -57,6 +64,7 @@ export class SoundEngine {
     marker: [] as Pool,
   };
   private lastTick = -1;
+  private tickSpeedDb = 0;
 
   private constructor(
     private readonly buffers: Tone.ToneAudioBuffers,
@@ -75,6 +83,11 @@ export class SoundEngine {
     Tone.getDestination().mute = muted;
   }
 
+  /** Follows the playback rate; only the density of ticks is adjusted. */
+  setSpeed(speed: number): void {
+    this.tickSpeedDb = tickDbForSpeed(speed);
+  }
+
   playTick({ time, semitones, intensity }: TickHit): void {
     const variation = microVariation(this.random);
     playSample(
@@ -87,7 +100,8 @@ export class SoundEngine {
         rate:
           rateForSemitones(TICK_BASE_SEMITONES + semitones) *
           rateForCents(variation.cents),
-        db: TICK_BASE_DB + (intensity - 1) * 6 + variation.db,
+        db:
+          TICK_BASE_DB + (intensity - 1) * 6 + variation.db + this.tickSpeedDb,
       },
     );
   }

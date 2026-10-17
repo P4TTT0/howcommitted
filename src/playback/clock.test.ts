@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const transport = vi.hoisted(() => ({
-  seconds: 0,
+  ticks: 0,
+  PPQ: 192,
   position: 0 as number | string,
   bpm: { value: 0 },
   schedule: vi.fn(),
@@ -19,6 +20,9 @@ vi.mock("tone", () => ({
 
 import { PlaybackClock } from "./clock";
 
+/** Ticks in one second of a 120 bpm scene at 192 PPQ. */
+const TPS = 384;
+
 let frames: Array<() => void> = [];
 let visibility: Array<() => void> = [];
 const doc = { hidden: false };
@@ -33,7 +37,7 @@ beforeEach(() => {
   frames = [];
   visibility = [];
   doc.hidden = false;
-  transport.seconds = 0;
+  transport.ticks = 0;
   vi.clearAllMocks();
   vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
     frames.push(callback);
@@ -102,10 +106,10 @@ describe("PlaybackClock", () => {
   it("finishes from the frame loop once Transport time reaches the duration", () => {
     const clock = new PlaybackClock({ duration: 10, bpm: 120 });
     clock.start();
-    transport.seconds = 5;
+    transport.ticks = 5 * TPS;
     runFrame();
     expect(clock.status).toBe("playing");
-    transport.seconds = 10.05;
+    transport.ticks = 10.05 * TPS;
     runFrame();
     expect(clock.status).toBe("ended");
     expect(transport.pause).toHaveBeenCalled();
@@ -145,7 +149,7 @@ describe("PlaybackClock", () => {
     expect(transport.cancel).toHaveBeenCalled();
     expect(transport.position).toBe(0);
     clock.start();
-    transport.seconds = 4.05;
+    transport.ticks = 4.05 * ((192 * 140) / 60);
     runFrame();
     expect(statuses.at(-1)).toBe("ended");
     expect(visibility).toHaveLength(1);
@@ -182,12 +186,70 @@ describe("PlaybackClock", () => {
 
   it("clamps visible time to the duration and removes listeners on dispose", () => {
     const clock = new PlaybackClock({ duration: 10, bpm: 120 });
-    transport.seconds = 99;
+    transport.ticks = 99 * TPS;
     expect(clock.seconds).toBe(10);
-    transport.seconds = 0;
+    transport.ticks = 0;
     expect(clock.seconds).toBe(0);
     clock.dispose();
     expect(visibility).toHaveLength(0);
     expect(transport.cancel).toHaveBeenCalled();
+  });
+
+  it("schedules hits in ticks of the scene's own tempo", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    const callback = vi.fn();
+    clock.at(2, callback);
+    expect(transport.schedule).toHaveBeenCalledWith(callback, `${2 * TPS}i`);
+  });
+
+  it("scales the Transport tempo by the speed and keeps it across scenes", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    clock.setSpeed(2);
+    expect(clock.speed).toBe(2);
+    expect(transport.bpm.value).toBe(240);
+    clock.loadScene({ duration: 4, bpm: 140 });
+    expect(transport.bpm.value).toBe(280);
+    expect(clock.speed).toBe(2);
+  });
+
+  it("schedules at the scene's tempo whatever the speed, so hits keep their place", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    clock.setSpeed(2);
+    const callback = vi.fn();
+    clock.at(2, callback);
+    expect(transport.schedule).toHaveBeenCalledWith(callback, `${2 * TPS}i`);
+  });
+
+  it("reads scene time from ticks, not from real seconds, at any speed", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    clock.setSpeed(2);
+    transport.ticks = 5 * TPS;
+    // Look-ahead (0.1 s of real time) is 0.2 scene seconds at 2x.
+    expect(clock.seconds).toBeCloseTo(4.8);
+    runFrame();
+    clock.start();
+    transport.ticks = 10.05 * TPS;
+    runFrame();
+    expect(clock.status).toBe("ended");
+  });
+
+  it("ignores speeds that are not positive numbers", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    clock.setSpeed(0);
+    clock.setSpeed(-1);
+    clock.setSpeed(Number.NaN);
+    expect(clock.speed).toBe(1);
+    expect(transport.bpm.value).toBe(120);
+  });
+
+  it("jumps to the end of a loaded scene without playing it", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    const seen: number[] = [];
+    clock.onFrame((seconds) => seen.push(seconds));
+    clock.loadScene({ duration: 4, bpm: 120 });
+    clock.jumpToEnd();
+    expect(clock.status).toBe("ended");
+    expect(seen.at(-1)).toBe(4);
+    expect(transport.start).not.toHaveBeenCalled();
   });
 });

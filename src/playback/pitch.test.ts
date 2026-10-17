@@ -7,6 +7,7 @@ import {
   rateForSemitones,
   restartRegister,
   semitonesForDegree,
+  tickDbForSpeed,
 } from "./pitch";
 
 describe("degreeForAccumulation", () => {
@@ -89,5 +90,21 @@ describe("restartRegister", () => {
       expect(restartRegister(10, run)).toBeLessThanOrEqual(7);
       expect(restartRegister(0, run)).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+describe("tickDbForSpeed", () => {
+  it("leaves 1x and slower untouched", () => {
+    expect(tickDbForSpeed(1)).toBe(0);
+    expect(tickDbForSpeed(0.5)).toBe(0);
+  });
+
+  it("ducks ticks by 3 dB per doubling above 1x", () => {
+    expect(tickDbForSpeed(2)).toBeCloseTo(-3);
+    expect(tickDbForSpeed(1.5)).toBeCloseTo(-1.755, 2);
+  });
+
+  it("ignores values that are not a speed", () => {
+    expect(tickDbForSpeed(Number.NaN)).toBe(0);
   });
 });
