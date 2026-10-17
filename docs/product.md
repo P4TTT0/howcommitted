@@ -38,8 +38,10 @@ CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 
 ## Controls
 
-- Pause, skip scene, mute.
-- Progress bar with scene ticks.
+- Pause, previous and next scene, speed (0.5×, 1×, 1.5×, 2×, kept for the whole run), mute, and cancel (back to the landing).
+- Scenes never advance on their own. A finished scene stays on screen to explore: its chart is interactive (pointer and keyboard show exact values) and a clear "Next" moves on. Going back or jumping to a scene already played lands in explore; it can be replayed.
+- Progress bar with clickable scene ticks.
+- Keyboard: Space pause/resume, ← → previous/next scene, M mute, Esc cancel. Never while typing.
 - Shared links never autoplay.
 
 ## MVP scope
