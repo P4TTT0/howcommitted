@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Experience } from "@/features/experience/Experience";
 import { parseSoloLogin } from "@/features/experience/parseSoloLogin";
+import { loadCachedPoster } from "@/og/load";
+import { userMetadata } from "@/og/metadata";
 
 type Props = { params: Promise<{ users: string[] }> };
 
@@ -14,7 +16,8 @@ async function soloLogin(params: Props["params"]): Promise<string> {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const login = await soloLogin(params);
-  return { title: `@${login} | Committed` };
+  // Cache only: link previews must never trigger a GitHub request or the quota.
+  return userMetadata(login, await loadCachedPoster(login));
 }
 
 export default async function UserPage({ params }: Props) {
