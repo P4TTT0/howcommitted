@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { blocks, contrastRatio, neutrals, versus } from "./tokens";
 
@@ -29,4 +30,16 @@ describe("versus palette", () => {
       expect(contrastRatio(color, paper)).toBeGreaterThanOrEqual(3);
     },
   );
+});
+
+describe("globals.css", () => {
+  const css = readFileSync("src/app/globals.css", "utf8").toLowerCase();
+
+  it.each([
+    ...Object.entries(neutrals),
+    ...Object.entries(blocks),
+    ...Object.entries(versus),
+  ])("declares %s as %s", (_, hex) => {
+    expect(css).toContain(hex.toLowerCase());
+  });
 });
