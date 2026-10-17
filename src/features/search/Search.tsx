@@ -9,6 +9,9 @@ import {
   useState,
 } from "react";
 import { recordIntent } from "@/features/experience/intent";
+import { versusPath } from "@/features/versus/parseVersusLogins";
+import { RivalsRow } from "@/features/versus/RivalsRow";
+import { rivalsFor } from "@/features/versus/rivals";
 import { preloadAudio, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
 import { StartButton } from "@/ui/StartButton";
@@ -19,6 +22,7 @@ import {
   type LookupState,
   lookupLogin,
   lookupMessage,
+  type PreviewUser,
 } from "./lookup";
 import { PlayerCard } from "./PlayerCard";
 import { PlayerColumn } from "./PlayerColumn";
@@ -37,8 +41,9 @@ function warmUpAudio() {
  * preview is fetched here; the history waits for the click (fetch on intent),
  * which also unlocks audio before navigating to the experience.
  */
-export function Search() {
+export function Search({ versus = false }: { versus?: boolean }) {
   const router = useRouter();
+  const [rivalPicks, setRivalPicks] = useState<PreviewUser[]>([]);
   const [value, setValue] = useState("");
   const [state, setState] = useState<LookupState>({ kind: "idle" });
   const [attempt, setAttempt] = useState(0);
@@ -87,6 +92,19 @@ export function Search() {
   }, [value, attempt]);
 
   const found = state.kind === "found" ? state.user : null;
+  const rivalLogins = found
+    ? rivalsFor(
+        found.login,
+        rivalPicks.map((rival) => rival.login),
+      )
+    : [];
+  const rivals = rivalPicks.filter((rival) =>
+    rivalLogins.includes(rival.login),
+  );
+  const rivalsRow =
+    versus && found ? (
+      <RivalsRow main={found} rivals={rivals} onChange={setRivalPicks} />
+    ) : null;
 
   // A found user is the likely next click: have the audio engine ready.
   useEffect(() => {
@@ -98,8 +116,10 @@ export function Search() {
     setStarting(true);
     // Called before any await so the click still counts as the user gesture.
     const unlocked = await unlockAudio();
-    if (unlocked) recordIntent(found.login);
-    router.push(`/${found.login}`);
+    const logins = [found.login, ...rivalLogins];
+    const path = versusPath(logins);
+    if (unlocked) recordIntent(logins.join("/"));
+    router.push(path);
   }
 
   function onSubmit(event: FormEvent) {
@@ -201,7 +221,16 @@ export function Search() {
             </p>
             {found ? (
               wide ? null : (
-                <PreviewRow user={found} disabled={starting} onStart={start} />
+                <div className="flex w-full flex-wrap items-start gap-x-3 gap-y-2">
+                  <PreviewRow
+                    user={found}
+                    disabled={starting}
+                    onStart={start}
+                  />
+                  {rivalsRow && (
+                    <div className="min-w-48 flex-1">{rivalsRow}</div>
+                  )}
+                </div>
               )
             ) : (
               canRetry(state) && (
@@ -236,7 +265,10 @@ export function Search() {
 
       <PlayerColumn>
         {found && wide && (
-          <PlayerCard user={found} disabled={starting} onStart={start} />
+          <>
+            <PlayerCard user={found} disabled={starting} onStart={start} />
+            {rivalsRow}
+          </>
         )}
       </PlayerColumn>
     </form>

@@ -173,28 +173,46 @@ const VIEWPORTS = [
 ] as const;
 
 for (const [width, height] of VIEWPORTS) {
-  for (const state of ["empty", "found"] as const) {
+  for (const state of ["empty", "found", "five"] as const) {
     test(`never scrolls and shows everything at ${width}x${height} (${state})`, async ({
       page,
     }) => {
-      await page.route("**/api/user/*", (route) =>
-        route.fulfill({
+      await page.route("**/api/user/*", (route) => {
+        const login = decodeURIComponent(
+          new URL(route.request().url()).pathname.split("/").pop() ?? "",
+        );
+        return route.fulfill({
           json: {
             user: {
               ...preview.user,
-              login: "sindresorhus",
-              name: "Sindre Sorhus",
+              login,
+              name: login === "sindresorhus" ? "Sindre Sorhus" : login,
             },
           },
-        }),
-      );
+        });
+      });
       await page.setViewportSize({ width, height });
       await page.goto("/");
-      if (state === "found") {
+      if (state !== "empty") {
         await page.getByLabel("GitHub username").fill("sindresorhus");
         await expect(
           page.locator("button:visible", { hasText: "Sindre Sorhus" }),
         ).toBeVisible();
+      }
+      if (state === "five") {
+        // The longest logins GitHub allows (39 characters), so pills are as wide as they get.
+        for (const rival of ["1", "2", "3", "4"].map(
+          (n) => `r${n}${"x".repeat(37)}`,
+        )) {
+          await page.getByRole("button", { name: "+ vs" }).click();
+          await page.getByLabel("Rival login").fill(rival);
+          await expect(
+            page.locator("#rival-status", { hasText: `Found @${rival}` }),
+          ).toBeVisible();
+          await page.getByLabel("Rival login").press("Enter");
+        }
+        await expect(page.getByRole("list", { name: "Rivals" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "+ vs" })).toHaveCount(0);
       }
 
       const scroll = await page.evaluate(() => ({
@@ -212,10 +230,13 @@ for (const [width, height] of VIEWPORTS) {
         page.getByRole("heading", { level: 1 }),
         page.getByText("Type a GitHub username.", { exact: false }),
       ];
-      if (state === "found") {
+      if (state !== "empty") {
         targets.push(
           page.locator("button:visible", { hasText: "Sindre Sorhus" }),
         );
+      }
+      if (state === "five") {
+        targets.push(page.getByRole("list", { name: "Rivals" }));
       }
       for (const target of targets) {
         const box = await target.boundingBox();
@@ -274,4 +295,84 @@ test("on a portrait screen the compact row stays under the question", async ({
     (inputBox?.y ?? 0) + (inputBox?.height ?? 0),
   );
   expect(rowBox?.x ?? 9999).toBeLessThan(100);
+});
+
+test.describe("versus on the landing", () => {
+  test.beforeEach(async ({ page }) => {
+    // Every login resolves to itself, so rivals differ from the main developer.
+    await page.route("**/api/user/*", (route) => {
+      const login = decodeURIComponent(
+        new URL(route.request().url()).pathname.split("/").pop() ?? "",
+      );
+      return route.fulfill({ json: { user: { ...preview.user, login } } });
+    });
+  });
+
+  test("+ vs adds rivals after the exact-username lookup, up to five", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByLabel("GitHub username").fill("ada");
+    await page.getByRole("button", { name: "+ vs" }).click();
+    const rival = page.getByLabel("Rival login");
+    await rival.fill("grace");
+    await expect(
+      page.locator("#rival-status", { hasText: "Found @grace" }),
+    ).toBeVisible();
+    await rival.press("Enter");
+    await expect(page).toHaveURL(/\/$/);
+    await expect(
+      page.getByRole("button", { name: "Remove @grace" }),
+    ).toBeVisible();
+  });
+
+  test("a rival cannot repeat the main developer or be reserved", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByLabel("GitHub username").fill("ada");
+    await page.getByRole("button", { name: "+ vs" }).click();
+    const rival = page.getByLabel("Rival login");
+    await rival.fill("lab");
+    await expect(
+      page.getByText(/collides with a Committed page/),
+    ).toBeVisible();
+    await rival.fill("ADA");
+    await expect(
+      page.locator("#rival-status", { hasText: "Found @ada" }),
+    ).toBeVisible();
+    await rival.press("Enter");
+    await expect(page.getByText("Already in the lineup.")).toBeVisible();
+  });
+
+  test("a pill can be removed", async ({ page }) => {
+    await page.goto("/");
+    await page.getByLabel("GitHub username").fill("grace");
+    await page.getByRole("button", { name: "+ vs" }).click();
+    await page.getByLabel("Rival login").fill("ada");
+    await expect(
+      page.locator("#rival-status", { hasText: "Found @ada" }),
+    ).toBeVisible();
+    await page.getByLabel("Rival login").press("Enter");
+    await page.getByRole("button", { name: "Remove @ada" }).click();
+    await expect(page.getByRole("button", { name: "Remove @ada" })).toHaveCount(
+      0,
+    );
+  });
+
+  test("Play with rivals opens the versus route", async ({ page }) => {
+    await page.goto("/");
+    await page.getByLabel("GitHub username").fill("grace");
+    await page.getByRole("button", { name: "+ vs" }).click();
+    await page.getByLabel("Rival login").fill("ada");
+    await expect(
+      page.locator("#rival-status", { hasText: "Found @ada" }),
+    ).toBeVisible();
+    await page.getByLabel("Rival login").press("Enter");
+    await page
+      .getByRole("button", { name: /^Play( @\w+)?$/ })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/\/grace\/ada$/);
+  });
 });

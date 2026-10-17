@@ -28,6 +28,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # The landing is prerendered, so the versus gate is read at build time.
       - run: pnpm build
+        env:
+          ALLOW_LAB: "1"
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
