@@ -1,4 +1,5 @@
 import type { History } from "@/domain/history";
+import type { RepoFlag } from "@/domain/repo-flags";
 import type { DailyCommits } from "@/domain/types";
 import type { YearBlock } from "@/domain/year-summary";
 import { formatCount } from "./format";
@@ -28,6 +29,8 @@ export type HistoryPlan = {
   note: string | null;
   /** Private contributions included in the total (a count only), 0 when none. */
   privateContributions: number;
+  /** Public repos created along the way (first, plus the most starred), oldest first. */
+  repoFlags: RepoFlag[];
 };
 
 function dayStart(date: string): number {
@@ -91,6 +94,7 @@ export function planFromHistory(
       incompleteYears: [],
       note: null,
       privateContributions: 0,
+      repoFlags: [],
     };
   }
 
@@ -161,5 +165,6 @@ export function planFromHistory(
     incompleteYears: gaps.map((gap) => gap.year),
     note: incompleteDetailNote(gaps),
     privateContributions: history.totals.privateContributions,
+    repoFlags: history.repoFlags ?? [],
   };
 }

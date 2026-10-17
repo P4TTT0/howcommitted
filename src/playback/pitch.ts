@@ -99,3 +99,16 @@ export function microVariation(
     db: (random() * 2 - 1) * db,
   };
 }
+
+/** Quieter ticks per doubling of playback speed, so a fast run stays pleasant. */
+const TICK_DB_PER_SPEED_DOUBLING = -3;
+
+/**
+ * Gain offset in dB for ticks at a playback speed. Speed never changes pitch
+ * (samples are not resampled); it only packs more hits per second, which reads
+ * louder, so ticks duck a little above 1x and are untouched at or below it.
+ */
+export function tickDbForSpeed(speed: number): number {
+  if (!(speed > 1)) return 0;
+  return TICK_DB_PER_SPEED_DOUBLING * Math.log2(speed);
+}

@@ -1,3 +1,4 @@
+import type { RepoFlag } from "@/domain/repo-flags";
 import { generateFakeProfile } from "@/features/sequencer/model/fakeProfile";
 import { buildPlan } from "@/features/sequencer/model/plan";
 import type { SceneData } from "@/features/sequencer/types";
@@ -22,6 +23,17 @@ export function labSceneData(): SceneData {
     .map(([year, contributions]) => ({ year, contributions }))
     .sort((a, b) => a.year - b.year);
 
+  // Lab only: invented repositories so the flags can be reviewed.
+  const flagAt = (fraction: number, flag: Omit<RepoFlag, "createdAt">) => {
+    const day = days[Math.floor(days.length * fraction)] ?? days[0];
+    return { ...flag, createdAt: `${day?.date ?? "2020-01-01"}T09:00:00Z` };
+  };
+  const repoFlags: RepoFlag[] = [
+    flagAt(0.02, { name: "hello-world", stars: 0, reason: "first" }),
+    flagAt(0.35, { name: "lab-notable", stars: 240, reason: "notable" }),
+    flagAt(0.7, { name: "lab-library", stars: 1200, reason: "notable" }),
+  ];
+
   return {
     login: "lab",
     history: null,
@@ -34,6 +46,7 @@ export function labSceneData(): SceneData {
       incompleteYears: [],
       note: null,
       privateContributions: 0,
+      repoFlags,
     },
   };
 }

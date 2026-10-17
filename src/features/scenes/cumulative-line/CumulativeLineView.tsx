@@ -8,13 +8,16 @@ import {
   stepLabel,
   yearReveals,
 } from "@/features/sequencer/model/plan";
+import { focusRing } from "@/ui/classes";
 import {
   CHART_HEIGHT,
   CHART_WIDTH,
   linePath,
   stepLabelPosition,
   stepPath,
+  topPercent,
 } from "./chart";
+import { type FlagMark, flagLabel } from "./scrub";
 
 /** At most this many year labels fit on the axis of a phone. */
 const MAX_YEAR_LABELS = 8;
@@ -23,13 +26,20 @@ type CumulativeLineViewProps = {
   plan: Plan;
   /** Small honest note shown under the chart. */
   note: string | null;
+  /** Repo-creation flags on the line, oldest first. */
+  marks: readonly FlagMark[];
 };
 
 /**
  * Scene 2, the markup: a year block with the running total above the line
- * chart. Everything that moves is addressed by data attributes from `mount.ts`.
+ * chart. Everything that moves is addressed by data attributes from `mount.ts`;
+ * the scrub overlay and cursor are for `explore.ts` and stay hidden until then.
  */
-export function CumulativeLineView({ plan, note }: CumulativeLineViewProps) {
+export function CumulativeLineView({
+  plan,
+  note,
+  marks,
+}: CumulativeLineViewProps) {
   const path = useMemo(() => linePath(plan), [plan]);
   const dashedPath = useMemo(() => stepPath(plan), [plan]);
   const labels = useMemo(() => labelledSteps(plan.steps), [plan]);
@@ -135,6 +145,40 @@ export function CumulativeLineView({ plan, note }: CumulativeLineViewProps) {
               </span>
             );
           })}
+          {marks.map((mark, index) => {
+            const left = mark.progress * 100;
+            const top = topPercent(plan, plan.cumulative[mark.dayIndex] ?? 0);
+            return (
+              <span key={`${mark.name}-${mark.date}`}>
+                <svg
+                  aria-hidden="true"
+                  data-flag={index}
+                  data-at={mark.progress}
+                  data-visible="false"
+                  viewBox="0 0 14 22"
+                  width={14}
+                  height={22}
+                  fill="currentColor"
+                  className="invisible absolute -translate-y-full data-[visible=true]:visible"
+                  style={{ left: `${left}%`, top: `${top}%` }}
+                >
+                  <path d="M0 0h2.5v22H0zM2.5 1h11l-3.5 4 3.5 4h-11z" />
+                </svg>
+                <span
+                  data-flag-label={index}
+                  data-visible="false"
+                  className="invisible absolute max-w-[60%] bg-paper px-1 font-mono text-xs data-[visible=true]:visible"
+                  style={{
+                    left: `${left}%`,
+                    top: `${top}%`,
+                    transform: `translate(${left > 55 ? "-100%" : "1rem"}, calc(-100% - 1.6rem))`,
+                  }}
+                >
+                  {flagLabel(mark)}
+                </span>
+              </span>
+            );
+          })}
           <span
             data-role="head"
             className="absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink"
@@ -147,6 +191,42 @@ export function CumulativeLineView({ plan, note }: CumulativeLineViewProps) {
               style={{ left: `${span.startProgress * 100}%` }}
             />
           ))}
+          <div
+            data-role="cursor"
+            hidden
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+          >
+            <span
+              data-cursor-line
+              className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-ink"
+            />
+            <span
+              data-cursor-dot
+              className="absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-paper bg-ink"
+            />
+            <p
+              data-cursor-chip
+              className="absolute top-0 bg-ink px-2 py-1 font-mono text-xs text-paper"
+            >
+              <span data-chip-date className="block" />
+              <span data-chip-total className="block font-bold" />
+            </p>
+          </div>
+          {/* Explore only: `explore.ts` shows it once the scene has ended. */}
+          <div
+            data-role="scrub"
+            hidden
+            role="slider"
+            tabIndex={-1}
+            aria-label="Cumulative contributions by date"
+            aria-orientation="horizontal"
+            aria-valuemin={0}
+            aria-valuemax={Math.max(0, plan.days.length - 1)}
+            aria-valuenow={Math.max(0, plan.days.length - 1)}
+            aria-valuetext={`${formatCount(plan.total)} contributions in total`}
+            className={`absolute inset-0 touch-none ${focusRing}`}
+          />
         </div>
         <div className="relative h-5 font-mono text-xs">
           {plan.years.map((span, index) =>

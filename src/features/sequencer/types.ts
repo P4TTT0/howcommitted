@@ -5,12 +5,25 @@ import type { PlaybackClock } from "@/playback/clock";
 import type { SoundEngine } from "@/playback/sound/engine";
 
 /**
- * The scene contract. The sequencer plays an ordered list of
+ * The scene contract. The sequencer runs an ordered list of
  * `SceneDefinition`s on the single clock from `src/playback`, then shows the
  * finale. A scene never owns a clock, a start button, controls or a progress
  * bar: it declares markup and, once that markup is in the DOM, wires sound and
  * motion to the clock it is handed. Entries are registered in
  * `src/features/scenes/registry.ts`; see docs/architecture.md.
+ *
+ * A scene has two phases:
+ *
+ * - Playing: `mount` runs and the clock drives sound and motion from 0 to the
+ *   scene's `duration`.
+ * - Explore: the scene sits in its final state and the user looks closer. It
+ *   starts when the clock ends and the sequencer HOLDS here: it never moves on
+ *   by itself. It is also where the user lands when they go back to (or jump
+ *   to) a scene they already played. There `mount` still runs first, so the
+ *   scene is wired exactly as when playing, and the clock is put at the end
+ *   without sound. Then `explore` runs.
+ *
+ * Replay is always a fresh `mount` in the playing phase.
  */
 
 /** Everything a scene may read. Scenes never fetch. */
@@ -48,6 +61,21 @@ export type SceneInstance = {
    * undoes all of it. Never start your own timers or animation loops.
    */
   mount(root: HTMLElement, runtime: SceneRuntime): () => void;
+  /**
+   * Optional. Called in the explore phase, after `mount`, with the scene
+   * already at its final state. Make the chart interactive here: pointer
+   * (mouse, touch, pen) and keyboard, with every exact value readable by
+   * assistive tech (a focusable element with `aria-valuetext`, or similar).
+   * Return a cleanup that restores whatever it changed.
+   *
+   * Rules: no sound (the sequencer keeps explore silent; sound only returns on
+   * a replay); no timers or animation loops of your own; pointer readouts are
+   * instantaneous DOM updates, anything that moves over time goes through the
+   * clock. Arrow keys on a focused chart should call `stopPropagation`, since
+   * the same keys otherwise change scene. A scene without `explore` simply
+   * shows its final state.
+   */
+  explore?(root: HTMLElement, runtime: SceneRuntime): () => void;
 };
 
 export type SceneDefinition = {

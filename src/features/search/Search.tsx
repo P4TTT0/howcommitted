@@ -27,6 +27,7 @@ import {
 import { PlayerCard } from "./PlayerCard";
 import { PlayerColumn } from "./PlayerColumn";
 import { PreviewRow } from "./PreviewRow";
+import { consumePrefill } from "./prefill";
 import { useTypingPlaceholder } from "./useTypingPlaceholder";
 import { useWideLayout } from "./useWideLayout";
 
@@ -105,6 +106,12 @@ export function Search({ versus = false }: { versus?: boolean }) {
     versus && found ? (
       <RivalsRow main={found} rivals={rivals} onChange={setRivalPicks} />
     ) : null;
+
+  // Back from a cancelled experience: the same developer, ready to go.
+  useEffect(() => {
+    const login = consumePrefill();
+    if (login) setValue(login);
+  }, []);
 
   // A found user is the likely next click: have the audio engine ready.
   useEffect(() => {

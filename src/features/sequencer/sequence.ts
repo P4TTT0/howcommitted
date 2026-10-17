@@ -36,34 +36,27 @@ export function buildSequence(
   return sequence;
 }
 
-/** Start of each scene on the whole-sequence timeline, in seconds. */
-export function sceneOffsets(durations: readonly number[]): number[] {
-  let offset = 0;
-  return durations.map((duration) => {
-    const start = offset;
-    offset += duration;
-    return start;
-  });
-}
+/**
+ * The progress track gives every scene an equal share, not a share of its
+ * duration: a three second scene must stay as easy to click as a thirty second
+ * one. These helpers work in 0..1 along the track.
+ */
 
-/** 0..1 across the whole sequence for a scene index and its local time. */
+/** 0..1 across the track for a scene index and how far into the scene it is. */
 export function sequenceProgress(
-  durations: readonly number[],
+  count: number,
   index: number,
-  seconds: number,
+  fraction: number,
 ): number {
-  const total = durations.reduce((sum, duration) => sum + duration, 0);
-  if (total <= 0) return 0;
-  const start = sceneOffsets(durations)[index] ?? 0;
-  const local = Math.min(durations[index] ?? 0, Math.max(0, seconds));
-  return Math.min(1, (start + local) / total);
+  if (count <= 0) return 0;
+  const local = Math.min(1, Math.max(0, fraction));
+  return Math.min(1, (index + local) / count);
 }
 
 /** 0..1 positions of the boundaries between scenes (no tick at 0 or 1). */
-export function sceneTicks(durations: readonly number[]): number[] {
-  const total = durations.reduce((sum, duration) => sum + duration, 0);
-  if (total <= 0) return [];
-  return sceneOffsets(durations)
-    .slice(1)
-    .map((start) => start / total);
+export function sceneTicks(count: number): number[] {
+  return Array.from(
+    { length: Math.max(0, count - 1) },
+    (_, i) => (i + 1) / count,
+  );
 }
