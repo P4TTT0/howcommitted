@@ -219,18 +219,42 @@ describe("getProfile", () => {
     expect(refund).toHaveBeenCalledTimes(1);
   });
 
-  it("refunds for unknown users and keeps the charge on success", async () => {
+  it("keeps the charge for unknown users so probing logins is not free", async () => {
     stubGithub(() => ({ data: { rateLimit, user: null } }));
     const ghost = setup();
     expect(await getProfile("ghost", visitor, ghost.deps)).toEqual({
       status: "not_found",
     });
-    expect(ghost.refund).toHaveBeenCalledTimes(1);
+    expect(ghost.charge).toHaveBeenCalledTimes(1);
+    expect(ghost.refund).not.toHaveBeenCalled();
 
     stubGithub(happyPath);
     const ok = setup();
     await getProfile("ada", visitor, ok.deps);
     expect(ok.refund).not.toHaveBeenCalled();
+  });
+
+  it("charges the history of a user whose free preview is already cached", async () => {
+    stubGithub(happyPath);
+    const { deps, charge } = setup();
+    await getPreview("ada", deps);
+    expect(charge).not.toHaveBeenCalled();
+
+    await getProfile("ada", visitor, deps);
+    expect(charge).toHaveBeenCalledTimes(1);
+  });
+
+  it("refunds the charge and rethrows when the generation throws", async () => {
+    stubGithub(happyPath);
+    const { deps, refund } = setup({
+      getToken: () => {
+        throw new Error("GITHUB_TOKEN is missing");
+      },
+    });
+    await expect(getProfile("ada", visitor, deps)).rejects.toThrow(
+      "GITHUB_TOKEN",
+    );
+    expect(refund).toHaveBeenCalledTimes(1);
   });
 
   it("does not charge while the breaker is open", async () => {
@@ -501,27 +525,29 @@ describe("getProfile", () => {
       kind === "Preview" ? userBody([2026, 2025, 2024]) : happyPath(kind),
     );
     const { deps } = setup({ now: () => new Date("2026-12-31T23:00:00Z") });
-    await getProfile("ada", deps);
+    await getProfile("ada", visitor, deps);
     expect(calls.Year).toBe(3);
 
     const newYear: ProfileDeps = {
       ...deps,
       now: () => new Date("2027-01-01T01:00:00Z"),
     };
-    expect(await getProfile("ada", newYear)).toMatchObject({
+    expect(await getProfile("ada", visitor, newYear)).toMatchObject({
       status: "ok",
       source: "fresh",
     });
     // 2027 is new and 2026 went stale; 2025 and 2024 stay cached.
     expect(calls.Year).toBe(5);
-    expect(await getProfile("ada", newYear)).toMatchObject({ source: "cache" });
+    expect(await getProfile("ada", visitor, newYear)).toMatchObject({
+      source: "cache",
+    });
     expect(calls.Year).toBe(5);
   });
 
   it("backs off from refreshes after a failed refresh", async () => {
     stubGithub(happyPath);
     const { deps } = setup();
-    await getProfile("ada", deps);
+    await getProfile("ada", visitor, deps);
 
     const tasks: (() => Promise<void>)[] = [];
     const stale: ProfileDeps = {
@@ -529,7 +555,7 @@ describe("getProfile", () => {
       now: () => new Date(NOW.getTime() + 7 * 60 * 60 * 1000),
       scheduleRefresh: (task) => tasks.push(task),
     };
-    await getProfile("ada", stale);
+    await getProfile("ada", visitor, stale);
     expect(tasks).toHaveLength(1);
 
     stubGithub((kind) =>
@@ -538,7 +564,9 @@ describe("getProfile", () => {
     await tasks[0]?.();
 
     // The failed refresh left a marker: stale data keeps being served quietly.
-    expect(await getProfile("ada", stale)).toMatchObject({ source: "cache" });
+    expect(await getProfile("ada", visitor, stale)).toMatchObject({
+      source: "cache",
+    });
     expect(tasks).toHaveLength(1);
   });
 
@@ -547,7 +575,7 @@ describe("getProfile", () => {
     const { deps, values } = setup();
     const held = await deps.lock.acquire("ada");
     let clock = NOW.getTime();
-    const result = await getProfile("ada", {
+    const result = await getProfile("ada", visitor, {
       ...deps,
       now: () => new Date(clock),
       sleep: async () => {

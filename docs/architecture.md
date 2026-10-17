@@ -89,7 +89,7 @@ Upstash Redis, with a versioned key prefix.
 |------|-----|--------|
 | User preview | 24 h | Changes rarely, cheap to refresh |
 | Past years | 30 days | The past does not change |
-| Current year | 6 h fresh, kept 7 days | Still changing. After 6 h it is served stale and refreshed after the response (`after()`); the current year is also fetched when the cached preview does not list it |
+| Current year | 6 h fresh, kept 7 days | Still changing. After 6 h it is served stale and refreshed after the response (`after()`); the current year is also fetched when the cached preview does not list it. A year cached before it ended is refreshed after Jan 1, and a failed refresh pauses refreshes for 5 min |
 | Repos | 24 h | New repos are infrequent |
 | "User not found" | 1 h | Negative cache |
 
@@ -104,13 +104,13 @@ Logins are lowercased in keys. Supporting keys: `v1:missing:{login}` (negative c
 ## Quota and rate limits
 
 - Cached profiles are free and unlimited for everyone.
-- Anonymous visitors get 2 cold generations per day. A generation is cold only when the profile has nothing cached at all; completing partial data or refreshing the current year is free. A failed generation refunds the run. Both the cookie and the IP must have a run left before either is charged. Only after the runs are used is the GitHub sign-in prompt shown, never upfront.
-- Identity: the signed `hc_visitor` cookie (HMAC with `QUOTA_COOKIE_SECRET`, at least 32 characters) plus the client IP. The IP comes from `x-real-ip`, then `x-vercel-forwarded-for`, then `x-forwarded-for`, validated as an IP. IPv6 clients are keyed by their /64. Requests with no usable IP count against the cookie only for cold runs and share a stricter preview limit.
+- Anonymous visitors get 2 cold generations per day. A generation is cold only when no year and no repos are cached (a cached preview does not count, so preview then history is still charged); completing partial data or refreshing a year is free. A failed generation refunds the run, except for unknown users, so probing logins is not free. Each identity is charged first and checked after, and everything is rolled back when either is over its limit, so concurrent requests cannot exceed the limit. Cold attempts are also limited per IP per minute. Only after the runs are used is the GitHub sign-in prompt shown, never upfront.
+- Identity: the signed `hc_visitor` cookie (HMAC with `QUOTA_COOKIE_SECRET`, at least 32 characters) plus the client IP. The IP comes from `x-real-ip`, then `x-vercel-forwarded-for`, then `x-forwarded-for`, validated as an IP. IPv6 clients are keyed by their /64. Requests with no usable IP count against the cookie only for cold runs and share stricter preview and cold-attempt limits. Visitors behind a shared IP (offices, CGNAT) share its daily runs. The header trust above assumes Vercel; self-hosting needs a trusted proxy that sets `x-real-ip` itself.
 - The cookie and IP quota is a soft gate (bypassable by clearing cookies or using a VPN). The global circuit breaker is the hard gate.
 - Signed-in visitors use their own token (5,000 points/hour each). Profiles they fetch populate the shared cache.
 - Global circuit breaker: when the server token's remaining points drop below 20%, anonymous cold generations and uncached previews stop (cache only, plus the sign-in prompt).
 - The breaker reads `rateLimit { cost remaining limit resetAt }` from every GitHub response, keeps the lowest value reported per window, and opens at once on a rate limit error (reset time from GitHub, or 60 s). It closes again once the reported window resets. Open and close transitions are logged.
-- Request coalescing: a Redis lock ensures simultaneous requests for the same uncached profile trigger one fetch. Other requests poll the lock with 0.5 to 2 s jittered backoff, then read the cache (or the leader's failure, kept for 30 s so nobody retries a failing upstream). One 50 s deadline covers waiting and fetching; past it they answer `degraded` (503). `maxDuration` of the history route is 60 s.
+- Request coalescing: a Redis lock ensures simultaneous requests for the same uncached profile trigger one fetch. Other requests poll the lock with 0.5 to 2 s jittered backoff, then read the cache (or the leader's failure, kept for 30 s so nobody retries a failing upstream). One 50 s deadline covers waiting and fetching; past it, or with under 5 s left when a waiter wins the lock, they answer `degraded` (503). `maxDuration` of the history route is 60 s.
 - A cold generation stops launching years and aborts in-flight requests on the first rate limit or timeout. Years that already landed stay cached, so a retry only pays for the rest.
 - Per-IP rate limit on preview lookups (30 per minute).
 - Results are typed and never thrown to the route: `login_required` (401), `degraded` (503, reasons `circuit_open`, `busy`, `store_down`), `rate_limited` (429), `timeout` (504), `upstream_error` (502), `not_found` (404). Redis failures fail closed for cold generations (`store_down`); cache read errors count as misses and cache write errors never lose a good result.

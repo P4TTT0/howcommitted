@@ -399,22 +399,36 @@ async function generateCold(
     return { status: "degraded", reason: "circuit_open" };
   }
 
-  // Only a profile with nothing cached is a new cold generation. Completing
-  // partial data or refreshing the current year is free for the visitor.
-  const charge = hasCachedData(snapshot)
+  // Only a profile with no history cached at all is a new cold generation.
+  // The preview route caches the user for free, so the user does not count.
+  // Completing partial data or refreshing a year is free for the visitor.
+  const charge = hasHistoryCached(snapshot)
     ? null
     : await mustSucceed(() => ctx.deps.chargeColdGeneration(visitor));
-  if (!hasCachedData(snapshot) && !charge) {
+  if (!hasHistoryCached(snapshot) && !charge) {
     return { status: "login_required", reason: "quota_exhausted" };
   }
 
-  const outcome = await fetchMissing(login, ctx, tally, snapshot);
+  const refund = () =>
+    charge
+      ? orElse("refund", () => charge.refund(), undefined)
+      : Promise.resolve();
+
+  let outcome: Fetched;
+  try {
+    outcome = await fetchMissing(login, ctx, tally, snapshot);
+  } catch (error) {
+    // For example a missing GitHub token: the visitor must not lose a run.
+    await refund();
+    throw error;
+  }
   if ("failure" in outcome) {
-    // A failed generation hands the visitor's run back.
-    if (charge) await orElse("refund", () => charge.refund(), undefined);
     const { failure } = outcome;
-    // Unknown users already have the longer negative cache.
+    // A failed generation hands the run back, except for unknown users:
+    // refunding those would make probing logins free.
+    // Unknown users already have the longer negative cache instead of a marker.
     if (failure.status !== "not_found") {
+      await refund();
       await orElse(
         "setFailure",
         () => cache.setFailure(login, failure),
@@ -428,10 +442,8 @@ async function generateCold(
 
 type Fetched = Complete | { failure: Failure };
 
-function hasCachedData(snapshot: Snapshot): boolean {
-  return (
-    snapshot.user !== null || snapshot.years.size > 0 || snapshot.repos !== null
-  );
+function hasHistoryCached(snapshot: Snapshot): boolean {
+  return snapshot.years.size > 0 || snapshot.repos !== null;
 }
 
 async function fetchMissing(
