@@ -132,6 +132,25 @@ describe("PlaybackClock", () => {
     expect(clock.status).toBe("paused");
   });
 
+  it("loads the next scene on the same clock", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    const statuses: string[] = [];
+    clock.onStatus((status) => statuses.push(status));
+    clock.start();
+    clock.skip();
+    clock.loadScene({ duration: 4, bpm: 140 });
+    expect(clock.status).toBe("idle");
+    expect(clock.duration).toBe(4);
+    expect(transport.bpm.value).toBe(140);
+    expect(transport.cancel).toHaveBeenCalled();
+    expect(transport.position).toBe(0);
+    clock.start();
+    transport.seconds = 4.05;
+    runFrame();
+    expect(statuses.at(-1)).toBe("ended");
+    expect(visibility).toHaveLength(1);
+  });
+
   it("clamps visible time to the duration and removes listeners on dispose", () => {
     const clock = new PlaybackClock({ duration: 10, bpm: 120 });
     transport.seconds = 99;
