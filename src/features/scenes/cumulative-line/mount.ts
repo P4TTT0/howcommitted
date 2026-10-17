@@ -34,8 +34,6 @@ export function mountCumulativeLine(
   plan: Plan,
   { clock, sound, reducedMotion }: SceneRuntime,
 ): () => void {
-  scheduleSound(clock, sound, plan);
-
   const timeline = gsap.timeline({ paused: true });
   try {
     addYearMotion(timeline, root, plan, reducedMotion);
@@ -45,8 +43,18 @@ export function mountCumulativeLine(
     throw error;
   }
 
+  let render: (seconds: number) => void;
+  try {
+    render = createRenderer(root, plan);
+  } catch (error) {
+    timeline.kill();
+    throw error;
+  }
+
   const stopDriving = clock.drive(timeline);
-  const stopRendering = clock.onFrame(createRenderer(root, plan));
+  const stopRendering = clock.onFrame(render);
+  // Last, so nothing is left scheduled if anything above threw.
+  scheduleSound(clock, sound, plan);
   return () => {
     stopDriving();
     stopRendering();

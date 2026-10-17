@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildSequence,
   sceneOffsets,
@@ -34,6 +34,7 @@ describe("buildSequence", () => {
   });
 
   it("skips a scene that throws instead of failing the sequence", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const sequence = buildSequence(
       [
         definition("boom", () => {
@@ -44,6 +45,8 @@ describe("buildSequence", () => {
       data,
     );
     expect(sequence.map((scene) => scene.id)).toEqual(["ok"]);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it("drops scenes with no duration", () => {

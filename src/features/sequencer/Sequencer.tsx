@@ -4,6 +4,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -12,6 +13,8 @@ import { type ClockStatus, PlaybackClock } from "@/playback/clock";
 import { SoundEngine } from "@/playback/sound/engine";
 import { ScreenMain } from "@/ui/ScreenMain";
 import { Controls, STAGE_BOTTOM_CLASS } from "./Controls";
+import { SequenceController, type SequenceState } from "./controller";
+import { formatCount } from "./model/format";
 import { StartGate, type StartPhase } from "./StartGate";
 import { buildSequence, sceneTicks, sequenceProgress } from "./sequence";
 import type { FinaleDefinition, SceneData, SceneDefinition } from "./types";
@@ -30,10 +33,13 @@ export type SequencerProps = {
   starting?: ReactNode;
 };
 
+const INITIAL: SequenceState = { index: 0, run: 0, done: false };
+
 /**
  * Plays the scenes in order on one clock, then the finale. It owns everything
  * around the scenes: start gate, sound engine, the clock, controls, progress
- * and the transition from one scene to the next.
+ * and the transition from one scene to the next (see `SequenceController`).
+ * With no playable scene it shows the finale at once.
  */
 export function Sequencer({
   data,
@@ -55,31 +61,21 @@ export function Sequencer({
   const fillRef = useRef<HTMLDivElement>(null);
   const clockRef = useRef<PlaybackClock | null>(null);
   const engineRef = useRef<SoundEngine | null>(null);
-  const reducedMotionRef = useRef(false);
+  const controllerRef = useRef<SequenceController | null>(null);
   const mountedRef = useRef(true);
   const autoStartedRef = useRef(false);
-  const indexRef = useRef(0);
 
   const [phase, setPhase] = useState<StartPhase>("start");
   const [status, setStatus] = useState<ClockStatus>("idle");
-  const [index, setIndexState] = useState(0);
-  /** Bumped by replay so every scene remounts from its first frame. */
-  const [run, setRun] = useState(0);
-  const [done, setDone] = useState(false);
+  const [seq, setSeq] = useState<SequenceState>(INITIAL);
   const [muted, setMuted] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const setIndex = useCallback((next: number) => {
-    indexRef.current = next;
-    setIndexState(next);
-  }, []);
-
-  const writeProgress = useCallback(
-    (seconds: number) => {
+  const paintProgress = useCallback(
+    (index: number, seconds: number) => {
       const fill = fillRef.current;
       if (!fill) return;
-      const progress = sequenceProgress(durations, indexRef.current, seconds);
-      fill.style.width = `${progress * 100}%`;
+      fill.style.width = `${sequenceProgress(durations, index, seconds) * 100}%`;
     },
     [durations],
   );
@@ -92,15 +88,9 @@ export function Sequencer({
       clockRef.current = null;
       engineRef.current?.dispose();
       engineRef.current = null;
+      controllerRef.current = null;
     };
   }, []);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: begin runs once, on mount
-  useEffect(() => {
-    if (!autoStart || autoStartedRef.current) return;
-    autoStartedRef.current = true;
-    void begin();
-  }, [autoStart]);
 
   async function begin() {
     const first = sequence[0];
@@ -132,43 +122,45 @@ export function Sequencer({
       engine?.dispose();
       return;
     }
-    reducedMotionRef.current = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+    const controller = new SequenceController(
+      sequence,
+      clock,
+      {
+        sound: () => engineRef.current,
+        reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)")
+          .matches,
+      },
+      setSeq,
+    );
     clock.onStatus((next) => {
       setStatus(next);
-      if (next !== "ended") return;
-      if (indexRef.current < sequence.length - 1)
-        setIndex(indexRef.current + 1);
-      else setDone(true);
+      if (next === "ended") controller.advance();
     });
-    clock.onFrame(writeProgress);
+    clock.onFrame((seconds) => paintProgress(controller.state.index, seconds));
     clockRef.current = clock;
     engineRef.current = engine;
+    controllerRef.current = controller;
     setPhase("running");
   }
 
-  // Mounts the current scene on the shared clock; the cleanup undoes it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scene changes are driven by index and run
+  const beginRef = useRef(begin);
+  beginRef.current = begin;
   useEffect(() => {
-    if (phase !== "running") return;
-    const clock = clockRef.current;
+    if (!autoStart || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    void beginRef.current();
+  }, [autoStart]);
+
+  // Layout effect: the scene's finished markup is swapped for its first frame
+  // before the browser paints, so it never flashes.
+  useLayoutEffect(() => {
+    const controller = controllerRef.current;
     const stage = stageRef.current;
-    const scene = sequence[index];
-    if (!clock || !stage || !scene) return;
-    clock.loadScene({
-      duration: scene.instance.duration,
-      bpm: scene.instance.bpm,
-    });
-    const cleanup = scene.instance.mount(stage, {
-      clock,
-      sound: () => engineRef.current,
-      reducedMotion: reducedMotionRef.current,
-    });
-    writeProgress(0);
-    clock.start();
-    return cleanup;
-  }, [phase, index, run, sequence]);
+    if (phase !== "running" || !controller || !stage) return;
+    paintProgress(seq.index, 0);
+    controller.mount(stage, seq);
+    return () => controller.unmount();
+  }, [phase, seq, paintProgress]);
 
   function toggleMute() {
     const next = !muted;
@@ -176,21 +168,15 @@ export function Sequencer({
     engineRef.current?.setMuted(next);
   }
 
-  function replay() {
-    setDone(false);
-    setIndex(0);
-    setRun((value) => value + 1);
-  }
-
-  const scene = sequence[index];
-  const finished = done || sequence.length === 0;
-  const clock = clockRef.current ?? undefined;
+  const scene = sequence[seq.index];
+  const finished = seq.done || sequence.length === 0;
   const progressPercent = Math.round(
-    sequenceProgress(durations, index, 0) * 100,
+    sequenceProgress(durations, seq.index, 0) * 100,
   );
   const progressText = scene
-    ? `Scene ${index + 1} of ${sequence.length}: ${scene.label}`
+    ? `Scene ${seq.index + 1} of ${sequence.length}: ${scene.label}`
     : "";
+  const finishedText = `Finished. ${formatCount(data.model.plan.total)} contributions.`;
 
   return (
     <ScreenMain>
@@ -202,7 +188,7 @@ export function Sequencer({
       <div className={`absolute inset-x-0 top-0 ${STAGE_BOTTOM_CLASS}`}>
         {scene && (
           <div
-            key={`${run}-${scene.id}`}
+            key={`${seq.run}-${scene.id}`}
             ref={stageRef}
             className="absolute inset-0"
           >
@@ -211,16 +197,18 @@ export function Sequencer({
         )}
         {finished && (
           <div className="absolute inset-0 z-40 overflow-y-auto bg-paper">
-            {finale.render(data, { replay })}
+            {finale.render(data, {
+              replay: () => controllerRef.current?.replay(),
+            })}
           </div>
         )}
       </div>
 
       <p className="sr-only" aria-live="polite">
-        {phase === "running" && !finished ? progressText : ""}
+        {finished ? finishedText : phase === "running" ? progressText : ""}
       </p>
 
-      {phase !== "running" && (
+      {phase !== "running" && sequence.length > 0 && (
         <StartGate
           phase={phase}
           autoStart={autoStart}
@@ -234,7 +222,7 @@ export function Sequencer({
       <Controls
         status={finished ? "ended" : status}
         muted={muted}
-        clock={clock}
+        clock={clockRef.current ?? undefined}
         onToggleMute={toggleMute}
         ticks={ticks}
         fillRef={fillRef}

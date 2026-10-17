@@ -50,6 +50,7 @@ export function Controls({
           <span
             key={tick}
             aria-hidden="true"
+            data-scene-tick
             className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-ink"
             style={{ left: `${tick * 100}%` }}
           />

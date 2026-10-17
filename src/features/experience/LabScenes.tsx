@@ -13,6 +13,11 @@ export function LabScenes({ sceneId }: { sceneId?: string }) {
   const data = useMemo(() => labSceneData(), []);
   const scenes = useMemo(() => {
     const only = SCENES.filter((scene) => scene.id === sceneId);
+    if (sceneId && only.length === 0) {
+      console.warn(
+        `Unknown lab scene "${sceneId}". Playing all: ${SCENES.map((scene) => scene.id).join(", ")}.`,
+      );
+    }
     return only.length > 0 ? only : SCENES;
   }, [sceneId]);
   return (

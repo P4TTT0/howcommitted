@@ -11,6 +11,8 @@ export function labSceneData(): SceneData {
   const days = generateFakeProfile();
   const plan = buildPlan(days);
 
+  // Lab only: the fake profile's `commits` stand in for contributions here.
+  // This is not a contributions source; real data comes from the calendar.
   const byYear = new Map<number, number>();
   for (const day of days) {
     const year = Number(day.date.slice(0, 4));

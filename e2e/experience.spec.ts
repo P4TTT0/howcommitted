@@ -62,13 +62,12 @@ async function mockApi(
 }
 
 const pauseButton = (page: Page) => page.getByRole("button", { name: "Pause" });
-/** Scenes played before the end card: year blocks, cumulative line. */
-const SCENE_COUNT = 2;
-
-/** Skips every scene in turn; the end card follows the last one. */
+/** Skips every scene in turn (one more than the scene ticks); the end card follows. */
 async function skipAllScenes(page: Page) {
   const skip = page.getByRole("button", { name: "Skip scene" });
-  for (let scene = 0; scene < SCENE_COUNT; scene += 1) {
+  await expect(skip).toBeEnabled();
+  const scenes = (await page.locator("[data-scene-tick]").count()) + 1;
+  for (let scene = 0; scene < scenes; scene += 1) {
     await expect(skip).toBeEnabled();
     await skip.click();
   }
@@ -238,16 +237,47 @@ test("scenes play in order, with a progress bar that names the scene", async ({
   ).toBeVisible();
 });
 
-test("pausing keeps the scene where it is and resuming continues", async ({
+test("pausing holds the position and resuming continues", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/ada");
+  await startButton(page).click();
+  await expect(pauseButton(page)).toBeEnabled();
+  await page.waitForTimeout(600);
+  await pauseButton(page).click();
+  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+
+  const fill = page.getByRole("progressbar").locator("div").first();
+  const held = await fill.evaluate((element) => element.style.width);
+  await page.waitForTimeout(800);
+  expect(await fill.evaluate((element) => element.style.width)).toBe(held);
+
+  await page.getByRole("button", { name: "Resume" }).click();
+  await expect(pauseButton(page)).toBeVisible();
+  await expect
+    .poll(() => fill.evaluate((element) => element.style.width))
+    .not.toBe(held);
+});
+
+test("skipping while paused loads the next scene paused; mute carries over", async ({
   page,
 }) => {
   await mockApi(page);
   await page.goto("/ada");
   await startButton(page).click();
+  await expect(pauseButton(page)).toBeEnabled();
+  await page.getByRole("button", { name: "Mute" }).click();
   await pauseButton(page).click();
+  await page.getByRole("button", { name: "Skip scene" }).click();
+
+  await expect(page.getByRole("progressbar")).toHaveAttribute(
+    "aria-valuetext",
+    /^Scene 2 of /,
+  );
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
-  await page.getByRole("button", { name: "Resume" }).click();
-  await expect(pauseButton(page)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mute" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 });
 
 test("skipping to the end shows the total and the principle", async ({

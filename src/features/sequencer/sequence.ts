@@ -26,8 +26,11 @@ export function buildSequence(
           instance,
         });
       }
-    } catch {
-      // Skipped on purpose: see above.
+    } catch (error) {
+      // Skipped on purpose (see above), but never silently in development.
+      if (process.env.NODE_ENV !== "production") {
+        console.error(`Scene "${definition.id}" failed to build`, error);
+      }
     }
   }
   return sequence;

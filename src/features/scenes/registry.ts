@@ -7,14 +7,20 @@ import type {
 } from "@/features/sequencer/types";
 
 /**
- * The scenes, in playback order. Adding a scene is one import and one entry
- * here; the sequencer is never edited. The contract is in
- * `features/sequencer/types.ts` and docs/architecture.md.
+ * The scenes, in playback order. A new scene is one import line above and one
+ * entry line below, placed where it plays. The sequencer is never edited.
+ * Contract: `features/sequencer/types.ts` and docs/architecture.md.
  */
 export const SCENES: readonly SceneDefinition[] = [
   yearBlocksScene,
   cumulativeLineScene,
+  // 3 Heatmap goes here.
+  // 4 Language mosaic goes here.
+  // 5 Big numbers goes here.
 ];
 
-/** What follows the last scene. The final poster replaces this one entry. */
+/**
+ * What follows the last scene. Owned by the final poster: that agent replaces
+ * the value of this one line (and the `finale/` folder it points to).
+ */
 export const FINALE: FinaleDefinition = endCardFinale;
