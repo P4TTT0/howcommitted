@@ -1,36 +1,43 @@
 import "server-only";
-import type {
-  ProfileData,
-  Repo,
-  UserProfile,
-  YearSummary,
-} from "@/domain/types";
+import type { ProfileData, UserProfile, YearSummary } from "@/domain/types";
 import type { Breaker } from "./breaker";
-import type { Cache } from "./cache";
+import { type Cache, type CachedYear, isYearStale } from "./cache";
 import { mapWithConcurrency } from "./concurrency";
-import type { GithubError, GraphqlResult } from "./graphql";
+import { type Failure, toFailure } from "./failure";
+import type { GithubError, GraphqlResult, RateLimitInfo } from "./graphql";
 import type { Lock } from "./lock";
-import { fetchRepos, fetchUserPreview, fetchYear } from "./queries";
-import type { Visitor } from "./visitor";
+import { logEvent } from "./log";
+import {
+  fetchRepos,
+  fetchUserPreview,
+  fetchYear,
+  type ReposResult,
+} from "./queries";
 
 /** Parallel year requests. Keeps us well under GitHub's secondary limits. */
 export const YEAR_CONCURRENCY = 6;
-/** How long a request waits for another request's fetch of the same profile. */
-export const COALESCE_WAIT_MS = 15_000;
-const COALESCE_POLL_MS = 400;
+/** Single budget for one request: lock waits plus the whole fan-out. Vercel allows 60 s. */
+export const GENERATION_DEADLINE_MS = 50_000;
+/** Waiters back off between these bounds, with jitter. */
+export const WAIT_MIN_MS = 500;
+export const WAIT_MAX_MS = 2_000;
+const WAIT_BASE_MS = 1_000;
 
-export type PreviewResult =
-  | { status: "ok"; user: UserProfile }
-  | { status: "not_found" }
-  | { status: "rate_limited"; resetAt: string | null }
-  | { status: "timeout" }
-  | { status: "upstream_error"; message: string };
+export type PreviewResult = { status: "ok"; user: UserProfile } | Failure;
 
 export type ProfileResult =
-  | { status: "ok"; profile: ProfileData; source: "cache" | "fresh" }
-  | Exclude<PreviewResult, { status: "ok" }>
-  | { status: "login_required"; reason: "quota_exhausted" }
-  | { status: "degraded"; reason: "circuit_open" | "busy" };
+  | {
+      status: "ok";
+      profile: ProfileData;
+      source: "cache" | "fresh";
+      /** True when the owner has more repositories than we page through. */
+      reposTruncated: boolean;
+    }
+  | Failure
+  | {
+      status: "degraded";
+      reason: "circuit_open" | "busy" | "store_down";
+    };
 
 export type ProfileDeps = {
   /** Lazy so cache hits work without a GitHub token configured. */
@@ -38,196 +45,464 @@ export type ProfileDeps = {
   cache: Cache;
   breaker: Breaker;
   lock: Lock;
-  /** Consumes one anonymous cold generation. Resolves false when exhausted. */
-  consumeColdGeneration: (visitor: Visitor) => Promise<boolean>;
+  /**
+   * Runs a task after the response is sent (for example Next.js `after`). Used
+   * to refresh a stale current year. Without it, stale data is served as is.
+   */
+  scheduleRefresh?: (task: () => Promise<void>) => void;
+  /** Test knobs. */
   now?: () => Date;
   sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
+  deadlineMs?: number;
 };
 
-type Failure = Exclude<PreviewResult, { status: "ok" }>;
+/** now/sleep/random/deadline resolved once per request. */
+type Context = {
+  deps: ProfileDeps;
+  now: () => Date;
+  sleep: (ms: number) => Promise<void>;
+  random: () => number;
+  deadline: number;
+  signal: AbortSignal;
+};
 
-function toFailure(error: GithubError): Failure {
-  switch (error.kind) {
-    case "not_found":
-      return { status: "not_found" };
-    case "rate_limited":
-      return { status: "rate_limited", resetAt: error.resetAt };
-    case "timeout":
-      return { status: "timeout" };
-    case "upstream":
-      return { status: "upstream_error", message: error.message };
+/** Cost bookkeeping for the one-line generation log. */
+type Tally = { cost: number; remaining: number | null; years: number };
+
+function newTally(): Tally {
+  return { cost: 0, remaining: null, years: 0 };
+}
+
+function createContext(deps: ProfileDeps): Context {
+  const now = deps.now ?? (() => new Date());
+  const deadlineMs = deps.deadlineMs ?? GENERATION_DEADLINE_MS;
+  return {
+    deps,
+    now,
+    sleep: deps.sleep ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms))),
+    random: deps.random ?? Math.random,
+    deadline: now().getTime() + deadlineMs,
+    signal: AbortSignal.timeout(deadlineMs),
+  };
+}
+
+/** A Redis failure on a path that must not proceed without Redis. */
+class StoreDownError extends Error {}
+
+/** Runs a store operation; failure is logged and replaced by `fallback`. */
+async function orElse<T>(
+  op: string,
+  run: () => Promise<T>,
+  fallback: T,
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    logEvent("store_error", { op, message: String(error) });
+    return fallback;
   }
 }
 
-const defaultSleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** Runs a store operation that gates cold generation: failure fails closed. */
+async function mustSucceed<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw new StoreDownError(String(error));
+  }
+}
+
+const STORE_DOWN: ProfileResult = { status: "degraded", reason: "store_down" };
+
+function yearsNeeded(user: UserProfile, now: Date): number[] {
+  // The cached preview can predate the current year's first contribution.
+  return [...new Set([...user.contributionYears, now.getUTCFullYear()])].sort(
+    (a, b) => b - a,
+  );
+}
+
+function recordCost(tally: Tally, rateLimit: RateLimitInfo | null): void {
+  if (!rateLimit) return;
+  tally.cost += rateLimit.cost;
+  tally.remaining =
+    tally.remaining === null
+      ? rateLimit.remaining
+      : Math.min(tally.remaining, rateLimit.remaining);
+}
+
+async function fetchAndRecord<T>(
+  ctx: Context,
+  tally: Tally,
+  call: () => Promise<GraphqlResult<T>>,
+): Promise<GraphqlResult<T>> {
+  const result = await call();
+  recordCost(tally, result.rateLimit);
+  const { breaker } = ctx.deps;
+  await orElse(
+    "breaker",
+    () =>
+      !result.ok && result.error.kind === "rate_limited"
+        ? breaker.recordRateLimited(result.error.resetAt, ctx.now())
+        : breaker.record(result.rateLimit, ctx.now()),
+    undefined,
+  );
+  return result;
+}
+
+async function failureFrom(
+  login: string,
+  error: GithubError,
+  ctx: Context,
+): Promise<Failure> {
+  if (error.kind === "not_found") {
+    await orElse(
+      "markMissing",
+      () => ctx.deps.cache.markMissing(login),
+      undefined,
+    );
+  }
+  return toFailure(error);
+}
 
 /** Exact-login preview, cached 24 h. Costs 1 point on a miss; never counts toward the quota. */
 export async function getPreview(
   login: string,
   deps: ProfileDeps,
 ): Promise<PreviewResult> {
-  if (await deps.cache.isMissing(login)) return { status: "not_found" };
-  const cached = await deps.cache.getUser(login);
+  return loadUser(login, createContext(deps), newTally());
+}
+
+async function loadUser(
+  login: string,
+  ctx: Context,
+  tally: Tally,
+): Promise<PreviewResult> {
+  const { cache } = ctx.deps;
+  if (await orElse("isMissing", () => cache.isMissing(login), false)) {
+    return { status: "not_found" };
+  }
+  const cached = await orElse("getUser", () => cache.getUser(login), null);
   if (cached) return { status: "ok", user: cached };
 
-  const result = await fetchAndRecord(deps, () =>
-    fetchUserPreview(deps.getToken(), login),
+  const result = await fetchAndRecord(ctx, tally, () =>
+    fetchUserPreview(ctx.deps.getToken(), login, ctx.signal),
   );
-  if (!result.ok) {
-    if (result.error.kind === "not_found") await deps.cache.markMissing(login);
-    return toFailure(result.error);
-  }
-  await deps.cache.setUser(result.data);
+  if (!result.ok) return failureFrom(login, result.error, ctx);
+  await orElse("setUser", () => cache.setUser(result.data), undefined);
   return { status: "ok", user: result.data };
 }
 
 type Snapshot = {
   user: UserProfile | null;
   years: Map<number, YearSummary>;
-  repos: Repo[] | null;
+  /** The current year is cached but older than its freshness window. */
+  staleCurrentYear: boolean;
+  repos: ReposResult | null;
 };
 
-async function readSnapshot(
-  login: string,
-  deps: ProfileDeps,
-): Promise<Snapshot> {
-  const user = await deps.cache.getUser(login);
+/** Cache read errors count as misses: the lock and breaker decide whether we may regenerate. */
+async function readSnapshot(login: string, ctx: Context): Promise<Snapshot> {
+  const { cache } = ctx.deps;
+  const now = ctx.now();
+  const user = await orElse("getUser", () => cache.getUser(login), null);
   const years = new Map<number, YearSummary>();
+  let staleCurrentYear = false;
   if (user) {
-    const found = await Promise.all(
-      user.contributionYears.map((year) => deps.cache.getYear(login, year)),
+    const entries = await Promise.all(
+      yearsNeeded(user, now).map((year) =>
+        orElse<CachedYear | null>(
+          "getYear",
+          () => cache.getYear(login, year),
+          null,
+        ),
+      ),
     );
-    for (const summary of found) if (summary) years.set(summary.year, summary);
+    for (const entry of entries) {
+      if (!entry) continue;
+      years.set(entry.summary.year, entry.summary);
+      if (isYearStale(entry, now)) staleCurrentYear = true;
+    }
   }
-  return { user, years, repos: await deps.cache.getRepos(login) };
+  const repos = await orElse("getRepos", () => cache.getRepos(login), null);
+  return { user, years, staleCurrentYear, repos };
 }
 
-function completeProfile(snapshot: Snapshot): ProfileData | null {
+type Complete = { profile: ProfileData; reposTruncated: boolean };
+
+function completeProfile(snapshot: Snapshot, now: Date): Complete | null {
   const { user, repos } = snapshot;
   if (!user || !repos) return null;
-  if (user.contributionYears.some((year) => !snapshot.years.has(year))) {
+  if (yearsNeeded(user, now).some((year) => !snapshot.years.has(year))) {
     return null;
   }
   return {
-    user,
-    repos,
-    years: [...snapshot.years.values()].sort((a, b) => a.year - b.year),
+    profile: {
+      user,
+      repos: repos.repos,
+      years: [...snapshot.years.values()].sort((a, b) => a.year - b.year),
+    },
+    reposTruncated: repos.truncated,
   };
 }
 
+type Lookup = { snapshot: Snapshot; result: ProfileResult | null };
+
+/** Negative cache, then a complete cached profile. Stale current years are served and refreshed. */
+async function lookup(login: string, ctx: Context): Promise<Lookup> {
+  const { cache, scheduleRefresh } = ctx.deps;
+  const snapshot = await readSnapshot(login, ctx);
+  if (await orElse("isMissing", () => cache.isMissing(login), false)) {
+    return { snapshot, result: { status: "not_found" } };
+  }
+  const complete = completeProfile(snapshot, ctx.now());
+  if (!complete) return { snapshot, result: null };
+  if (snapshot.staleCurrentYear && scheduleRefresh) {
+    scheduleRefresh(() => refreshCurrentYear(login, ctx.deps));
+  }
+  return { snapshot, result: { status: "ok", source: "cache", ...complete } };
+}
+
 /**
- * Full profile. Served from cache when complete (free, unlimited). Otherwise a
- * cold generation: one request holds a Redis lock and fetches; concurrent
- * requests for the same login wait and then read the cache.
+ * Full profile. Served from cache when complete. Otherwise one request holds a
+ * Redis lock and generates it; concurrent requests for the same login poll the
+ * lock cheaply, then read what the leader cached (or the failure it recorded).
  */
 export async function getProfile(
   login: string,
-  visitor: Visitor,
   deps: ProfileDeps,
 ): Promise<ProfileResult> {
-  const now = deps.now ?? (() => new Date());
-  const sleep = deps.sleep ?? defaultSleep;
-  const deadline = now().getTime() + COALESCE_WAIT_MS;
+  const ctx = createContext(deps);
 
-  for (;;) {
-    if (await deps.cache.isMissing(login)) return { status: "not_found" };
-    const cached = completeProfile(await readSnapshot(login, deps));
-    if (cached) return { status: "ok", profile: cached, source: "cache" };
+  const cached = await lookup(login, ctx);
+  if (cached.result) return cached.result;
 
-    const release = await deps.lock.acquire(login);
+  for (let attempt = 0; ; attempt++) {
+    let release: Awaited<ReturnType<Lock["acquire"]>>;
+    try {
+      release = await deps.lock.acquire(login);
+    } catch (error) {
+      logEvent("store_error", { op: "lock", message: String(error) });
+      return STORE_DOWN;
+    }
     if (release) {
       try {
-        return await generateCold(login, visitor, deps);
+        return await generate(login, ctx);
       } finally {
-        await release();
+        // A failed release must never replace a good result; the lock TTL heals it.
+        await orElse("unlock", release, undefined);
       }
     }
-
-    if (now().getTime() >= deadline) {
+    if (ctx.now().getTime() >= ctx.deadline) {
       return { status: "degraded", reason: "busy" };
     }
-    await sleep(COALESCE_POLL_MS);
+    await ctx.sleep(waitDelay(attempt, ctx.random));
   }
+}
+
+function waitDelay(attempt: number, random: () => number): number {
+  const ceiling = Math.min(WAIT_MAX_MS, WAIT_BASE_MS * 2 ** attempt);
+  return WAIT_MIN_MS + random() * (ceiling - WAIT_MIN_MS);
+}
+
+async function generate(login: string, ctx: Context): Promise<ProfileResult> {
+  const startedAt = ctx.now().getTime();
+  const tally = newTally();
+  let result: ProfileResult;
+  try {
+    result = await generateCold(login, ctx, tally);
+  } catch (error) {
+    if (!(error instanceof StoreDownError)) throw error;
+    logEvent("store_error", { op: "gate", message: error.message });
+    result = STORE_DOWN;
+  }
+  logEvent("generation", {
+    login: login.toLowerCase(),
+    status: result.status,
+    source: result.status === "ok" ? result.source : null,
+    years: tally.years,
+    ms: ctx.now().getTime() - startedAt,
+    remaining: tally.remaining,
+    cost: tally.cost,
+  });
+  return result;
 }
 
 async function generateCold(
   login: string,
-  visitor: Visitor,
-  deps: ProfileDeps,
+  ctx: Context,
+  tally: Tally,
 ): Promise<ProfileResult> {
-  const now = deps.now ?? (() => new Date());
+  const { cache, breaker } = ctx.deps;
 
-  // Another request may have finished while we were acquiring the lock.
-  const snapshot = await readSnapshot(login, deps);
-  const cached = completeProfile(snapshot);
-  if (cached) return { status: "ok", profile: cached, source: "cache" };
+  // Another request may have finished while we waited for the lock.
+  const { snapshot, result: cached } = await lookup(login, ctx);
+  if (cached) return cached;
 
-  if (await deps.breaker.isOpen(now())) {
+  // A recent failure is served to everyone instead of being retried at once.
+  const failed = await orElse(
+    "getFailure",
+    () => cache.getFailure(login),
+    null,
+  );
+  if (failed) return failed;
+
+  if (await mustSucceed(() => breaker.isOpen(ctx.now()))) {
     return { status: "degraded", reason: "circuit_open" };
   }
-  if (!(await deps.consumeColdGeneration(visitor))) {
-    return { status: "login_required", reason: "quota_exhausted" };
-  }
 
+  const outcome = await fetchMissing(login, ctx, tally, snapshot);
+  if ("failure" in outcome) {
+    const { failure } = outcome;
+    // Unknown users already have the longer negative cache.
+    if (failure.status !== "not_found") {
+      await orElse(
+        "setFailure",
+        () => cache.setFailure(login, failure),
+        undefined,
+      );
+    }
+    return failure;
+  }
+  return { status: "ok", source: "fresh", ...outcome };
+}
+
+type Fetched = Complete | { failure: Failure };
+
+async function fetchMissing(
+  login: string,
+  ctx: Context,
+  tally: Tally,
+  snapshot: Snapshot,
+): Promise<Fetched> {
   let user = snapshot.user;
   if (!user) {
-    const preview = await getPreview(login, deps);
-    if (preview.status !== "ok") return preview;
+    const preview = await loadUser(login, ctx, tally);
+    if (preview.status !== "ok") return { failure: preview };
     user = preview.user;
   }
 
-  const missingYears = user.contributionYears.filter(
+  const yearsFailure = await fetchMissingYears(
+    login,
+    ctx,
+    tally,
+    snapshot,
+    user,
+  );
+  if (yearsFailure) return { failure: yearsFailure };
+
+  const repos = await fetchMissingRepos(login, ctx, tally, snapshot);
+  if ("failure" in repos) return repos;
+
+  const complete = completeProfile(
+    { ...snapshot, user, repos: repos.repos },
+    ctx.now(),
+  );
+  return (
+    complete ?? {
+      failure: { status: "upstream_error", message: "Incomplete profile data" },
+    }
+  );
+}
+
+/**
+ * Fetches the years that are not cached and caches each as it lands, so a
+ * retry only pays for the rest. The first rate limit or timeout aborts the
+ * in-flight requests and stops launching new ones. Returns the failure, if any.
+ */
+async function fetchMissingYears(
+  login: string,
+  ctx: Context,
+  tally: Tally,
+  snapshot: Snapshot,
+  user: UserProfile,
+): Promise<Failure | null> {
+  const missing = yearsNeeded(user, ctx.now()).filter(
     (year) => !snapshot.years.has(year),
   );
-  const fetchedYears = await mapWithConcurrency(
-    missingYears,
+  const fanOut = new AbortController();
+  const signal = AbortSignal.any([ctx.signal, fanOut.signal]);
+  const state: { failure: GithubError | null } = { failure: null };
+
+  await mapWithConcurrency(
+    missing,
     YEAR_CONCURRENCY,
     async (year) => {
-      const result = await fetchAndRecord(deps, () =>
-        fetchYear(deps.getToken(), login, year),
+      tally.years += 1;
+      const result = await fetchAndRecord(ctx, tally, () =>
+        fetchYear(ctx.deps.getToken(), login, year, signal),
       );
-      // Cache each year as it lands so a retry after a failure only pays for the rest.
-      if (result.ok) await deps.cache.setYear(login, result.data, now());
-      return result;
+      if (result.ok) {
+        snapshot.years.set(year, result.data);
+        await orElse(
+          "setYear",
+          () => ctx.deps.cache.setYear(login, result.data, ctx.now()),
+          undefined,
+        );
+        return;
+      }
+      // Keep the first failure: the siblings we abort report a timeout of their own.
+      state.failure ??= result.error;
+      if (
+        result.error.kind === "rate_limited" ||
+        result.error.kind === "timeout"
+      ) {
+        fanOut.abort();
+      }
     },
+    () => signal.aborted,
   );
-  for (const result of fetchedYears) {
-    if (!result.ok) return failureOrMissing(login, result.error, deps);
-    snapshot.years.set(result.data.year, result.data);
-  }
 
-  let repos = snapshot.repos;
-  if (!repos) {
-    const result = await fetchAndRecord(deps, () =>
-      fetchRepos(deps.getToken(), login),
-    );
-    if (!result.ok) return failureOrMissing(login, result.error, deps);
-    repos = result.data;
-    await deps.cache.setRepos(login, repos);
+  if (state.failure) return failureFrom(login, state.failure, ctx);
+  // Launches were skipped because the deadline passed.
+  if (missing.some((year) => !snapshot.years.has(year))) {
+    return { status: "timeout" };
   }
-
-  const profile = completeProfile({ user, years: snapshot.years, repos });
-  if (!profile) {
-    return { status: "upstream_error", message: "Incomplete profile data" };
-  }
-  return { status: "ok", profile, source: "fresh" };
+  return null;
 }
 
-async function failureOrMissing(
+async function fetchMissingRepos(
   login: string,
-  error: GithubError,
-  deps: ProfileDeps,
-): Promise<Failure> {
-  if (error.kind === "not_found") await deps.cache.markMissing(login);
-  return toFailure(error);
+  ctx: Context,
+  tally: Tally,
+  snapshot: Snapshot,
+): Promise<{ repos: ReposResult } | { failure: Failure }> {
+  if (snapshot.repos) return { repos: snapshot.repos };
+  const result = await fetchAndRecord(ctx, tally, () =>
+    fetchRepos(ctx.deps.getToken(), login, ctx.signal),
+  );
+  if (!result.ok) {
+    return { failure: await failureFrom(login, result.error, ctx) };
+  }
+  const { repos, truncated } = result.data;
+  await orElse(
+    "setRepos",
+    () => ctx.deps.cache.setRepos(login, repos, truncated),
+    undefined,
+  );
+  return { repos: result.data };
 }
 
-async function fetchAndRecord<T>(
+/** Background refresh of a stale current year. Skips when someone else is generating or the breaker is open. */
+async function refreshCurrentYear(
+  login: string,
   deps: ProfileDeps,
-  call: () => Promise<GraphqlResult<T>>,
-): Promise<GraphqlResult<T>> {
-  const result = await call();
-  await deps.breaker.record(result.rateLimit);
-  return result;
+): Promise<void> {
+  const ctx = createContext(deps);
+  const year = ctx.now().getUTCFullYear();
+  try {
+    const release = await deps.lock.acquire(login);
+    if (!release) return;
+    try {
+      if (await deps.breaker.isOpen(ctx.now())) return;
+      const result = await fetchAndRecord(ctx, newTally(), () =>
+        fetchYear(deps.getToken(), login, year, ctx.signal),
+      );
+      if (result.ok) await deps.cache.setYear(login, result.data, ctx.now());
+    } finally {
+      await orElse("unlock", release, undefined);
+    }
+  } catch (error) {
+    logEvent("refresh_error", { login, message: String(error) });
+  }
 }

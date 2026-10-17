@@ -1,8 +1,11 @@
 import "server-only";
 import type { Store } from "./cache";
 
-/** Longer than a cold profile normally takes, short enough to heal after a crash. */
-export const LOCK_TTL_SECONDS = 60;
+/** Covers the generation deadline (50 s) plus margin; short enough to heal after a crash. */
+export const LOCK_TTL_SECONDS = 75;
+
+/** Deletes the key only when it still holds our token (atomic compare-and-delete). */
+const RELEASE_SCRIPT = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
 
 export type Lock = {
   /** Returns a release function, or null when someone else holds the lock. */
@@ -21,8 +24,8 @@ export function createLock(store: Store, prefix: string): Lock {
       });
       if (acquired === null) return null;
       return async () => {
-        // Only delete our own lock; it may have expired and been taken by someone else.
-        if ((await store.get(key)) === token) await store.del(key);
+        // The lock may have expired and been taken by someone else: only delete our own.
+        await store.eval(RELEASE_SCRIPT, [key], [token]);
       };
     },
   };

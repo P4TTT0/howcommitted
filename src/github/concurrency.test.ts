@@ -20,6 +20,22 @@ describe("mapWithConcurrency", () => {
     expect(result).toEqual(Array.from({ length: 12 }, (_, i) => i * 2));
   });
 
+  it("stops launching new items once shouldStop is true", async () => {
+    let started = 0;
+    const result = await mapWithConcurrency(
+      [1, 2, 3, 4, 5, 6],
+      2,
+      async (n) => {
+        started++;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return n;
+      },
+      () => started >= 2,
+    );
+    expect(started).toBe(2);
+    expect(result).toEqual([1, 2]);
+  });
+
   it("handles an empty list", async () => {
     expect(await mapWithConcurrency([], 6, async (n) => n)).toEqual([]);
   });

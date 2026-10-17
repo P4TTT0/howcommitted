@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { YearSummary } from "@/domain/types";
-import { createCache, TTL, ttlForYear } from "./cache";
-import { createMemoryStore } from "./memory-store";
+import {
+  type CachedYear,
+  createCache,
+  isYearStale,
+  TTL,
+  ttlForYear,
+} from "./cache";
+import { createTestStore } from "./test-store";
 
 const NOW = new Date("2026-10-16T12:00:00Z");
 const DAY = 24 * 60 * 60;
@@ -21,15 +27,28 @@ const summary = (year: number): YearSummary => ({
 });
 
 describe("ttlForYear", () => {
-  it("caches past years for 30 days and the current year for 6 hours", () => {
+  it("keeps past years for 30 days and the current year for its stale window", () => {
     expect(ttlForYear(2025, NOW)).toBe(30 * DAY);
-    expect(ttlForYear(2026, NOW)).toBe(6 * 60 * 60);
+    expect(ttlForYear(2026, NOW)).toBe(TTL.yearCurrentRetained);
+  });
+});
+
+describe("isYearStale", () => {
+  const entry = (year: number, fetchedAt: string): CachedYear => ({
+    summary: summary(year),
+    fetchedAt,
+  });
+
+  it("only the current year goes stale, after 6 hours", () => {
+    expect(isYearStale(entry(2026, "2026-10-16T06:01:00Z"), NOW)).toBe(false);
+    expect(isYearStale(entry(2026, "2026-10-16T05:59:00Z"), NOW)).toBe(true);
+    expect(isYearStale(entry(2025, "2020-01-01T00:00:00Z"), NOW)).toBe(false);
   });
 });
 
 describe("createCache", () => {
   it("uses the documented key format, lowercased, with an optional prefix", async () => {
-    const { store, values, ttls } = createMemoryStore();
+    const { store, values, ttls } = createTestStore();
     const cache = createCache(store, "preview:");
 
     await cache.setUser({
@@ -41,10 +60,12 @@ describe("createCache", () => {
     });
     await cache.setYear("Torvalds", summary(2024), NOW);
     await cache.setYear("Torvalds", summary(2026), NOW);
-    await cache.setRepos("Torvalds", []);
+    await cache.setRepos("Torvalds", [], false);
     await cache.markMissing("ghost");
+    await cache.setFailure("Ghost", { status: "timeout" });
 
     expect([...values.keys()].sort()).toEqual([
+      "preview:v1:failed:ghost",
       "preview:v1:missing:ghost",
       "preview:v1:repos:torvalds",
       "preview:v1:user:torvalds",
@@ -53,17 +74,25 @@ describe("createCache", () => {
     ]);
     expect(ttls.get("preview:v1:user:torvalds")).toBe(TTL.user);
     expect(ttls.get("preview:v1:year:torvalds:2024")).toBe(TTL.yearPast);
-    expect(ttls.get("preview:v1:year:torvalds:2026")).toBe(TTL.yearCurrent);
+    expect(ttls.get("preview:v1:year:torvalds:2026")).toBe(
+      TTL.yearCurrentRetained,
+    );
     expect(ttls.get("preview:v1:repos:torvalds")).toBe(TTL.repos);
     expect(ttls.get("preview:v1:missing:ghost")).toBe(TTL.missing);
+    expect(ttls.get("preview:v1:failed:ghost")).toBe(TTL.failure);
   });
 
   it("reads back what it stored and reports negative cache", async () => {
-    const { store } = createMemoryStore();
+    const { store } = createTestStore();
     const cache = createCache(store, "");
     expect(await cache.getYear("a", 2024)).toBeNull();
     await cache.setYear("a", summary(2024), NOW);
-    expect(await cache.getYear("A", 2024)).toEqual(summary(2024));
+    expect(await cache.getYear("A", 2024)).toEqual({
+      summary: summary(2024),
+      fetchedAt: NOW.toISOString(),
+    });
+    expect(await cache.getRepos("a")).toBeNull();
+    expect(await cache.getFailure("a")).toBeNull();
     expect(await cache.isMissing("a")).toBe(false);
     await cache.markMissing("a");
     expect(await cache.isMissing("A")).toBe(true);

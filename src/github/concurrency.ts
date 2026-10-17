@@ -1,17 +1,24 @@
 import "server-only";
 
-/** Maps items with at most `limit` calls in flight. Results keep input order. */
+/**
+ * Maps items with at most `limit` calls in flight. Results keep input order.
+ * Once `shouldStop` returns true no new item is started; items that never
+ * started are absent from the result.
+ */
 export async function mapWithConcurrency<T, R>(
   items: readonly T[],
   limit: number,
   fn: (item: T) => Promise<R>,
+  shouldStop: () => boolean = () => false,
 ): Promise<R[]> {
-  const results = new Array<R>(items.length);
+  const results: (R | undefined)[] = new Array(items.length);
+  const started: boolean[] = new Array(items.length).fill(false);
   let next = 0;
 
   async function worker(): Promise<void> {
-    while (next < items.length) {
+    while (next < items.length && !shouldStop()) {
       const index = next++;
+      started[index] = true;
       results[index] = await fn(items[index] as T);
     }
   }
@@ -21,5 +28,5 @@ export async function mapWithConcurrency<T, R>(
     worker,
   );
   await Promise.all(workers);
-  return results;
+  return results.filter((_, index) => started[index]) as R[];
 }
