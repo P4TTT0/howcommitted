@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  LONGEST_PLACEHOLDER,
+  exampleAt,
+  exampleFor,
   PLACEHOLDER_NAMES,
   placeholderAt,
   placeholderFor,
@@ -53,8 +54,18 @@ describe("placeholderFor", () => {
   });
 });
 
-describe("LONGEST_PLACEHOLDER", () => {
-  it("is the widest example", () => {
-    expect(LONGEST_PLACEHOLDER).toBe("sindresorhus");
+describe("exampleAt", () => {
+  it("is the whole name from its first letter to its clearing tick", () => {
+    // ab: ticks 0-4 (2 typing, 2 hold, 1 clear); xyz: ticks 5-10
+    for (const tick of [0, 1, 2, 3, 4])
+      expect(exampleAt(tick, names, 2)).toBe("ab");
+    for (const tick of [5, 7, 10])
+      expect(exampleAt(tick, names, 2)).toBe("xyz");
+    expect(exampleAt(11, names, 2)).toBe("ab");
+  });
+
+  it("is static when the animation is off", () => {
+    expect(exampleFor(null)).toBe("torvalds");
+    expect(exampleFor(0)).toBe("torvalds");
   });
 });

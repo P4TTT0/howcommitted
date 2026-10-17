@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { recordIntent } from "@/features/experience/intent";
 import { preloadAudio, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
@@ -15,7 +21,6 @@ import {
   lookupMessage,
 } from "./lookup";
 import { PreviewRow } from "./PreviewRow";
-import { LONGEST_PLACEHOLDER, STATIC_PLACEHOLDER } from "./placeholder";
 import { useTypingPlaceholder } from "./useTypingPlaceholder";
 
 const NUDGE = "Type a GitHub username first.";
@@ -37,7 +42,11 @@ export function Search() {
   const [starting, setStarting] = useState(false);
   const [focused, setFocused] = useState(false);
   const [nudge, setNudge] = useState(false);
-  const placeholder = useTypingPlaceholder(value === "" && !focused);
+  const { text: placeholder, example } = useTypingPlaceholder(
+    value === "" && !focused,
+  );
+  const sizerRef = useRef<HTMLSpanElement>(null);
+  const [fieldWidth, setFieldWidth] = useState<number | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` re-runs the lookup on retry
   useEffect(() => {
@@ -100,8 +109,20 @@ export function Search() {
     nudge && state.kind === "idle"
       ? NUDGE
       : lookupMessage(state as Exclude<LookupState, { kind: "found" }>);
-  // Empty and idle: reserve the longest example so "?" does not jump per tick.
-  const sizer = value || (focused ? STATIC_PLACEHOLDER : LONGEST_PLACEHOLDER);
+  // The field is as wide as the name it shows: what was typed, else the full
+  // example being typed. It changes once per name, with a short glide.
+  const sizer = value || example;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `sizer` is the text being measured
+  useLayoutEffect(() => {
+    const node = sizerRef.current;
+    if (!node) return;
+    const measure = () => setFieldWidth(node.getBoundingClientRect().width);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [sizer]);
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-7">
@@ -115,11 +136,15 @@ export function Search() {
         </span>
         <span className="flex max-w-full items-baseline max-sm:text-[0.55em]">
           <span aria-hidden="true">is&nbsp;@</span>
-          <span className="inline-grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] items-baseline">
+          <span
+            style={fieldWidth === null ? undefined : { width: fieldWidth }}
+            className="inline-grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] items-baseline motion-safe:transition-[width] motion-safe:duration-250 motion-safe:ease-out"
+          >
             {/* Sizer: the field is as wide as what it shows, like part of the sentence. */}
             <span
+              ref={sizerRef}
               aria-hidden="true"
-              className="invisible col-start-1 row-start-1 whitespace-pre pr-[0.04em]"
+              className="invisible w-max col-start-1 row-start-1 whitespace-pre pr-[0.04em]"
             >
               {sizer}
             </span>

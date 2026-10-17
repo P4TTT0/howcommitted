@@ -7,11 +7,6 @@ export const PLACEHOLDER_NAMES = [
   "yyx990803",
 ] as const;
 
-/** The widest example, used to size the idle field. */
-export const LONGEST_PLACEHOLDER: string = PLACEHOLDER_NAMES.reduce((a, b) =>
-  b.length > a.length ? b : a,
-);
-
 /** One typed letter per tick. */
 export const PLACEHOLDER_TICK_MS = 140;
 
@@ -46,4 +41,28 @@ export function placeholderAt(
 /** `tick` is null when the animation is off (reduced motion, focus, typing). */
 export function placeholderFor(tick: number | null): string {
   return tick === null ? STATIC_PLACEHOLDER : placeholderAt(tick);
+}
+
+/**
+ * The full name the placeholder is currently typing (or holding, or has just
+ * cleared). The field is sized from it, so its width changes once per name.
+ */
+export function exampleAt(
+  tick: number,
+  names: readonly string[] = PLACEHOLDER_NAMES,
+  hold: number = PLACEHOLDER_HOLD_TICKS,
+): string {
+  const total = names.reduce((sum, name) => sum + name.length + hold + 1, 0);
+  let remaining = tick % total;
+  for (const name of names) {
+    const span = name.length + hold + 1;
+    if (remaining < span) return name;
+    remaining -= span;
+  }
+  return STATIC_PLACEHOLDER;
+}
+
+/** Like `placeholderFor`, for the name being typed. */
+export function exampleFor(tick: number | null): string {
+  return tick === null ? STATIC_PLACEHOLDER : exampleAt(tick);
 }

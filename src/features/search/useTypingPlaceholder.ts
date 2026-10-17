@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  exampleFor,
   PLACEHOLDER_NAMES,
   PLACEHOLDER_TICK_MS,
   placeholderFor,
@@ -10,10 +11,14 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * The kinetic placeholder: types example usernames while `active`, and stays
+ * The kinetic placeholder (`text`) and the full name it is typing (`example`):
+ * types example usernames while `active`, and stays
  * static when inactive or when the visitor prefers reduced motion.
  */
-export function useTypingPlaceholder(active: boolean): string {
+export function useTypingPlaceholder(active: boolean): {
+  text: string;
+  example: string;
+} {
   const [tick, setTick] = useState<number | null>(null);
 
   useEffect(() => {
@@ -30,5 +35,5 @@ export function useTypingPlaceholder(active: boolean): string {
     return () => clearInterval(timer);
   }, [active]);
 
-  return placeholderFor(tick);
+  return { text: placeholderFor(tick), example: exampleFor(tick) };
 }
