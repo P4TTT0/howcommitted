@@ -30,6 +30,7 @@ import { PreviewRow } from "./PreviewRow";
 import { consumePrefill } from "./prefill";
 import { useTypingPlaceholder } from "./useTypingPlaceholder";
 import { useWideLayout } from "./useWideLayout";
+import { parseVsParam } from "./vsParam";
 
 const NUDGE = "Type a GitHub username first.";
 
@@ -51,6 +52,7 @@ export function Search({ versus = false }: { versus?: boolean }) {
   const [starting, setStarting] = useState(false);
   const [focused, setFocused] = useState(false);
   const [nudge, setNudge] = useState(false);
+  const [openRivals, setOpenRivals] = useState(false);
   const { text: placeholder, example } = useTypingPlaceholder(
     value === "" && !focused,
   );
@@ -104,11 +106,24 @@ export function Search({ versus = false }: { versus?: boolean }) {
   );
   const rivalsRow =
     versus && found ? (
-      <RivalsRow main={found} rivals={rivals} onChange={setRivalPicks} />
+      <RivalsRow
+        main={found}
+        rivals={rivals}
+        onChange={setRivalPicks}
+        initialOpen={openRivals}
+      />
     ) : null;
 
   // Back from a cancelled experience: the same developer, ready to go.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: read once on mount
   useEffect(() => {
+    const challenged = parseVsParam(window.location.search, versus);
+    if (challenged) {
+      // "Challenge someone": this developer as P1, rival input ready.
+      setValue(challenged);
+      setOpenRivals(true);
+      return;
+    }
     const login = consumePrefill();
     if (login) setValue(login);
   }, []);
