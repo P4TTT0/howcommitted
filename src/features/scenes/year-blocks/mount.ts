@@ -1,6 +1,6 @@
+import { formatCount } from "@/features/sequencer/model/format";
+import { blockForYearIndex } from "@/features/sequencer/model/plan";
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { formatCount } from "@/features/timeline/format";
-import { blockForYearIndex } from "@/features/timeline/plan";
 import { semitonesForDegree } from "@/playback/pitch";
 import { activeBarIndex, riseProgress, type YearBar } from "./bars";
 

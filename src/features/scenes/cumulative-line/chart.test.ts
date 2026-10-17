@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { buildPlan } from "@/features/sequencer/model/plan";
 import { linePath, stepPath } from "./chart";
-import { buildPlan } from "./plan";
 
 const days = Array.from({ length: 28 }, (_, index) => ({
   date: new Date(Date.UTC(2024, 0, 1 + index)).toISOString().slice(0, 10),

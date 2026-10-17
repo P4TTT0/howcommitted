@@ -1,6 +1,6 @@
+import { generateFakeProfile } from "@/features/sequencer/model/fakeProfile";
+import { buildPlan } from "@/features/sequencer/model/plan";
 import type { SceneData } from "@/features/sequencer/types";
-import { generateFakeProfile } from "@/features/timeline/fakeProfile";
-import { buildPlan } from "@/features/timeline/plan";
 
 /**
  * The lab's scene data: the generated profile mapped like a real history, so

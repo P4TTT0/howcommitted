@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { History } from "@/domain/history";
-import type { HistoryPlan } from "@/features/timeline/historyPlan";
+import type { HistoryPlan } from "@/features/sequencer/model/historyPlan";
 import type { PlaybackClock } from "@/playback/clock";
 import type { SoundEngine } from "@/playback/sound/engine";
 

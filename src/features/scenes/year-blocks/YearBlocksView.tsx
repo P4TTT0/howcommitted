@@ -1,5 +1,5 @@
-import { formatCount } from "@/features/timeline/format";
-import { blockForYearIndex } from "@/features/timeline/plan";
+import { formatCount } from "@/features/sequencer/model/format";
+import { blockForYearIndex } from "@/features/sequencer/model/plan";
 import type { YearBar } from "./bars";
 
 /** At most this many year labels fit on the axis of a phone. */

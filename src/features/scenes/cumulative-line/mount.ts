@@ -1,11 +1,5 @@
 import gsap from "gsap";
-import type { SceneRuntime } from "@/features/sequencer/types";
-import { cumulativeAt } from "@/playback/aggregate";
-import type { PlaybackClock } from "@/playback/clock";
-import { semitonesForDegree } from "@/playback/pitch";
-import type { SoundEngine } from "@/playback/sound/engine";
-import { CHART_WIDTH, topPercent } from "./chart";
-import { formatCount } from "./format";
+import { formatCount } from "@/features/sequencer/model/format";
 import {
   DRAW_SECONDS,
   FLOOD,
@@ -13,7 +7,13 @@ import {
   stepCueTimes,
   YEAR_WIPE_SECONDS,
   yearReveals,
-} from "./plan";
+} from "@/features/sequencer/model/plan";
+import type { SceneRuntime } from "@/features/sequencer/types";
+import { cumulativeAt } from "@/playback/aggregate";
+import type { PlaybackClock } from "@/playback/clock";
+import { semitonesForDegree } from "@/playback/pitch";
+import type { SoundEngine } from "@/playback/sound/engine";
+import { CHART_WIDTH, topPercent } from "./chart";
 
 /**
  * Wires the cumulative line to the sequencer's clock: sound scheduled on the

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { FINALE, SCENES } from "@/features/scenes/registry";
+import { planFromHistory } from "@/features/sequencer/model/historyPlan";
 import { Sequencer } from "@/features/sequencer/Sequencer";
 import type { SceneData } from "@/features/sequencer/types";
-import { planFromHistory } from "@/features/timeline/historyPlan";
 import { isAudioUnlocked, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
 import { ScreenMain } from "@/ui/ScreenMain";

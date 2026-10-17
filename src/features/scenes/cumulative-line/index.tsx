@@ -1,7 +1,7 @@
+import { BPM, TOTAL_SECONDS } from "@/features/sequencer/model/plan";
 import type { SceneDefinition } from "@/features/sequencer/types";
 import { CumulativeLineView } from "./CumulativeLineView";
 import { mountCumulativeLine } from "./mount";
-import { BPM, TOTAL_SECONDS } from "./plan";
 
 /** Scene 2: cumulative contributions drawn as one line, with payoff floods. */
 export const cumulativeLineScene: SceneDefinition = {

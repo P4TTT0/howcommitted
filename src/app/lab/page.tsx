@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LabScenes } from "@/features/experience/LabScenes";
-import { isLabEnabled } from "@/features/timeline/labGate";
+import { isLabEnabled } from "@/features/experience/labGate";
 
 export const metadata: Metadata = {
   title: "Lab | Committed",

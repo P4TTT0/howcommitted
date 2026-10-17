@@ -1,10 +1,10 @@
-import { endCardFinale } from "@/features/experience/endCardFinale";
+import { cumulativeLineScene } from "@/features/scenes/cumulative-line";
+import { endCardFinale } from "@/features/scenes/finale";
 import { yearBlocksScene } from "@/features/scenes/year-blocks";
 import type {
   FinaleDefinition,
   SceneDefinition,
 } from "@/features/sequencer/types";
-import { cumulativeLineScene } from "@/features/timeline/cumulativeLineScene";
 
 /**
  * The scenes, in playback order. Adding a scene is one import and one entry

@@ -1,12 +1,5 @@
 import { useMemo } from "react";
-import {
-  CHART_HEIGHT,
-  CHART_WIDTH,
-  linePath,
-  stepLabelPosition,
-  stepPath,
-} from "./chart";
-import { formatCount } from "./format";
+import { formatCount } from "@/features/sequencer/model/format";
 import {
   blockForYearIndex,
   displayedYearIndex,
@@ -14,7 +7,14 @@ import {
   type Plan,
   stepLabel,
   yearReveals,
-} from "./plan";
+} from "@/features/sequencer/model/plan";
+import {
+  CHART_HEIGHT,
+  CHART_WIDTH,
+  linePath,
+  stepLabelPosition,
+  stepPath,
+} from "./chart";
 
 /** At most this many year labels fit on the axis of a phone. */
 const MAX_YEAR_LABELS = 8;
