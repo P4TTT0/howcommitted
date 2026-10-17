@@ -85,11 +85,28 @@ describe("interpretHistory", () => {
 });
 
 describe("failureCopy", () => {
-  it("is honest about sign-in not existing yet", () => {
+  it("asks for GitHub sign-in with the agreed copy once the free runs are used", () => {
     expect(failureCopy({ kind: "login_required" }, "ada")).toEqual({
-      message: "Free runs used for today. Sign in with GitHub is coming soon.",
+      message:
+        "Free runs used. Sign in with GitHub to keep going — it uses your own quota, and we only read public data.",
       retry: false,
+      signIn: true,
     });
+  });
+
+  it("offers sign-in only for login_required", () => {
+    for (const kind of [
+      "not_found",
+      "invalid",
+      "upstream",
+      "network",
+      "server",
+    ] as const) {
+      expect(failureCopy({ kind }, "ada").signIn).toBeUndefined();
+    }
+    expect(
+      failureCopy({ kind: "busy", retryAfterSeconds: null }, "ada").signIn,
+    ).toBeUndefined();
   });
 
   it("names the missing user and does not offer a retry", () => {
