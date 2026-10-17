@@ -418,9 +418,11 @@ test("back and forward never spend a run without a click", async ({ page }) => {
   expect(mocks.historyRequests).toHaveLength(1);
 });
 
-test("more than one segment is not found for now", async ({ page }) => {
-  const response = await page.goto("/ada/grace");
-  expect(response?.status()).toBe(404);
+test("malformed multi-segment paths are not found", async ({ page }) => {
+  for (const path of ["/ada/lab", "/ada/-bad", "/ada/ADA", "/a/b/c/d/e/f"]) {
+    const response = await page.goto(path);
+    expect(response?.status(), path).toBe(404);
+  }
 });
 
 test("contributions not attributed to a day show as a labelled step with an honest note", async ({
