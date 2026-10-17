@@ -1,7 +1,12 @@
 import type { FinaleDefinition } from "@/features/sequencer/types";
 import { EndCard } from "./EndCard";
 
-/** The current finale: the end card. The final poster will replace it. */
+/**
+ * The final poster. The client cannot read server env, so next.config.ts
+ * inlines the versus gate (closed in production) as NEXT_PUBLIC_VERSUS.
+ */
+const versusEnabled = process.env.NEXT_PUBLIC_VERSUS === "1";
+
 export const endCardFinale: FinaleDefinition = {
   render({ login, model }, { replay }) {
     const { firstYear, lastYear } = model;
@@ -15,6 +20,7 @@ export const endCardFinale: FinaleDefinition = {
         yearBlocks={model.yearBlocks}
         note={model.note}
         privateContributions={model.privateContributions}
+        versusEnabled={versusEnabled}
         onReplay={replay}
       />
     );
