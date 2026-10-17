@@ -2,6 +2,7 @@ import { bigNumbersScene } from "@/features/scenes/big-numbers";
 import { cumulativeLineScene } from "@/features/scenes/cumulative-line";
 import { endCardFinale } from "@/features/scenes/finale";
 import { heatmapScene } from "@/features/scenes/heatmap";
+import { languageMosaicScene } from "@/features/scenes/language-mosaic";
 import { yearBlocksScene } from "@/features/scenes/year-blocks";
 import type {
   FinaleDefinition,
@@ -17,7 +18,7 @@ export const SCENES: readonly SceneDefinition[] = [
   yearBlocksScene,
   cumulativeLineScene,
   heatmapScene,
-  // 4 Language mosaic goes here.
+  languageMosaicScene,
   bigNumbersScene,
 ];
 
