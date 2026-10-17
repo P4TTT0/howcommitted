@@ -2,19 +2,26 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
-import { unlockAudio } from "@/playback/unlock";
+import { recordIntent } from "@/features/experience/intent";
+import { preloadAudio, unlockAudio } from "@/playback/unlock";
+import { focusRing } from "@/ui/classes";
+import { StartButton } from "@/ui/StartButton";
 import {
   canRetry,
   checkInput,
   formatActiveSpan,
-  interpretLookup,
   LOOKUP_DEBOUNCE_MS,
   type LookupState,
+  lookupLogin,
   lookupMessage,
 } from "./lookup";
 
-const focusClass =
-  "focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-ink";
+/** Names longer than this leave the display face and truncate in mono. */
+const DISPLAY_NAME_MAX_CHARACTERS = 18;
+
+function warmUpAudio() {
+  void preloadAudio().catch(() => {});
+}
 
 /**
  * Landing search: debounced exact-username lookup with a preview. Only the
@@ -35,11 +42,16 @@ export function Search() {
       setState({ kind: "idle" });
       return;
     }
-    if (check.kind === "invalid") {
+    if (check.kind === "invalid" || check.kind === "reserved") {
       // Stay quiet while typing; complain once the typing pauses.
       setState({ kind: "idle" });
       const timer = setTimeout(
-        () => setState({ kind: "invalid" }),
+        () =>
+          setState(
+            check.kind === "invalid"
+              ? { kind: "invalid" }
+              : { kind: "reserved", login: check.login },
+          ),
         LOOKUP_DEBOUNCE_MS,
       );
       return () => clearTimeout(timer);
@@ -48,16 +60,8 @@ export function Search() {
     setState({ kind: "looking", login: check.login });
     const controller = new AbortController();
     const timer = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `/api/user/${encodeURIComponent(check.login)}`,
-          { signal: controller.signal },
-        );
-        const body: unknown = await response.json().catch(() => null);
-        setState(interpretLookup(check.login, response.status, body));
-      } catch {
-        if (!controller.signal.aborted) setState({ kind: "failed" });
-      }
+      const next = await lookupLogin(check.login, controller.signal);
+      if (next && !controller.signal.aborted) setState(next);
     }, LOOKUP_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
@@ -67,14 +71,22 @@ export function Search() {
 
   const found = state.kind === "found" ? state.user : null;
 
+  // A found user is the likely next click: have the audio engine ready.
+  useEffect(() => {
+    if (found) warmUpAudio();
+  }, [found]);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!found || starting) return;
     setStarting(true);
     // Called before any await so the click still counts as the user gesture.
-    await unlockAudio();
+    const unlocked = await unlockAudio();
+    if (unlocked) recordIntent(found.login);
     router.push(`/${found.login}`);
   }
+
+  const displayName = found?.name ?? found?.login ?? "";
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-4 py-10">
@@ -96,12 +108,13 @@ export function Search() {
           type="text"
           value={value}
           onChange={(event) => setValue(event.target.value)}
+          onFocus={warmUpAudio}
           autoComplete="off"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
           aria-describedby="lookup-status"
-          className={`min-h-14 w-full border-2 border-ink bg-paper px-4 font-mono text-base ${focusClass}`}
+          className={`min-h-14 w-full border-2 border-ink bg-paper px-4 font-mono text-base ${focusRing}`}
         />
 
         <div
@@ -109,23 +122,29 @@ export function Search() {
           role="status"
           className="min-h-20 font-mono text-xs"
         >
-          {found ? (
+          {state.kind === "found" ? (
             <div className="flex items-center gap-4 border-2 border-ink p-3">
               {/* biome-ignore lint/performance/noImgElement: a 64px remote avatar needs no optimizer */}
               <img
-                src={found.avatarUrl}
+                src={state.user.avatarUrl}
                 alt=""
                 width={64}
                 height={64}
                 className="size-16 shrink-0 border-2 border-ink object-cover"
               />
               <div className="min-w-0">
-                <p className="truncate font-display text-3xl font-black uppercase leading-none">
-                  {found.name ?? found.login}
+                <p
+                  className={
+                    displayName.length <= DISPLAY_NAME_MAX_CHARACTERS
+                      ? "truncate font-display text-3xl font-black uppercase leading-none"
+                      : "truncate font-mono text-sm font-bold"
+                  }
+                >
+                  {displayName}
                 </p>
-                <p className="mt-1 truncate">@{found.login}</p>
+                <p className="mt-1 truncate">@{state.user.login}</p>
                 <p className="mt-1">
-                  {formatActiveSpan(found.contributionYears)}
+                  {formatActiveSpan(state.user.contributionYears)}
                 </p>
               </div>
             </div>
@@ -136,7 +155,7 @@ export function Search() {
                 <button
                   type="button"
                   onClick={() => setAttempt((count) => count + 1)}
-                  className={`min-h-11 min-w-11 border-2 border-ink px-3 uppercase ${focusClass}`}
+                  className={`min-h-11 min-w-11 border-2 border-ink px-3 uppercase ${focusRing}`}
                 >
                   Try again
                 </button>
@@ -145,13 +164,11 @@ export function Search() {
           )}
         </div>
 
-        <button
+        <StartButton
           type="submit"
+          size="form"
           aria-disabled={!found || starting}
-          className={`min-h-14 bg-block-ultramarine px-6 py-3 text-center font-display text-[clamp(2.5rem,9vw,4.5rem)] font-black uppercase leading-[0.85] text-paper aria-disabled:cursor-not-allowed aria-disabled:opacity-40 ${focusClass}`}
-        >
-          How Committed?
-        </button>
+        />
       </form>
     </main>
   );
