@@ -1,4 +1,4 @@
-import { isLabEnabled } from "@/features/timeline/labGate";
+import { isLabEnabled } from "@/features/experience/labGate";
 
 type Env = Record<string, string | undefined>;
 
