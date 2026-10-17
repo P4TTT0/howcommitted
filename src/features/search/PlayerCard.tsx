@@ -22,7 +22,7 @@ export function PlayerCard({ user, disabled, onStart }: PlayerCardProps) {
       onClick={onStart}
       aria-disabled={disabled}
       aria-label={`Play @${user.login}`}
-      className={`player-wipe flex w-full flex-col items-stretch gap-[clamp(8px,1.6dvh,16px)] border-2 border-ink p-[clamp(8px,1.4dvh,14px)] text-left not-aria-disabled:hover:bg-ink not-aria-disabled:hover:text-paper aria-disabled:cursor-wait ${pressable} ${focusRing}`}
+      className={`player-wipe flex w-full flex-col items-stretch gap-[clamp(8px,1.6dvh,16px)] border-2 border-ink p-[clamp(8px,1.4dvh,14px)] text-center not-aria-disabled:hover:bg-ink not-aria-disabled:hover:text-paper aria-disabled:cursor-wait ${pressable} ${focusRing}`}
     >
       {/* biome-ignore lint/performance/noImgElement: a remote avatar needs no optimizer */}
       <img
