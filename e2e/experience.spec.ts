@@ -62,7 +62,10 @@ async function mockApi(
 }
 
 const startButton = (page: Page) =>
-  page.getByRole("button", { name: "How Committed?" });
+  page.getByRole("button", { name: "Play", exact: true });
+/** The landing call to action: "Play", or "Play @login" once a user is found. */
+const listenButton = (page: Page) =>
+  page.getByRole("button", { name: /^Play( @\w+)?$/ }).first();
 
 test("search shows a preview, then the click opens the experience", async ({
   page,
@@ -70,19 +73,20 @@ test("search shows a preview, then the click opens the experience", async ({
   const mocks = await mockApi(page);
   await page.goto("/");
 
-  const button = startButton(page);
+  const button = listenButton(page);
   await expect(button).toHaveAttribute("aria-disabled", "true");
 
   await page.getByLabel("GitHub username").fill("ada");
   await expect(page.getByText("Ada Lovelace")).toBeVisible();
-  await expect(page.getByText("Active 2022 to 2024")).toBeVisible();
+  await expect(page.getByText("Active 2022–2024")).toBeVisible();
   await expect(button).toHaveAttribute("aria-disabled", "false");
   // The preview alone never spends a generation.
   expect(mocks.historyRequests).toHaveLength(0);
 
   await button.click();
   await expect(page).toHaveURL(/\/ada$/);
-  expect(mocks.historyRequests).toHaveLength(1);
+  // The history request goes out right after the navigation, not with it.
+  await expect.poll(() => mocks.historyRequests.length).toBe(1);
 
   // Audio was unlocked by the landing click, so the scene starts by itself.
   await expect(page.locator('[data-role="block"]')).toBeVisible();
@@ -106,7 +110,7 @@ test("an unknown user gets a clear message and no start", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("GitHub username").fill("ghost");
   await expect(page.getByText("No GitHub user named @ghost")).toBeVisible();
-  await expect(startButton(page)).toHaveAttribute("aria-disabled", "true");
+  await expect(listenButton(page)).toHaveAttribute("aria-disabled", "true");
   await page.getByLabel("GitHub username").press("Enter");
   await expect(page).toHaveURL(/\/$/);
 });
@@ -311,7 +315,7 @@ test("back and forward never spend a run without a click", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("GitHub username").fill("ada");
   await expect(page.getByText("Ada Lovelace")).toBeVisible();
-  await startButton(page).click();
+  await listenButton(page).click();
   await expect(page.locator('[data-role="block"]')).toBeVisible();
   expect(mocks.historyRequests).toHaveLength(1);
 

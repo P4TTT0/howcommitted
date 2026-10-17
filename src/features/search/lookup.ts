@@ -131,7 +131,7 @@ export function formatActiveSpan(years: readonly number[]): string {
   if (!span) return "No contribution years yet";
   return span.first === span.last
     ? `Active in ${span.first}`
-    : `Active ${span.first} to ${span.last}`;
+    : `Active ${span.first}–${span.last}`;
 }
 
 /** Text for the status line; the found state shows a card instead. */

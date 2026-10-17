@@ -70,7 +70,7 @@ function announcement(phase: Phase, login: string): string {
     case "init":
       return "";
     case "gate":
-      return "Press How Committed? to start.";
+      return "Press Play to start.";
     case "loading":
       return "Reading the contribution history.";
     case "failed":

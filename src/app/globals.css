@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant wide (@media (min-width: 1024px) and (orientation: landscape));
+
 @theme {
   --color-paper: #f3f1ec;
   --color-ink: #141414;
@@ -27,6 +29,20 @@ body {
   background-color: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-mono);
+}
+
+@layer base {
+  /* Anything you can press looks pressable. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
 }
 
 /* Loading moment: the first block wipes in, the baseline starts to draw. */
@@ -65,5 +81,32 @@ body {
   .loading-baseline {
     animation: none;
     transform: scaleX(0.5);
+  }
+}
+
+/* Landing signature: the cumulative line is drawn once, left to right. */
+@keyframes draw-line {
+  from {
+    clip-path: inset(-4px 100% -4px 0);
+  }
+  to {
+    clip-path: inset(-4px 0 -4px 0);
+  }
+}
+
+.signature-line {
+  animation: draw-line 5s cubic-bezier(0.45, 0, 0.2, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signature-line {
+    animation: none;
+  }
+}
+
+/* The found developer's card wipes in from the left, like the year blocks. */
+@media (prefers-reduced-motion: no-preference) {
+  .player-wipe {
+    animation: wipe-in 0.3s cubic-bezier(0.23, 1, 0.32, 1) both;
   }
 }

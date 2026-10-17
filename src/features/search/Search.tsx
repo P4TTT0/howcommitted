@@ -1,30 +1,39 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { recordIntent } from "@/features/experience/intent";
 import { preloadAudio, unlockAudio } from "@/playback/unlock";
-import { focusRing } from "@/ui/classes";
+import { actionClass } from "@/ui/classes";
 import { StartButton } from "@/ui/StartButton";
 import {
   canRetry,
   checkInput,
-  formatActiveSpan,
   LOOKUP_DEBOUNCE_MS,
   type LookupState,
   lookupLogin,
   lookupMessage,
 } from "./lookup";
+import { PlayerCard } from "./PlayerCard";
+import { PlayerColumn } from "./PlayerColumn";
+import { PreviewRow } from "./PreviewRow";
+import { useTypingPlaceholder } from "./useTypingPlaceholder";
+import { useWideLayout } from "./useWideLayout";
 
-/** Names longer than this leave the display face and truncate in mono. */
-const DISPLAY_NAME_MAX_CHARACTERS = 18;
+const NUDGE = "Type a GitHub username first.";
 
 function warmUpAudio() {
   void preloadAudio().catch(() => {});
 }
 
 /**
- * Landing search: debounced exact-username lookup with a preview. Only the
+ * The landing question: "How committed is @[input]?". Debounced exact-username lookup with a preview. Only the
  * preview is fetched here; the history waits for the click (fetch on intent),
  * which also unlocks audio before navigating to the experience.
  */
@@ -34,6 +43,14 @@ export function Search() {
   const [state, setState] = useState<LookupState>({ kind: "idle" });
   const [attempt, setAttempt] = useState(0);
   const [starting, setStarting] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [nudge, setNudge] = useState(false);
+  const { text: placeholder, example } = useTypingPlaceholder(
+    value === "" && !focused,
+  );
+  const wide = useWideLayout();
+  const sizerRef = useRef<HTMLSpanElement>(null);
+  const [fieldWidth, setFieldWidth] = useState<number | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` re-runs the lookup on retry
   useEffect(() => {
@@ -76,8 +93,7 @@ export function Search() {
     if (found) warmUpAudio();
   }, [found]);
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function start() {
     if (!found || starting) return;
     setStarting(true);
     // Called before any await so the click still counts as the user gesture.
@@ -86,90 +102,143 @@ export function Search() {
     router.push(`/${found.login}`);
   }
 
-  const displayName = found?.name ?? found?.login ?? "";
+  function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    // Not found yet: say so politely instead of doing nothing silently.
+    if (!found && state.kind === "idle") setNudge(true);
+    void start();
+  }
+
+  const statusText =
+    nudge && state.kind === "idle"
+      ? NUDGE
+      : lookupMessage(state as Exclude<LookupState, { kind: "found" }>);
+  // The field is as wide as the name it shows: what was typed, else the full
+  // example being typed. It changes once per name, with a short glide.
+  const sizer = value || example;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `sizer` is the text being measured
+  useLayoutEffect(() => {
+    const node = sizerRef.current;
+    if (!node) return;
+    const measure = () => setFieldWidth(node.getBoundingClientRect().width);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [sizer]);
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-4 py-10">
-      <h1 className="font-display text-[clamp(3.5rem,16vw,12rem)] font-black uppercase leading-[0.8]">
-        Committed
-      </h1>
-
-      <form
-        onSubmit={onSubmit}
-        noValidate
-        className="flex w-full max-w-xl flex-col gap-4"
-      >
-        <label htmlFor="login" className="font-mono text-xs uppercase">
-          GitHub username
-        </label>
-        <input
-          id="login"
-          name="login"
-          type="text"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onFocus={warmUpAudio}
-          autoComplete="off"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          aria-describedby="lookup-status"
-          className={`min-h-14 w-full border-2 border-ink bg-paper px-4 font-mono text-base ${focusRing}`}
-        />
-
-        <div
-          id="lookup-status"
-          role="status"
-          className="min-h-20 font-mono text-xs"
-        >
-          {state.kind === "found" ? (
-            <div className="flex items-center gap-4 border-2 border-ink p-3">
-              {/* biome-ignore lint/performance/noImgElement: a 64px remote avatar needs no optimizer */}
-              <img
-                src={state.user.avatarUrl}
-                alt=""
-                width={64}
-                height={64}
-                className="size-16 shrink-0 border-2 border-ink object-cover"
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      className="flex flex-col wide:flex-row wide:items-center wide:justify-between wide:gap-[4vw]"
+    >
+      <div className="flex min-w-0 flex-col gap-[clamp(10px,3dvh,28px)]">
+        <div className="font-display text-[clamp(40px,min(12vw,16dvh),200px)] wide:text-[clamp(40px,min(7.5vw,16dvh),200px)] font-black uppercase leading-[0.86] max-sm:text-[max(24px,min(15.5vw,9dvh))]">
+          <label
+            id="ask-how"
+            htmlFor="login"
+            className="block whitespace-nowrap"
+          >
+            <span className="max-sm:block">How</span>{" "}
+            <span className="max-sm:block">committed</span>
+          </label>
+          <span id="ask-rest" className="sr-only">
+            is GitHub username
+          </span>
+          <span className="flex max-w-full items-baseline max-sm:text-[0.55em]">
+            <span aria-hidden="true">is&nbsp;@</span>
+            <span
+              style={fieldWidth === null ? undefined : { width: fieldWidth }}
+              className="inline-grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] items-baseline motion-safe:transition-[width] motion-safe:duration-250 motion-safe:ease-out"
+            >
+              {/* Sizer: the field is as wide as what it shows, like part of the sentence. */}
+              <span
+                ref={sizerRef}
+                aria-hidden="true"
+                className="invisible w-max col-start-1 row-start-1 whitespace-pre pr-[0.04em]"
+              >
+                {sizer}
+              </span>
+              <input
+                id="login"
+                name="login"
+                type="text"
+                value={value}
+                onChange={(event) => {
+                  setValue(event.target.value);
+                  setNudge(false);
+                }}
+                onFocus={() => {
+                  setFocused(true);
+                  warmUpAudio();
+                }}
+                onBlur={() => setFocused(false)}
+                placeholder={placeholder}
+                aria-labelledby="ask-how ask-rest"
+                aria-describedby="lookup-status"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="col-start-1 row-start-1 w-0 min-w-full rounded-none border-0 border-b-[length:min(0.07em,8px)] border-ink bg-transparent p-0 font-[inherit] uppercase text-[inherit] caret-block-ultramarine outline-none placeholder:text-ink placeholder:opacity-40 focus:border-block-ultramarine focus:shadow-[0_3px_0_0_var(--color-block-ultramarine)]"
               />
-              <div className="min-w-0">
-                <p
-                  className={
-                    displayName.length <= DISPLAY_NAME_MAX_CHARACTERS
-                      ? "truncate font-display text-3xl font-black uppercase leading-none"
-                      : "truncate font-mono text-sm font-bold"
-                  }
-                >
-                  {displayName}
-                </p>
-                <p className="mt-1 truncate">@{state.user.login}</p>
-                <p className="mt-1">
-                  {formatActiveSpan(state.user.contributionYears)}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-3">
-              <p>{lookupMessage(state)}</p>
-              {canRetry(state) && (
+            </span>
+            <span aria-hidden="true">?</span>
+          </span>
+        </div>
+
+        <div className={`font-mono text-sm ${found && wide ? "" : "min-h-14"}`}>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* The live region stays outside the button; it is read, not shown, when found. */}
+            <p
+              id="lookup-status"
+              role="status"
+              className={found ? "sr-only" : "flex min-h-14 items-center"}
+            >
+              {found ? `Found @${found.login}` : statusText}
+            </p>
+            {found ? (
+              wide ? null : (
+                <PreviewRow user={found} disabled={starting} onStart={start} />
+              )
+            ) : (
+              canRetry(state) && (
                 <button
                   type="button"
                   onClick={() => setAttempt((count) => count + 1)}
-                  className={`min-h-11 min-w-11 border-2 border-ink px-3 uppercase ${focusRing}`}
+                  className={`${actionClass} min-h-11`}
                 >
                   Try again
                 </button>
-              )}
-            </div>
-          )}
+              )
+            )}
+          </div>
         </div>
 
-        <StartButton
-          type="submit"
-          size="form"
-          aria-disabled={!found || starting}
-        />
-      </form>
-    </main>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          <StartButton
+            type="submit"
+            tone="ink"
+            size="cta"
+            aria-disabled={!found || starting}
+            aria-label={found ? `Play @${found.login}` : undefined}
+          >
+            Play
+          </StartButton>
+          <p className="max-w-[48ch] font-mono text-[15px] leading-relaxed">
+            Type a GitHub username. Their contribution history plays as sound
+            and motion, year by year. Headphones on.
+          </p>
+        </div>
+      </div>
+
+      <PlayerColumn>
+        {found && wide && (
+          <PlayerCard user={found} disabled={starting} onStart={start} />
+        )}
+      </PlayerColumn>
+    </form>
   );
 }
