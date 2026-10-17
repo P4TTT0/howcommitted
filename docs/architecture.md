@@ -96,13 +96,13 @@ Upstash Redis, with a versioned key prefix.
 | Repos | 24 h | New repos are infrequent |
 | "User not found" | 1 h | Negative cache |
 
-Key format (a prefix bump is a full invalidation):
+Key format (bumping the version in `cache.ts` invalidates cached data; v2 dropped entries with truncated daily commits. Lock, breaker and quota keys are versioned separately and stay `v1`):
 
-- `v1:user:{login}`
-- `v1:year:{login}:{year}`
-- `v1:repos:{login}`
+- `v2:user:{login}`
+- `v2:year:{login}:{year}`
+- `v2:repos:{login}`
 
-Logins are lowercased in keys. Supporting keys: `v1:missing:{login}` (negative cache, 1 h), `v1:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v1:user:{login}`).
+Logins are lowercased in keys. Supporting keys: `v2:missing:{login}` (negative cache, 1 h), `v2:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v2:user:{login}`).
 
 ## Quota and rate limits
 

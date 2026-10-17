@@ -82,21 +82,21 @@ describe("createCache", () => {
     await cache.setFailure("Ghost", { status: "timeout" });
 
     expect([...values.keys()].sort()).toEqual([
-      "preview:v1:failed:ghost",
-      "preview:v1:missing:ghost",
-      "preview:v1:repos:torvalds",
-      "preview:v1:user:torvalds",
-      "preview:v1:year:torvalds:2024",
-      "preview:v1:year:torvalds:2026",
+      "preview:v2:failed:ghost",
+      "preview:v2:missing:ghost",
+      "preview:v2:repos:torvalds",
+      "preview:v2:user:torvalds",
+      "preview:v2:year:torvalds:2024",
+      "preview:v2:year:torvalds:2026",
     ]);
-    expect(ttls.get("preview:v1:user:torvalds")).toBe(TTL.user);
-    expect(ttls.get("preview:v1:year:torvalds:2024")).toBe(TTL.yearPast);
-    expect(ttls.get("preview:v1:year:torvalds:2026")).toBe(
+    expect(ttls.get("preview:v2:user:torvalds")).toBe(TTL.user);
+    expect(ttls.get("preview:v2:year:torvalds:2024")).toBe(TTL.yearPast);
+    expect(ttls.get("preview:v2:year:torvalds:2026")).toBe(
       TTL.yearCurrentRetained,
     );
-    expect(ttls.get("preview:v1:repos:torvalds")).toBe(TTL.repos);
-    expect(ttls.get("preview:v1:missing:ghost")).toBe(TTL.missing);
-    expect(ttls.get("preview:v1:failed:ghost")).toBe(TTL.failure);
+    expect(ttls.get("preview:v2:repos:torvalds")).toBe(TTL.repos);
+    expect(ttls.get("preview:v2:missing:ghost")).toBe(TTL.missing);
+    expect(ttls.get("preview:v2:failed:ghost")).toBe(TTL.failure);
   });
 
   it("reads back what it stored and reports negative cache", async () => {
