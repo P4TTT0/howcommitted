@@ -1,3 +1,4 @@
+import { bigNumbersScene } from "@/features/scenes/big-numbers";
 import { cumulativeLineScene } from "@/features/scenes/cumulative-line";
 import { endCardFinale } from "@/features/scenes/finale";
 import { yearBlocksScene } from "@/features/scenes/year-blocks";
@@ -16,7 +17,7 @@ export const SCENES: readonly SceneDefinition[] = [
   cumulativeLineScene,
   // 3 Heatmap goes here.
   // 4 Language mosaic goes here.
-  // 5 Big numbers goes here.
+  bigNumbersScene,
 ];
 
 /**
