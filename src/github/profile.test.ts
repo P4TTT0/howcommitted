@@ -46,6 +46,7 @@ const yearBody = (commits: number) => ({
         totalIssueContributions: 0,
         restrictedContributionsCount: 0,
         contributionCalendar: {
+          totalContributions: commits,
           weeks: [
             {
               contributionDays: [

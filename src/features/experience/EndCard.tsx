@@ -25,7 +25,7 @@ function YearBars({
   yearBlocks,
 }: Pick<EndCardProps, "firstYear" | "lastYear" | "yearBlocks">) {
   const commitsByYear = new Map(
-    yearBlocks.map((block) => [block.year, block.commits]),
+    yearBlocks.map((block) => [block.year, block.contributions]),
   );
   const years = Array.from(
     { length: lastYear - firstYear + 1 },

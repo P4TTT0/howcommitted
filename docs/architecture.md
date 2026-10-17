@@ -77,7 +77,11 @@ Profile cost is about contribution years + 2 points, so about 280 uncached profi
 - `contributionCalendar` counts all contribution types (2023 example: calendar 4,924 vs commits 4,458). Never label it as commits.
 - Per-repo daily nodes cap at 100 per `contributionsCollection` window, so a repo with commits on more than 100 days in a year was under-counted (torvalds 2024: 888 summed vs 2,888 official). Each year is therefore fetched as 4 quarters in one query (same 1-point cost), with totals and calendar from a full-year alias.
 - `maxRepositories` caps at 100 repos per quarter window, so a repo outside the top 100 in a quarter can still cause a mismatch. Compare summed daily commits against the official total; if they differ, show the real total with a notice.
-- Private contributions appear only if the user enabled sharing them. Show as "+N private"; never invent their dates.
+- Private contributions appear only if the user enabled sharing them. They are inside the calendar's daily counts and total (as an unknown type); never invent their dates or types. The experience plays the calendar, so `restrictedContributionsCount` is only used to state the private share honestly.
+
+### History response (contributions)
+
+Each year of `History` carries the experience's data from the calendar: `dailyContributions: {date, count}[]` (days with at least one contribution) and `totalContributions` (the calendar's own yearly total). `History.totalContributions` sums them and each `yearBlocks` entry is `{year, contributions}`. The public-commit data (`dailyCommits`, `reconciliation`, `totals.commits` and the PR/review/issue/private breakdown) stays in the payload for later scenes, but the line, counter, year blocks and milestones no longer depend on it.
 
 ### GraphQL limits
 
@@ -100,13 +104,13 @@ Upstash Redis, with a versioned key prefix.
 | Repos | 24 h | New repos are infrequent |
 | "User not found" | 1 h | Negative cache |
 
-Key format (bumping the version in `cache.ts` invalidates cached data; v2 dropped entries with truncated daily commits. Lock, breaker and quota keys are versioned separately and stay `v1`):
+Key format (bumping the version in `cache.ts` invalidates cached data; v2 dropped entries with truncated daily commits; v3 added the calendar total per year (`totalContributions`), so older entries without it are never read. Lock, breaker and quota keys are versioned separately and stay `v1`):
 
-- `v2:user:{login}`
-- `v2:year:{login}:{year}`
-- `v2:repos:{login}`
+- `v3:user:{login}`
+- `v3:year:{login}:{year}`
+- `v3:repos:{login}`
 
-Logins are lowercased in keys. Supporting keys: `v2:missing:{login}` (negative cache, 1 h), `v2:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v2:user:{login}`).
+Logins are lowercased in keys. Supporting keys: `v3:missing:{login}` (negative cache, 1 h), `v3:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v3:user:{login}`).
 
 ## Quota and rate limits
 

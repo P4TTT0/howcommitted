@@ -79,7 +79,7 @@ describe("planFromHistory", () => {
     expect(result.plan.years.map((span) => span.year)).toEqual([
       2022, 2023, 2024,
     ]);
-    expect(result.yearBlocks.map((block) => block.commits)).toEqual(
+    expect(result.yearBlocks.map((block) => block.contributions)).toEqual(
       history.years.map((year) => year.totals.commits),
     );
     expect(result.note).toBeNull();

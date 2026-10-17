@@ -126,6 +126,7 @@ describe("history response contract", () => {
                 [{ occurredAt: "2024-02-29T10:00:00Z", commitCount: 3 }],
               ],
               calendar: [{ date: "2024-02-29", count: 5, weekday: 4 }],
+              totalContributions: 5,
             }),
           ],
           repos: [
@@ -149,6 +150,7 @@ describe("history response contract", () => {
       "languages",
       "longestStreak",
       "repoFlags",
+      "totalContributions",
       "totals",
       "user",
       "yearBlocks",
@@ -162,8 +164,10 @@ describe("history response contract", () => {
     ]);
     expect(keys(body.history.years[0])).toEqual([
       "dailyCommits",
+      "dailyContributions",
       "heatmap",
       "reconciliation",
+      "totalContributions",
       "totals",
       "year",
     ]);
@@ -192,7 +196,7 @@ describe("history response contract", () => {
       "length",
       "start",
     ]);
-    expect(keys(body.history.yearBlocks[0])).toEqual(["commits", "year"]);
+    expect(keys(body.history.yearBlocks[0])).toEqual(["contributions", "year"]);
     expect(keys(body.history.languages[0])).toEqual([
       "isOther",
       "name",

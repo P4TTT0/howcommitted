@@ -32,34 +32,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const isNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
-function isDailyCommits(value: unknown): boolean {
+function isDailyContributions(value: unknown): boolean {
   return (
-    isRecord(value) && typeof value.date === "string" && isNumber(value.commits)
+    isRecord(value) && typeof value.date === "string" && isNumber(value.count)
   );
 }
 
 function isHistoryYear(value: unknown): boolean {
   if (!isRecord(value)) return false;
-  const { totals, dailyCommits, reconciliation } = value;
+  const { totals, dailyContributions } = value;
   return (
     isNumber(value.year) &&
     isRecord(totals) &&
     isNumber(totals.commits) &&
-    Array.isArray(dailyCommits) &&
-    dailyCommits.every(isDailyCommits) &&
-    isRecord(reconciliation) &&
-    typeof reconciliation.matches === "boolean"
+    isNumber(value.totalContributions) &&
+    Array.isArray(dailyContributions) &&
+    dailyContributions.every(isDailyContributions)
   );
 }
 
 function isYearBlock(value: unknown): boolean {
-  return isRecord(value) && isNumber(value.year) && isNumber(value.commits);
+  return (
+    isRecord(value) && isNumber(value.year) && isNumber(value.contributions)
+  );
 }
 
 /** Checks everything the experience reads, so a bad payload never reaches it. */
 function isHistory(value: unknown): value is History {
   if (!isRecord(value)) return false;
-  const { user, years, yearBlocks, totals } = value;
+  const { user, years, yearBlocks, totals, totalContributions } = value;
   return (
     isRecord(user) &&
     typeof user.login === "string" &&
@@ -69,7 +70,9 @@ function isHistory(value: unknown): value is History {
     Array.isArray(yearBlocks) &&
     yearBlocks.every(isYearBlock) &&
     isRecord(totals) &&
-    isNumber(totals.commits)
+    isNumber(totals.commits) &&
+    isNumber(totals.privateContributions) &&
+    isNumber(totalContributions)
   );
 }
 

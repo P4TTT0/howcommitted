@@ -19,7 +19,9 @@ describe("buildYearSummary and yearBlocks", () => {
         [{ occurredAt: "2023-03-01T00:00:00Z", commitCount: 7 }],
       ],
       calendar: [],
+      totalContributions: 25,
     });
+    expect(summary.totalContributions).toBe(25);
     expect(summary.totals.commits).toBe(10);
     expect(summary.reconciliation.matches).toBe(false);
     expect(summary.reconciliation.summed).toBe(7);
@@ -33,10 +35,11 @@ describe("buildYearSummary and yearBlocks", () => {
         totals: totals(commits),
         commitContributionsByRepo: [],
         calendar: [],
+        totalContributions: commits * 10,
       });
     expect(yearBlocks([make(2024, 5), make(2022, 9)])).toEqual([
-      { year: 2022, commits: 9 },
-      { year: 2024, commits: 5 },
+      { year: 2022, contributions: 90 },
+      { year: 2024, contributions: 50 },
     ]);
   });
 });

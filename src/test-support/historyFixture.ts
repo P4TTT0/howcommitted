@@ -39,6 +39,11 @@ export function makeYear(
       privateContributions: 0,
     },
     dailyCommits,
+    dailyContributions: dailyCommits.map((day) => ({
+      date: day.date,
+      count: day.commits,
+    })),
+    totalContributions: commits,
     reconciliation: {
       summed,
       official: commits,
@@ -58,9 +63,13 @@ export function makeHistory(
   return {
     user: { login, name: null, avatarUrl: "", createdAt },
     years,
+    totalContributions: years.reduce(
+      (sum, year) => sum + year.totalContributions,
+      0,
+    ),
     yearBlocks: years.map((year) => ({
       year: year.year,
-      commits: year.totals.commits,
+      contributions: year.totalContributions,
     })),
     totals: {
       commits,

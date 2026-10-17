@@ -78,6 +78,7 @@ describe("fetchYear", () => {
     totalIssueContributions: 3,
     restrictedContributionsCount: 9,
     contributionCalendar: {
+      totalContributions: 11,
       weeks: [
         {
           contributionDays: [
@@ -129,6 +130,7 @@ describe("fetchYear", () => {
     });
     expect(result.data.totals.privateContributions).toBe(9);
     expect(result.data.calendar).toHaveLength(2);
+    expect(result.data.totalContributions).toBe(11);
     expect(sentVariables(fetchMock, 0)).toEqual({
       login: "a",
       from: "2023-01-01T00:00:00Z",
