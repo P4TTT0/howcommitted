@@ -60,24 +60,35 @@ export async function createScene({
   reducedMotion,
 }: SceneOptions): Promise<Scene> {
   const clock = new PlaybackClock({ duration: TOTAL_SECONDS, bpm: BPM });
-  await clock.unlock();
-
-  // Sound is optional: if the samples fail to load the scene still plays.
   let engine: SoundEngine | null = null;
+  let timeline: gsap.core.Timeline | null = null;
+
+  // Anything half-built is torn down, including Transport events, on failure.
   try {
-    engine = await SoundEngine.load();
-    engine.setMuted(muted);
-  } catch {
-    engine = null;
+    await clock.unlock();
+
+    // Sound is optional: if the samples fail to load the scene still plays.
+    try {
+      engine = await SoundEngine.load();
+      engine.setMuted(muted);
+    } catch {
+      engine = null;
+    }
+
+    scheduleSound(clock, () => engine, plan);
+
+    timeline = gsap.timeline({ paused: true });
+    if (!reducedMotion) addPayoffMotion(timeline, root, plan);
+  } catch (error) {
+    timeline?.kill();
+    clock.dispose();
+    engine?.dispose();
+    throw error;
   }
-
-  scheduleSound(clock, () => engine, plan);
-
-  const timeline = gsap.timeline({ paused: true });
-  if (!reducedMotion) addPayoffMotion(timeline, root, plan);
 
   const stopDriving = clock.drive(timeline);
   const stopRendering = clock.onFrame(createRenderer(root, plan));
+  const built = timeline;
 
   return {
     clock,
@@ -85,7 +96,7 @@ export async function createScene({
     dispose() {
       stopDriving();
       stopRendering();
-      timeline.kill();
+      built.kill();
       clock.dispose();
       engine?.dispose();
     },

@@ -10,7 +10,7 @@ import { createScene, formatCount, type Scene, yearIndexAt } from "./scene";
 type Phase = "start" | "loading" | "running";
 
 const controlClass =
-  "border-2 border-ink px-3 py-2 font-mono text-xs uppercase focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 aria-pressed:bg-ink aria-pressed:text-paper";
+  "min-h-11 min-w-11 border-2 border-ink px-3 py-2 font-mono text-xs uppercase focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 aria-pressed:bg-ink aria-pressed:text-paper";
 
 export function Timeline() {
   const plan = useMemo(() => buildPlan(generateFakeProfile()), []);
@@ -21,6 +21,7 @@ export function Timeline() {
   const [phase, setPhase] = useState<Phase>("start");
   const [status, setStatus] = useState<ClockStatus>("idle");
   const [muted, setMuted] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -35,6 +36,7 @@ export function Timeline() {
     const root = rootRef.current;
     if (!root || phase !== "start") return;
     setPhase("loading");
+    setFailed(false);
     try {
       const reducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
@@ -49,6 +51,8 @@ export function Timeline() {
       scene.clock.start();
       setPhase("running");
     } catch {
+      // createScene already tore down anything it had built.
+      setFailed(true);
       setPhase("start");
     }
   }
@@ -62,6 +66,8 @@ export function Timeline() {
   const clock = sceneRef.current?.clock;
   const first = blockForYearIndex(0);
   const firstYear = plan.years[0]?.year ?? 0;
+  const lastYear = plan.years.at(-1)?.year ?? firstYear;
+  const chartLabel = `Cumulative commits from ${firstYear} to ${lastYear}, ${formatCount(plan.total)} in total`;
 
   return (
     <main
@@ -101,7 +107,7 @@ export function Timeline() {
               preserveAspectRatio="none"
               className="absolute inset-0 h-full w-full"
               role="img"
-              aria-label="Cumulative commits over eight years"
+              aria-label={chartLabel}
             >
               <defs>
                 <clipPath id="reveal">
@@ -176,6 +182,12 @@ export function Timeline() {
         );
       })}
 
+      <p className="sr-only" aria-live="polite">
+        {status === "ended"
+          ? `Finished. ${formatCount(plan.total)} commits.`
+          : ""}
+      </p>
+
       {phase !== "running" && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-paper p-4 pb-20">
           <button
@@ -189,8 +201,13 @@ export function Timeline() {
           <p className="max-w-prose text-center font-mono text-xs">
             {phase === "loading"
               ? "Loading sound"
-              : "Lab. Generated profile, eight years of commits. Turn sound on."}
+              : `Lab. Generated profile, ${plan.years.length} years of commits. Turn sound on.`}
           </p>
+          {failed && (
+            <p role="alert" className="font-mono text-xs">
+              Playback could not start. Try again.
+            </p>
+          )}
         </div>
       )}
 
@@ -227,7 +244,7 @@ export function Timeline() {
           aria-pressed={muted}
           onClick={toggleMute}
         >
-          {muted ? "Unmute" : "Mute"}
+          Mute
         </button>
       </div>
     </main>
