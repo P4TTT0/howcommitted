@@ -65,7 +65,7 @@ const ipKey = (ip: string) => `v1:quota:cold:ip:${ip}:${DAY_KEY}`;
 
 describe("anonymous cold quota", () => {
   it("allows two cold generations per cookie, then blocks", async () => {
-    const quota = createQuota(fakeRedis().redis, "", () => NOW);
+    const quota = createQuota(fakeRedis().redis, "", { now: () => NOW });
     const visitor = { ip: "1.1.1.1", cookieId: "c1" };
     expect(COLD_GENERATIONS_PER_DAY).toBe(2);
     expect(await quota.chargeColdGeneration(visitor)).not.toBeNull();
@@ -73,8 +73,26 @@ describe("anonymous cold quota", () => {
     expect(await quota.chargeColdGeneration(visitor)).toBeNull();
   });
 
+  it("uses a custom daily limit, including zero", async () => {
+    const roomy = createQuota(fakeRedis().redis, "", {
+      now: () => NOW,
+      coldPerDay: 3,
+    });
+    const visitor = { ip: "1.1.1.2", cookieId: "c2" };
+    for (let i = 0; i < 3; i++) {
+      expect(await roomy.chargeColdGeneration(visitor)).not.toBeNull();
+    }
+    expect(await roomy.chargeColdGeneration(visitor)).toBeNull();
+
+    const closed = createQuota(fakeRedis().redis, "", {
+      now: () => NOW,
+      coldPerDay: 0,
+    });
+    expect(await closed.chargeColdGeneration(visitor)).toBeNull();
+  });
+
   it("blocks a fresh cookie coming from an IP that is already exhausted", async () => {
-    const quota = createQuota(fakeRedis().redis, "", () => NOW);
+    const quota = createQuota(fakeRedis().redis, "", { now: () => NOW });
     await quota.chargeColdGeneration({ ip: "2.2.2.2", cookieId: "a" });
     await quota.chargeColdGeneration({ ip: "2.2.2.2", cookieId: "b" });
     expect(
@@ -84,7 +102,7 @@ describe("anonymous cold quota", () => {
 
   it("rolls back the other identity when one is over its limit", async () => {
     const { redis, counts } = fakeRedis();
-    const quota = createQuota(redis, "", () => NOW);
+    const quota = createQuota(redis, "", { now: () => NOW });
     await quota.chargeColdGeneration({ ip: "3.3.3.3", cookieId: "a" });
     await quota.chargeColdGeneration({ ip: "3.3.3.3", cookieId: "b" });
 
@@ -104,7 +122,7 @@ describe("anonymous cold quota", () => {
 
   it("cannot exceed the limit under concurrent charges", async () => {
     const { redis, counts } = fakeRedis();
-    const quota = createQuota(redis, "", () => NOW);
+    const quota = createQuota(redis, "", { now: () => NOW });
     const results = await Promise.all(
       Array.from({ length: COLD_ATTEMPTS_PER_MINUTE }, () =>
         quota.chargeColdGeneration({ ip: "9.9.9.9", cookieId: "same" }),
@@ -116,7 +134,7 @@ describe("anonymous cold quota", () => {
   });
 
   it("rate limits cold attempts per IP even across fresh cookies", async () => {
-    const quota = createQuota(fakeRedis().redis, "", () => NOW);
+    const quota = createQuota(fakeRedis().redis, "", { now: () => NOW });
     const results: unknown[] = [];
     for (let i = 0; i <= COLD_ATTEMPTS_PER_MINUTE; i++) {
       results.push(
@@ -128,7 +146,7 @@ describe("anonymous cold quota", () => {
 
   it("gives the run back on refund, once, and never below zero", async () => {
     const { redis, counts } = fakeRedis();
-    const quota = createQuota(redis, "", () => NOW);
+    const quota = createQuota(redis, "", { now: () => NOW });
     const visitor = { ip: "4.4.4.4", cookieId: "x" };
     const first = await quota.chargeColdGeneration(visitor);
     await quota.chargeColdGeneration(visitor);
@@ -144,14 +162,14 @@ describe("anonymous cold quota", () => {
 
   it("sets the expiry together with the first charge", async () => {
     const { redis, ttls } = fakeRedis();
-    const quota = createQuota(redis, "", () => NOW);
+    const quota = createQuota(redis, "", { now: () => NOW });
     await quota.chargeColdGeneration({ ip: "5.5.5.5", cookieId: "d" });
     expect(ttls.get(cookieKey("d"))).toBeGreaterThan(24 * 60 * 60);
   });
 
   it("starts a new counter each UTC day", async () => {
     let now = NOW;
-    const quota = createQuota(fakeRedis().redis, "", () => now);
+    const quota = createQuota(fakeRedis().redis, "", { now: () => now });
     const visitor = { ip: "5.5.5.5", cookieId: "d" };
     await quota.chargeColdGeneration(visitor);
     await quota.chargeColdGeneration(visitor);
@@ -163,7 +181,7 @@ describe("anonymous cold quota", () => {
 
   it("rolls back and throws when the store fails midway", async () => {
     const { redis, counts, failOn } = fakeRedis();
-    const quota = createQuota(redis, "", () => NOW);
+    const quota = createQuota(redis, "", { now: () => NOW });
     failOn.add(ipKey("6.6.6.6"));
     await expect(
       quota.chargeColdGeneration({ ip: "6.6.6.6", cookieId: "z" }),
@@ -172,7 +190,7 @@ describe("anonymous cold quota", () => {
   });
 
   it("does not share an IP counter between visitors with unknown IPs", async () => {
-    const quota = createQuota(fakeRedis().redis, "", () => NOW);
+    const quota = createQuota(fakeRedis().redis, "", { now: () => NOW });
     for (const cookieId of ["a", "b", "c", "d"]) {
       expect(
         await quota.chargeColdGeneration({ ip: "unknown", cookieId }),

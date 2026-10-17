@@ -33,6 +33,19 @@ export function githubToken(): string {
   return required("GITHUB_TOKEN");
 }
 
+/**
+ * Optional override of the anonymous daily cold runs, so previews can test
+ * freely while production keeps the default. 0 turns anonymous cold runs off.
+ */
+export function coldGenerationsPerDay(fallback: number): number {
+  const raw = process.env.QUOTA_COLD_PER_DAY?.trim();
+  if (!raw) return fallback;
+  if (!/^\d+$/.test(raw)) {
+    throw new ConfigError("QUOTA_COLD_PER_DAY", "must be a whole number");
+  }
+  return Number(raw);
+}
+
 /** Optional namespace so previews never share keys with production. */
 export function keyPrefix(): string {
   const prefix = process.env.CACHE_KEY_PREFIX?.trim();
