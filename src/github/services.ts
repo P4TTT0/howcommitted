@@ -2,10 +2,15 @@ import "server-only";
 import { after } from "next/server";
 import { createBreaker } from "./breaker";
 import { createCache } from "./cache";
-import { getRedis, githubToken, keyPrefix } from "./config";
+import {
+  coldGenerationsPerDay,
+  getRedis,
+  githubToken,
+  keyPrefix,
+} from "./config";
 import { createLock } from "./lock";
 import type { ProfileDeps } from "./profile";
-import { createQuota, type Quota } from "./quota";
+import { COLD_GENERATIONS_PER_DAY, createQuota, type Quota } from "./quota";
 
 export type Services = {
   deps: ProfileDeps;
@@ -19,7 +24,9 @@ export type Services = {
 export function getServices(): Services {
   const redis = getRedis();
   const prefix = keyPrefix();
-  const quota = createQuota(redis, prefix);
+  const quota = createQuota(redis, prefix, {
+    coldPerDay: coldGenerationsPerDay(COLD_GENERATIONS_PER_DAY),
+  });
   return {
     quota,
     deps: {

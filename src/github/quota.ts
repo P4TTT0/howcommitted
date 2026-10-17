@@ -3,7 +3,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import type { Redis } from "@upstash/redis";
 import { UNKNOWN_IP, type Visitor } from "./visitor";
 
-/** Cold (uncached) profile generations per anonymous visitor per day. */
+/** Default cold (uncached) profile generations per anonymous visitor per day. */
 export const COLD_GENERATIONS_PER_DAY = 2;
 /** Cold generation attempts per IP per minute, whatever the cookie. */
 export const COLD_ATTEMPTS_PER_MINUTE = 10;
@@ -34,7 +34,10 @@ export type ColdCharge = { refund(): Promise<void> };
 export function createQuota(
   redis: Redis,
   prefix: string,
-  now: () => Date = () => new Date(),
+  {
+    now = () => new Date(),
+    coldPerDay = COLD_GENERATIONS_PER_DAY,
+  }: { now?: () => Date; coldPerDay?: number } = {},
 ) {
   const limiter = (name: string, max: number) =>
     new Ratelimit({
@@ -80,7 +83,7 @@ export function createQuota(
       const charged = keys.filter((_, i) => results[i]?.status === "fulfilled");
       const failure = results.find((r) => r.status === "rejected");
       const exhausted = results.some(
-        (r) => r.status === "fulfilled" && r.value > COLD_GENERATIONS_PER_DAY,
+        (r) => r.status === "fulfilled" && r.value > coldPerDay,
       );
 
       if (failure || exhausted) {
