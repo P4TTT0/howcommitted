@@ -24,11 +24,12 @@ Example: `feat/year-blocks-scene`.
 
 ## Commits
 
-Conventional Commits: `type(scope): summary`, for example `feat(playback): add shared transport clock`. Keep tests and docs in the same commit as the behavior they cover.
+Conventional Commits: `type(scope): summary`, for example `feat(playback): add shared transport clock`. Keep each commit a single reviewable unit.
 
 ## Pull requests
 
 - Keep them short-lived and focused on one unit of work.
+- A PR includes its tests and docs.
 - Planned CI must pass: Biome, typecheck, Vitest, Playwright.
 - Visual or audio changes: review the Vercel preview deployment, not only the diff.
 - Say what to review first and what is intentionally out of scope.

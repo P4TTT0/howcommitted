@@ -12,10 +12,10 @@ Nothing here is implemented yet.
 | Rendering | SVG / Canvas | Enough for flat 2D blocks and lines |
 | Animation | GSAP | Precise timeline control |
 | Audio | Tone.js | Its Transport clock syncs visuals and sound |
-| Styling | Tailwind CSS v4 | |
+| Styling | Tailwind CSS v4 | Utility CSS with design tokens, no runtime |
 | Tooling | pnpm, Biome, Vitest, Playwright | |
 
-Excluded: Three.js/WebGL, a database, a global state library.
+Not in the MVP (deliberate scope decision): Three.js/WebGL, a database, a global state library.
 
 ## Folder structure
 
@@ -24,7 +24,7 @@ src/app/              Thin Next routes only
   page.tsx            Landing
   [...users]/page.tsx /torvalds = solo, /a/b/c = versus
   [...users]/opengraph-image.tsx
-  api/                Route handlers
+  api/                Route handlers (planned: api/history/[user]/route.ts)
 src/domain/           Pure TS types and metrics
 src/github/           Server-only GraphQL client, queries, cache
 src/playback/         One clock driving GSAP and Tone.js (sound/ inside)
@@ -33,6 +33,9 @@ src/ui/               Shared presentational components
 public/sounds/        .ogg with .mp3 fallback
 e2e/                  Playwright
 .github/              workflows/ci.yml, ISSUE_TEMPLATE, pull_request_template.md (planned)
+.env.example          Required env vars (planned)
+biome.json            Lint and format config (planned)
+LICENSE               MIT
 ```
 
 GitHub usernames cannot contain "/", so path segments map unambiguously to users.
@@ -56,9 +59,9 @@ GitHub GraphQL with a server token. Costs measured live in October 2026 against 
 | Contributions | One request per contribution year, in parallel (concurrency cap ~6): totals (commits, PRs, reviews, issues, restricted/private count) plus `commitContributionsByRepository(maxRepositories:100){contributions(first:100){nodes{occurredAt commitCount}}}`, summed by date for true commits per day | 1 point each | ~1.8 s each |
 | Repos | `repositories(ownerAffiliations:OWNER, isFork:false, orderBy CREATED_AT, first:100)`, paginated, with `createdAt`, `stargazerCount`, `languages(first:10 by SIZE)` | 1 point | ~2.2 s |
 
-The summed daily commits matched the official `totalCommitContributions` exactly (4458) in the measured profile.
+For the measured year (2023), summed daily commits matched `totalCommitContributions` exactly (4,458).
 
-Profile cost is about contribution years + 2 points, so roughly 500 uncached profiles per hour per 5,000-point token.
+Profile cost is about contribution years + 2 points, so about 280 uncached profiles per hour for a 16-year profile, and about 500 for an 8-year profile (per 5,000-point token).
 
 ### Gotchas
 
@@ -83,16 +86,23 @@ Upstash Redis, with a versioned key prefix.
 
 | Data | TTL | Reason |
 |------|-----|--------|
-| User preview | 24 h | |
+| User preview | 24 h | Changes rarely, cheap to refresh |
 | Past years | 30 days | The past does not change |
 | Current year | 6 h | Still changing |
-| Repos | 24 h | |
+| Repos | 24 h | New repos are infrequent |
 | "User not found" | 1 h | Negative cache |
+
+Key format (a prefix bump is a full invalidation):
+
+- `v1:user:{login}`
+- `v1:year:{login}:{year}`
+- `v1:repos:{login}`
 
 ## Quota and rate limits
 
 - Cached profiles are free and unlimited for everyone.
 - Anonymous visitors get 2 cold (uncached) generations per day, tracked by cookie and IP with `@upstash/ratelimit`. Only after that is the GitHub sign-in prompt shown, never upfront.
+- The cookie and IP quota is a soft gate (bypassable by clearing cookies or using a VPN). The global circuit breaker is the hard gate.
 - Signed-in visitors use their own token (5,000 points/hour each). Profiles they fetch populate the shared cache.
 - Global circuit breaker: when the server token's remaining points drop below 20%, anonymous cold generations stop (cache only, plus the sign-in prompt).
 - Request coalescing: a Redis lock ensures simultaneous requests for the same uncached profile trigger one fetch.

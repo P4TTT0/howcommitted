@@ -2,7 +2,7 @@
 
 ## Aesthetic: Kinetic Poster
 
-Flat color blocks, giant kinetic typography, numbers as protagonists. It deliberately avoids the generic AI look and the Spotify Wrapped cliche.
+Flat color blocks, giant kinetic typography, numbers as protagonists. It avoids the generic AI look. The direction is Wrapped-adjacent (kinetic poster); its main risk is reading as a Wrapped clone, so typography and restraint differentiate it.
 
 ## Typography
 
@@ -91,4 +91,4 @@ Requirement, not polish.
 - Every scene is designed for portrait phone and landscape desktop.
 - Type scales fluidly with its container, not at fixed breakpoints.
 - Versus columns stack into pills on mobile.
-- Playwright checks each scene at 3 viewports in CI (planned).
+- Playwright checks each scene at multiple viewports in CI (planned; exact set defined when CI is built).

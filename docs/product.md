@@ -4,9 +4,17 @@
 
 Committed turns your commit history into a chronological audio-visual animation with the satisfaction of an incremental game: every commit adds up, every streak climbs, every milestone pops.
 
-It is an experience, not a professional metrics dashboard and not a narrative. Visuals and sound are both premium.
+It is an experience, not a professional metrics dashboard and not a narrative.
 
-Principle: COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value. See [AGENTS.md](../AGENTS.md).
+Quality bar: sound is addictive and satisfying (sample-based, incremental, Balatro-like); visuals are poster-grade.
+
+## Core principle
+
+COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
+
+- Versus is a game, not a job ranking.
+- Copy describes habits ("night owl", "weekend dev", "longest streak"), never merit ("best", "most productive", "winner").
+- The final screen and the share card always show: "Commits are not productivity. This is rhythm, not value."
 
 ## Experience flow
 
@@ -23,7 +31,7 @@ Principle: COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never val
 |---|-------|---------|
 | 1 | Year blocks | Block height = commits; block color = year identity |
 | 2 | Cumulative line | Cumulative commits with repo-creation flags. In versus: bar chart race |
-| 3 | Heatmap | Weekday by week |
+| 3 | Heatmap | Weekday by week. Data comes from the contribution calendar, so label it "contributions", not commits |
 | 4 | Language mosaic | Proportional blocks, top 5 plus "other". Label: languages of owned repos, not per-commit |
 | 5 | Big numbers | Four giant numbers: commits, PRs, reviews, issues |
 | - | Final poster | Summary, fixed line "Commits are not productivity. This is rhythm, not value.", actions |
@@ -47,3 +55,8 @@ Principle: COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never val
 - Pre-AI vs Post-AI milestone and global industry comparison. A possible later add-on, not core.
 - Hourly heatmap. It needs per-commit timestamps.
 - WebGL / Three.js.
+
+## Decisions
+
+- Radar chart rejected: mismatched scales, and it reads as a performance review, violating the core principle.
+- Exact-username lookup instead of fuzzy search: GitHub's user search API allows only 30 requests/minute.
