@@ -26,7 +26,7 @@ export const TTL = {
 } as const;
 
 /** Bump the version segment to invalidate everything at once. */
-const VERSION = "v1";
+const VERSION = "v2";
 
 /** A cached year plus when it was fetched, so the current year can go stale. */
 export type CachedYear = { summary: YearSummary; fetchedAt: string };
