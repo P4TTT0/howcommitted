@@ -44,7 +44,8 @@ test("typing a username finds the user in a clickable row", async ({
   await page.getByLabel("GitHub username").fill("ada");
   const row = page.locator("button:visible", { hasText: "Ada Lovelace" });
   await expect(row).toBeVisible();
-  await expect(row).toContainText("@ada · Active 2022–2024");
+  await expect(row).toContainText("@ada");
+  await expect(row).toContainText("Active 2022–2024");
   await expect(row).toHaveCSS("cursor", "pointer");
 });
 
@@ -238,7 +239,8 @@ test("on a wide landscape screen the found developer is a card on the right", as
     .getByRole("button", { name: "Play @ada", exact: false })
     .last();
   await expect(card).toContainText("Ada Lovelace");
-  await expect(card).toContainText("@ada · Active 2022–2024");
+  await expect(card).toContainText("@ada");
+  await expect(card).toContainText("Active 2022–2024");
   const box = await card.boundingBox();
   expect((box?.x ?? 0) + (box?.width ?? 0) / 2).toBeGreaterThan(1536 / 2);
   await expect(card).toHaveCSS("cursor", "pointer");

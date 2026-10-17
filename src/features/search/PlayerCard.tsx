@@ -43,7 +43,10 @@ export function PlayerCard({ user, disabled, onStart }: PlayerCardProps) {
           {name}
         </span>
         <span className="mt-2 block truncate font-mono text-sm">
-          @{user.login} · {formatActiveSpan(user.contributionYears)}
+          @{user.login}
+        </span>
+        <span className="block whitespace-nowrap font-mono text-sm">
+          {formatActiveSpan(user.contributionYears)}
         </span>
       </span>
     </button>

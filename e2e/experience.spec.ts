@@ -78,7 +78,7 @@ test("search shows a preview, then the click opens the experience", async ({
 
   await page.getByLabel("GitHub username").fill("ada");
   await expect(page.getByText("Ada Lovelace")).toBeVisible();
-  await expect(page.getByText("@ada · Active 2022–2024")).toBeVisible();
+  await expect(page.getByText("Active 2022–2024")).toBeVisible();
   await expect(button).toHaveAttribute("aria-disabled", "false");
   // The preview alone never spends a generation.
   expect(mocks.historyRequests).toHaveLength(0);
