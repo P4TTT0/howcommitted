@@ -1,42 +1,26 @@
 import gsap from "gsap";
-import { cumulativeAt } from "@/playback/aggregate";
-import { PlaybackClock } from "@/playback/clock";
-import { semitonesForDegree } from "@/playback/pitch";
-import { SoundEngine } from "@/playback/sound/engine";
-import { CHART_WIDTH, topPercent } from "./chart";
-import { formatCount } from "./format";
+import { formatCount } from "@/features/sequencer/model/format";
 import {
-  BPM,
   DRAW_SECONDS,
   FLOOD,
   type Plan,
   stepCueTimes,
-  TOTAL_SECONDS,
   YEAR_WIPE_SECONDS,
   yearReveals,
-} from "./plan";
+} from "@/features/sequencer/model/plan";
+import type { SceneRuntime } from "@/features/sequencer/types";
+import { cumulativeAt } from "@/playback/aggregate";
+import type { PlaybackClock } from "@/playback/clock";
+import { semitonesForDegree } from "@/playback/pitch";
+import type { SoundEngine } from "@/playback/sound/engine";
+import { CHART_WIDTH, topPercent } from "./chart";
 
 /**
- * Wires one playback run: sound scheduled on the Transport, a paused GSAP
- * timeline seeked by the clock, and a per-frame renderer for the values that
- * are a pure function of time. The DOM is addressed through data attributes
- * so React stays out of the 60 fps path.
+ * Wires the cumulative line to the sequencer's clock: sound scheduled on the
+ * Transport, a paused GSAP timeline seeked by the clock, and a per-frame
+ * renderer for the values that are a pure function of time. The DOM is
+ * addressed through data attributes so React stays out of the 60 fps path.
  */
-
-export type Scene = {
-  clock: PlaybackClock;
-  setMuted(muted: boolean): void;
-  dispose(): void;
-};
-
-export type SceneOptions = {
-  root: HTMLElement;
-  plan: Plan;
-  muted: boolean;
-  reducedMotion: boolean;
-};
-
-export { formatCount };
 
 function find<T extends Element>(root: HTMLElement, selector: string): T {
   const element = root.querySelector<T>(selector);
@@ -44,54 +28,37 @@ function find<T extends Element>(root: HTMLElement, selector: string): T {
   return element;
 }
 
-export async function createScene({
-  root,
-  plan,
-  muted,
-  reducedMotion,
-}: SceneOptions): Promise<Scene> {
-  const clock = new PlaybackClock({ duration: TOTAL_SECONDS, bpm: BPM });
-  let engine: SoundEngine | null = null;
-  let timeline: gsap.core.Timeline | null = null;
-
-  // Anything half-built is torn down, including Transport events, on failure.
+/** Returns the cleanup; anything half-built is undone if wiring throws. */
+export function mountCumulativeLine(
+  root: HTMLElement,
+  plan: Plan,
+  { clock, sound, reducedMotion }: SceneRuntime,
+): () => void {
+  const timeline = gsap.timeline({ paused: true });
   try {
-    await clock.unlock();
-
-    // Sound is optional: if the samples fail to load the scene still plays.
-    try {
-      engine = await SoundEngine.load();
-      engine.setMuted(muted);
-    } catch {
-      engine = null;
-    }
-
-    scheduleSound(clock, () => engine, plan);
-
-    timeline = gsap.timeline({ paused: true });
     addYearMotion(timeline, root, plan, reducedMotion);
     if (!reducedMotion) addPayoffMotion(timeline, root, plan);
   } catch (error) {
-    timeline?.kill();
-    clock.dispose();
-    engine?.dispose();
+    timeline.kill();
+    throw error;
+  }
+
+  let render: (seconds: number) => void;
+  try {
+    render = createRenderer(root, plan);
+  } catch (error) {
+    timeline.kill();
     throw error;
   }
 
   const stopDriving = clock.drive(timeline);
-  const stopRendering = clock.onFrame(createRenderer(root, plan));
-  const built = timeline;
-
-  return {
-    clock,
-    setMuted: (next) => engine?.setMuted(next),
-    dispose() {
-      stopDriving();
-      stopRendering();
-      built.kill();
-      clock.dispose();
-      engine?.dispose();
-    },
+  const stopRendering = clock.onFrame(render);
+  // Last, so nothing is left scheduled if anything above threw.
+  scheduleSound(clock, sound, plan);
+  return () => {
+    stopDriving();
+    stopRendering();
+    timeline.kill();
   };
 }
 

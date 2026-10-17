@@ -1,6 +1,10 @@
 import { scaleLinear } from "d3-scale";
 import { line } from "d3-shape";
-import type { LinePoint, Plan, UnattributedStep } from "./plan";
+import type {
+  LinePoint,
+  Plan,
+  UnattributedStep,
+} from "@/features/sequencer/model/plan";
 
 /** The plot is drawn in a fixed box and stretched to fit its container. */
 export const CHART_WIDTH = 1000;

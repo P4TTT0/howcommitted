@@ -2,16 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import {
-  type HistoryPlan,
-  planFromHistory,
-} from "@/features/timeline/historyPlan";
-import { Timeline } from "@/features/timeline/Timeline";
+import { FINALE, SCENES } from "@/features/scenes/registry";
+import { planFromHistory } from "@/features/sequencer/model/historyPlan";
+import { Sequencer } from "@/features/sequencer/Sequencer";
+import type { SceneData } from "@/features/sequencer/types";
 import { isAudioUnlocked, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
 import { ScreenMain } from "@/ui/ScreenMain";
 import { StartButton } from "@/ui/StartButton";
-import { EndCard } from "./EndCard";
 import {
   failureCopy,
   type HistoryFailure,
@@ -27,13 +25,7 @@ type Phase =
   | { name: "loading" }
   | { name: "failed"; failure: HistoryFailure }
   | { name: "empty"; login: string }
-  | {
-      name: "scene";
-      login: string;
-      model: HistoryPlan;
-      firstYear: number;
-      lastYear: number;
-    };
+  | { name: "scene"; login: string; data: SceneData };
 
 async function fetchHistory(login: string): Promise<HistoryOutcome> {
   try {
@@ -54,11 +46,18 @@ function sceneOrEmpty(outcome: HistoryOutcome & { kind: "ok" }): Phase {
   try {
     const model = planFromHistory(outcome.history);
     const login = outcome.history.user.login;
-    const { firstYear, lastYear } = model;
-    if (model.plan.total === 0 || firstYear === null || lastYear === null) {
+    if (
+      model.plan.total === 0 ||
+      model.firstYear === null ||
+      model.lastYear === null
+    ) {
       return { name: "empty", login };
     }
-    return { name: "scene", login, model, firstYear, lastYear };
+    return {
+      name: "scene",
+      login,
+      data: { login, model, history: outcome.history },
+    };
   } catch {
     return { name: "failed", failure: { kind: "server" } };
   }
@@ -227,11 +226,12 @@ function screen(phase: Phase, login: string, start: () => void) {
         </ScreenMain>
       );
 
-    case "scene": {
-      const { model } = phase;
+    case "scene":
       return (
-        <Timeline
-          plan={model.plan}
+        <Sequencer
+          data={phase.data}
+          scenes={SCENES}
+          finale={FINALE}
           title={`@${phase.login} contribution history`}
           caption="Turn sound on."
           autoStart
@@ -242,21 +242,7 @@ function screen(phase: Phase, login: string, start: () => void) {
               heading={false}
             />
           }
-          note={model.note}
-          renderEnd={({ replay }) => (
-            <EndCard
-              login={phase.login}
-              total={model.plan.total}
-              firstYear={phase.firstYear}
-              lastYear={phase.lastYear}
-              yearBlocks={model.yearBlocks}
-              note={model.note}
-              privateContributions={model.privateContributions}
-              onReplay={replay}
-            />
-          )}
         />
       );
-    }
   }
 }

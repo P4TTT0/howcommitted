@@ -36,11 +36,14 @@ export type ClockOptions = {
   bpm: number;
 };
 
+/** Duration and tempo of one scene on the clock. */
+export type ClockScene = ClockOptions;
+
 type FrameListener = (seconds: number) => void;
 type StatusListener = (status: ClockStatus) => void;
 
 export class PlaybackClock {
-  readonly duration: number;
+  duration: number;
   private readonly frameListeners = new Set<FrameListener>();
   private readonly statusListeners = new Set<StatusListener>();
   private current: ClockStatus = "idle";
@@ -49,6 +52,8 @@ export class PlaybackClock {
     if (document.hidden) this.pause();
   };
   private frameHandle = 0;
+  /** A skip while paused: the next `start()` begins paused too. */
+  private holdPaused = false;
 
   constructor({ duration, bpm }: ClockOptions) {
     this.duration = duration;
@@ -68,6 +73,23 @@ export class PlaybackClock {
     const { seconds } = Tone.getTransport();
     const heard = seconds - Tone.getContext().lookAhead;
     return Math.min(this.duration, Math.max(0, heard));
+  }
+
+  /**
+   * Re-arms the same clock for the next scene of a sequence: scheduled hits
+   * are dropped, the Transport goes back to zero and the status to `idle`.
+   * Frame subscribers stay (each scene unsubscribes its own); callers then
+   * schedule the scene's hits and `start()`.
+   */
+  loadScene({ duration, bpm }: ClockScene): void {
+    cancelAnimationFrame(this.frameHandle);
+    const transport = Tone.getTransport();
+    transport.cancel();
+    transport.stop();
+    transport.position = 0;
+    transport.bpm.value = bpm;
+    this.duration = duration;
+    this.setStatus("idle");
   }
 
   /** Resumes the AudioContext. Call from a user gesture. */
@@ -97,9 +119,17 @@ export class PlaybackClock {
   }
 
   start(): void {
+    const hold = this.holdPaused;
+    this.holdPaused = false;
     this.setStatus("playing");
     Tone.getTransport().start();
     this.runFrames();
+    if (hold) this.pause();
+  }
+
+  /** Forgets a pending hold, so the next `start()` plays (used by replay). */
+  resetHold(): void {
+    this.holdPaused = false;
   }
 
   pause(): void {
@@ -117,6 +147,7 @@ export class PlaybackClock {
   }
 
   restart(): void {
+    this.holdPaused = false;
     const transport = Tone.getTransport();
     transport.stop();
     transport.position = 0;
@@ -136,7 +167,10 @@ export class PlaybackClock {
 
   /** Jumps to the end state. Hits not yet played are dropped. */
   skip(): void {
-    if (this.current === "playing" || this.current === "paused") this.finish();
+    if (this.current !== "playing" && this.current !== "paused") return;
+    // Skipping while paused keeps the pause: the next scene loads paused.
+    this.holdPaused = this.current === "paused";
+    this.finish();
   }
 
   private finish(): void {
