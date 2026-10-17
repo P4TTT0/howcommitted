@@ -44,6 +44,10 @@ export class PlaybackClock {
   private readonly frameListeners = new Set<FrameListener>();
   private readonly statusListeners = new Set<StatusListener>();
   private current: ClockStatus = "idle";
+  /** Hidden tabs stop rAF; pause instead of letting the scene run unseen. */
+  private readonly onVisibility = () => {
+    if (document.hidden) this.pause();
+  };
   private frameHandle = 0;
 
   constructor({ duration, bpm }: ClockOptions) {
@@ -52,13 +56,7 @@ export class PlaybackClock {
     transport.cancel();
     transport.stop();
     transport.bpm.value = bpm;
-    // The end event runs on the audio timeline; Draw hops it to the frame
-    // that matches what is audible.
-    transport.schedule((time) => {
-      Tone.getDraw().schedule(() => {
-        if (this.current === "playing") this.finish();
-      }, time);
-    }, duration);
+    document.addEventListener("visibilitychange", this.onVisibility);
   }
 
   get status(): ClockStatus {
@@ -128,6 +126,7 @@ export class PlaybackClock {
 
   dispose(): void {
     cancelAnimationFrame(this.frameHandle);
+    document.removeEventListener("visibilitychange", this.onVisibility);
     const transport = Tone.getTransport();
     transport.stop();
     transport.cancel();
@@ -161,6 +160,11 @@ export class PlaybackClock {
     cancelAnimationFrame(this.frameHandle);
     const tick = () => {
       if (this.current !== "playing") return;
+      // The end is detected here, on the frame loop, from raw Transport time.
+      if (Tone.getTransport().seconds >= this.duration) {
+        this.finish();
+        return;
+      }
       this.emitFrame();
       this.frameHandle = requestAnimationFrame(tick);
     };

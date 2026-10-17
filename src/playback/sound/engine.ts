@@ -116,6 +116,8 @@ export class SoundEngine {
     this.payoffVoices.length = 0;
     this.limiter.dispose();
     this.buffers.dispose();
+    // The destination is global; do not leave it muted for the next engine.
+    Tone.getDestination().mute = false;
   }
 
   private play(
