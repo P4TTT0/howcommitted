@@ -171,7 +171,7 @@ export function CumulativeLineView({
                   style={{
                     left: `${left}%`,
                     top: `${top}%`,
-                    transform: `translate(${left > 55 ? "-100%" : "1rem"}, -140%)`,
+                    transform: `translate(${left > 55 ? "-100%" : "1rem"}, calc(-100% - 1.6rem))`,
                   }}
                 >
                   {flagLabel(mark)}

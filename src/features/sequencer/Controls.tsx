@@ -270,7 +270,7 @@ export function Controls({
 
       <button
         type="button"
-        className={`${base} ${tertiary} col-start-3 row-start-1 md:hidden`}
+        className={`${base} h-11 border-ink px-1 not-disabled:hover:bg-ink not-disabled:hover:text-paper col-start-3 row-start-1 md:hidden`}
         onClick={onCycleSpeed}
         aria-label={`Playback speed ${speedLabel(speed)}. Change speed`}
         title="Playback speed"

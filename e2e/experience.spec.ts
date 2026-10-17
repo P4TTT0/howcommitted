@@ -62,15 +62,40 @@ async function mockApi(
 }
 
 const pauseButton = (page: Page) => page.getByRole("button", { name: "Pause" });
-/** Skips every scene in turn (one more than the scene ticks); the end card follows. */
+const nextButton = (page: Page) =>
+  page.getByRole("button", { name: "Next", exact: true });
+const prevButton = (page: Page) =>
+  page.getByRole("button", { name: "Previous scene" });
+const progress = (page: Page) =>
+  page.getByRole("progressbar", { name: "Playback progress" });
+
+/** Goes through every scene with Next (one more than the ticks); the end card follows. */
 async function skipAllScenes(page: Page) {
-  const skip = page.getByRole("button", { name: "Skip scene" });
-  await expect(skip).toBeEnabled();
+  // The bar only exists once the history has loaded.
+  await expect(nextButton(page)).toBeEnabled();
   const scenes = (await page.locator("[data-scene-tick]").count()) + 1;
   for (let scene = 0; scene < scenes; scene += 1) {
-    await expect(skip).toBeEnabled();
-    await skip.click();
+    await expect(nextButton(page)).toBeEnabled();
+    await nextButton(page).click();
   }
+}
+
+/**
+ * Lands on a scene in explore without waiting for it to play: leaving a scene
+ * counts it as played, so stepping forward and back reopens it finished.
+ */
+async function openInExplore(page: Page, sceneNumber: number) {
+  for (let scene = 1; scene <= sceneNumber; scene += 1) {
+    await nextButton(page).click();
+  }
+  await prevButton(page).click();
+  await expect(progress(page)).toHaveAttribute(
+    "aria-valuetext",
+    new RegExp(`^Scene ${sceneNumber} of`),
+  );
+  await expect(
+    page.getByRole("button", { name: "Replay" }).first(),
+  ).toBeVisible();
 }
 
 const startButton = (page: Page) =>
@@ -208,11 +233,8 @@ test("scenes play in order, with a progress bar that names the scene", async ({
   await page.goto("/ada");
   await startButton(page).click();
 
-  const progress = page.getByRole("progressbar", {
-    name: "Playback progress",
-  });
   await expect(pauseButton(page)).toBeEnabled();
-  await expect(progress).toHaveAttribute(
+  await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
     "Scene 1 of 2: Year blocks",
   );
@@ -227,8 +249,8 @@ test("scenes play in order, with a progress bar that names the scene", async ({
     page.getByRole("img", { name: `Contributions per year: ${perYear}` }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Skip scene" }).click();
-  await expect(progress).toHaveAttribute(
+  await nextButton(page).click();
+  await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
     "Scene 2 of 2: Cumulative line",
   );
@@ -258,7 +280,7 @@ test("pausing holds the position and resuming continues", async ({ page }) => {
     .not.toBe(held);
 });
 
-test("skipping while paused loads the next scene paused; mute carries over", async ({
+test("moving to another scene plays it, and mute carries over", async ({
   page,
 }) => {
   await mockApi(page);
@@ -266,21 +288,20 @@ test("skipping while paused loads the next scene paused; mute carries over", asy
   await startButton(page).click();
   await expect(pauseButton(page)).toBeEnabled();
   await page.getByRole("button", { name: "Mute" }).click();
-  await pauseButton(page).click();
-  await page.getByRole("button", { name: "Skip scene" }).click();
+  await nextButton(page).click();
 
-  await expect(page.getByRole("progressbar")).toHaveAttribute(
+  await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
     /^Scene 2 of /,
   );
-  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+  await expect(pauseButton(page)).toBeVisible();
   await expect(page.getByRole("button", { name: "Mute" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
 });
 
-test("skipping to the end shows the total and the principle", async ({
+test("going past the last scene shows the total and the principle", async ({
   page,
 }) => {
   await mockApi(page);
@@ -464,7 +485,9 @@ test("contributions not attributed to a day show as a labelled step with an hone
   });
   await page.goto("/ada");
   await startButton(page).click();
-  await skipAllScenes(page);
+  await expect(pauseButton(page)).toBeEnabled();
+  // The scene just has to have been left once: it then reopens finished.
+  await openInExplore(page, 2);
 
   await expect(
     page.getByText(`+${missing} not attributed to a day`),
@@ -478,6 +501,7 @@ test("contributions not attributed to a day show as a labelled step with an hone
       .first(),
   ).toBeVisible();
   // The total is the official one, not the sum of the days.
+  await nextButton(page).click();
   await expect(page.getByText("@ada: 1,000 contributions, 2023")).toBeVisible();
 });
 
