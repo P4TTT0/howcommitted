@@ -2,7 +2,7 @@
 
 ## Vision
 
-Committed turns your commit history into a chronological audio-visual animation with the satisfaction of an incremental game: every commit adds up, every streak climbs, every milestone pops.
+Committed turns your GitHub contribution history into a chronological audio-visual animation with the satisfaction of an incremental game: every contribution adds up, every streak climbs, every milestone pops.
 
 It is an experience, not a professional metrics dashboard and not a narrative.
 
@@ -10,11 +10,11 @@ Quality bar: sound is addictive and satisfying (sample-based, incremental, Balat
 
 ## Core principle
 
-COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
+CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 
 - Versus is a game, not a job ranking.
 - Copy describes habits ("night owl", "weekend dev", "longest streak"), never merit ("best", "most productive", "winner").
-- The final screen and the share card always show: "Commits are not productivity. This is rhythm, not value."
+- The final screen and the share card always show: "Contributions are not productivity. This is rhythm, not value."
 
 ## Experience flow
 
@@ -29,12 +29,12 @@ COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 
 | # | Scene | Content |
 |---|-------|---------|
-| 1 | Year blocks | Block height = commits; block color = year identity |
-| 2 | Cumulative line | Cumulative commits with repo-creation flags. In versus: bar chart race |
-| 3 | Heatmap | Weekday by week. Data comes from the contribution calendar, so label it "contributions", not commits |
+| 1 | Year blocks | Block height = calendar contributions of the year; block color = year identity |
+| 2 | Cumulative line | Cumulative contributions with repo-creation flags. In versus: bar chart race |
+| 3 | Heatmap | Weekday by week. Same calendar data as the line; label it "contributions", never commits |
 | 4 | Language mosaic | Proportional blocks, top 5 plus "other". Label: languages of owned repos, not per-commit |
 | 5 | Big numbers | Four giant numbers: commits, PRs, reviews, issues |
-| - | Final poster | Summary, fixed line "Commits are not productivity. This is rhythm, not value.", actions |
+| - | Final poster | Summary, fixed line "Contributions are not productivity. This is rhythm, not value.", actions |
 
 ## Controls
 
@@ -59,5 +59,6 @@ COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 ## Decisions
 
 - Radar chart rejected: mismatched scales, and it reads as a performance review, violating the core principle.
-- Commits not attributed to a day are shown as an explicit step, never spread across days: GitHub can truncate per-day detail while the yearly total stays exact. The line draws only real daily commits; the missing amount appears at the end of its year as one dashed step with the label "+N not attributed to a day" and a soft, distinct sound cue, and a note says so. Counter and year blocks end on the official totals. If the daily detail ever exceeds a yearly total it is not scaled down: the official total wins and the year is flagged. A milestone crossed inside a step fires at the step.
+- The experience plays all contributions from the GitHub calendar, public and private (private only when the user shares them on their profile). Commits alone left most employed developers empty, because their work lives in private repositories (a profile with 1,912 calendar contributions had 6 public commits). The calendar mixes contribution types, so the counter's unit is always "contributions", never "commits". Public commit data is still fetched for later scenes (big numbers, PRs, reviews, issues) but does not drive the line, counter, year blocks or milestones. The end card states the private share honestly ("Includes N private contributions.") when it is above zero, and the empty state says private contributions appear only if the user shares them.
+- Contributions not attributed to a day are shown as an explicit step, never spread across days: if a year's summed daily contributions differ from the calendar's yearly total, the difference is one dashed step at the end of its year with the label "+N not attributed to a day" and a soft, distinct sound cue, and a note says so. With the calendar this should be rare. Counter and year blocks end on the calendar totals. If the daily detail ever exceeds a yearly total it is not scaled down: the calendar total wins and the year is flagged. A milestone crossed inside a step fires at the step.
 - Exact-username lookup instead of fuzzy search: GitHub's user search API allows only 30 requests/minute.
