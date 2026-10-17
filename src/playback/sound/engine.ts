@@ -7,14 +7,15 @@
 
 import * as Tone from "tone";
 import type { Kit, PayoffHit, TickHit } from "./kit";
+import { createBubbleKit } from "./kits/bubble";
 import { createChipsKit } from "./kits/chips";
 import { createMarimbaKit } from "./kits/marimba";
+import type { KitId } from "./registry";
 
 export type { PayoffHit, TickHit } from "./kit";
 
-export type KitId = "chips" | "marimba";
-
 const LOADERS: Record<KitId, (random: () => number) => Promise<Kit>> = {
+  bubble: createBubbleKit,
   chips: createChipsKit,
   marimba: createMarimbaKit,
 };
