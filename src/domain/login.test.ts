@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidLogin } from "./login";
+import { isReservedLogin, isValidLogin } from "./login";
 
 describe("isValidLogin", () => {
   it.each(["torvalds", "a", "Ada-Lovelace", "a1-b2", "x".repeat(39)])(
@@ -22,5 +22,13 @@ describe("isValidLogin", () => {
     "ada\n",
   ])("rejects %j", (login) => {
     expect(isValidLogin(login)).toBe(false);
+  });
+});
+
+describe("isReservedLogin", () => {
+  it("flags logins that collide with app routes, in any case", () => {
+    expect(isReservedLogin("lab")).toBe(true);
+    expect(isReservedLogin("API")).toBe(true);
+    expect(isReservedLogin("torvalds")).toBe(false);
   });
 });

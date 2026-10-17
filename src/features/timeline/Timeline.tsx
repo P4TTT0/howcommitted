@@ -1,32 +1,66 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ClockStatus } from "@/playback/clock";
-import { CHART_HEIGHT, CHART_WIDTH, linePath } from "./chart";
-import { generateFakeProfile } from "./fakeProfile";
+import { ScreenMain } from "@/ui/ScreenMain";
+import { Controls } from "./Controls";
+import {
+  CHART_HEIGHT,
+  CHART_WIDTH,
+  linePath,
+  stepLabelPosition,
+  stepPath,
+} from "./chart";
 import {
   blockForYearIndex,
-  buildPlan,
   displayedYearIndex,
+  labelledSteps,
+  type Plan,
+  stepLabel,
   yearReveals,
 } from "./plan";
+import { StartGate, type StartPhase } from "./StartGate";
 import { createScene, formatCount, type Scene } from "./scene";
 
-type Phase = "start" | "loading" | "running";
+export type TimelineProps = {
+  plan: Plan;
+  /** Shown under the start button. */
+  caption: string;
+  /** Visually hidden page heading. */
+  title?: string;
+  /** Start as soon as mounted. Only valid after a user gesture unlocked audio. */
+  autoStart?: boolean;
+  /** Shown in place of the start button while an auto start is loading. */
+  starting?: ReactNode;
+  /** Small honest note shown under the chart. */
+  note?: string | null;
+  /** Content for the end state; shown over the chart when playback ends. */
+  renderEnd?: (actions: { replay(): void }) => ReactNode;
+};
 
-const controlClass =
-  "min-h-11 min-w-11 border-2 border-ink px-2 py-2 sm:px-3 font-mono text-xs uppercase focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 aria-pressed:bg-ink aria-pressed:text-paper";
+/** At most this many year labels fit on the axis of a phone. */
+const MAX_YEAR_LABELS = 8;
 
-export function Timeline() {
-  const plan = useMemo(() => buildPlan(generateFakeProfile()), []);
+export function Timeline({
+  plan,
+  caption,
+  title,
+  autoStart = false,
+  starting,
+  note,
+  renderEnd,
+}: TimelineProps) {
   const path = useMemo(() => linePath(plan), [plan]);
+  const dashedPath = useMemo(() => stepPath(plan), [plan]);
+  const labels = useMemo(() => labelledSteps(plan.steps), [plan]);
   const rootRef = useRef<HTMLElement>(null);
   const sceneRef = useRef<Scene | null>(null);
   const mountedRef = useRef(true);
-  const [phase, setPhase] = useState<Phase>("start");
+  const [phase, setPhase] = useState<StartPhase>("start");
   const [status, setStatus] = useState<ClockStatus>("idle");
   const [muted, setMuted] = useState(false);
   const [failed, setFailed] = useState(false);
+  const autoStartedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -36,6 +70,13 @@ export function Timeline() {
       sceneRef.current = null;
     };
   }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: begin runs once, on mount
+  useEffect(() => {
+    if (!autoStart || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    void begin();
+  }, [autoStart]);
 
   async function begin() {
     const root = rootRef.current;
@@ -77,13 +118,16 @@ export function Timeline() {
   const reveals = useMemo(() => yearReveals(plan), [plan]);
   const firstYear = plan.years[0]?.year ?? 0;
   const lastYear = plan.years.at(-1)?.year ?? firstYear;
+  const labelEvery = Math.ceil(plan.years.length / MAX_YEAR_LABELS);
   const chartLabel = `Cumulative commits from ${firstYear} to ${lastYear}, ${formatCount(plan.total)} in total`;
 
   return (
-    <main
-      ref={rootRef}
-      className="relative h-dvh w-full overflow-hidden bg-paper text-ink"
-    >
+    <ScreenMain ref={rootRef}>
+      {title && (
+        <h1 className="sr-only" tabIndex={-1}>
+          {title}
+        </h1>
+      )}
       <div className="absolute inset-0">
         <section
           data-role="block"
@@ -148,7 +192,35 @@ export function Timeline() {
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
               />
+              {/* Commits no day carries: dashed, so it reads as not a day. */}
+              <path
+                d={dashedPath}
+                clipPath="url(#reveal)"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="5"
+                strokeDasharray="12 10"
+                vectorEffect="non-scaling-stroke"
+              />
             </svg>
+            {labels.map((step) => {
+              const { leftPercent, topPercent } = stepLabelPosition(plan, step);
+              return (
+                <span
+                  key={step.year}
+                  data-step-label={step.progress}
+                  data-visible="false"
+                  className="invisible absolute max-w-[55%] bg-paper px-1 font-mono text-xs data-[visible=true]:visible"
+                  style={{
+                    left: `${leftPercent}%`,
+                    top: `${topPercent}%`,
+                    transform: `translate(${leftPercent > 55 ? "-100%" : "0"}, -50%)`,
+                  }}
+                >
+                  {stepLabel(step)}
+                </span>
+              );
+            })}
             <span
               data-role="head"
               className="absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink"
@@ -162,17 +234,25 @@ export function Timeline() {
               />
             ))}
           </div>
-          <div className="relative h-5 font-mono text-[10px]">
-            {plan.years.map((span) => (
-              <span
-                key={span.year}
-                className="absolute top-1"
-                style={{ left: `${span.startProgress * 100}%` }}
-              >
-                {span.year}
-              </span>
-            ))}
+          <div className="relative h-5 font-mono text-xs">
+            {plan.years.map((span, index) =>
+              index % labelEvery === 0 ? (
+                <span
+                  key={span.year}
+                  className="absolute top-1"
+                  style={{ left: `${span.startProgress * 100}%` }}
+                >
+                  {span.year}
+                </span>
+              ) : null,
+            )}
           </div>
+          {note && <p className="font-mono text-xs leading-4">{note}</p>}
+          {status === "ended" && renderEnd && (
+            <div className="absolute inset-0 z-40 overflow-y-auto bg-paper">
+              {renderEnd({ replay: () => clock?.restart() })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -211,64 +291,22 @@ export function Timeline() {
       </p>
 
       {phase !== "running" && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-paper p-4 pb-20">
-          <button
-            type="button"
-            onClick={begin}
-            disabled={phase === "loading"}
-            className="bg-block-ultramarine px-[0.4em] py-[0.25em] text-center font-display text-[min(18vw,24dvh)] font-black uppercase leading-[0.85] text-paper focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-ink"
-          >
-            How Committed?
-          </button>
-          <p className="max-w-prose text-center font-mono text-xs">
-            {phase === "loading"
-              ? "Loading sound"
-              : `Lab. Generated profile, ${plan.years.length} years of commits. Turn sound on.`}
-          </p>
-          {failed && (
-            <p role="alert" className="font-mono text-xs">
-              Playback could not start. Try again.
-            </p>
-          )}
-        </div>
+        <StartGate
+          phase={phase}
+          autoStart={autoStart}
+          failed={failed}
+          starting={starting}
+          caption={caption}
+          onBegin={begin}
+        />
       )}
 
-      <div className="absolute inset-x-0 bottom-0 z-50 flex h-14 items-center gap-2 border-t-2 border-ink bg-paper px-3 sm:px-4">
-        <button
-          type="button"
-          className={controlClass}
-          disabled={status !== "playing" && status !== "paused"}
-          onClick={() =>
-            status === "playing" ? clock?.pause() : clock?.resume()
-          }
-        >
-          {status === "paused" ? "Resume" : "Pause"}
-        </button>
-        <button
-          type="button"
-          className={controlClass}
-          disabled={status !== "playing" && status !== "paused"}
-          onClick={() => clock?.skip()}
-        >
-          Skip
-        </button>
-        <button
-          type="button"
-          className={controlClass}
-          disabled={status === "idle"}
-          onClick={() => clock?.restart()}
-        >
-          Replay
-        </button>
-        <button
-          type="button"
-          className={`${controlClass} ml-auto`}
-          aria-pressed={muted}
-          onClick={toggleMute}
-        >
-          Mute
-        </button>
-      </div>
-    </main>
+      <Controls
+        status={status}
+        muted={muted}
+        clock={clock}
+        onToggleMute={toggleMute}
+      />
+    </ScreenMain>
   );
 }

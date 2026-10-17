@@ -1,4 +1,4 @@
-import type { DailyCommits } from "@/playback/aggregate";
+import type { DailyCommits } from "@/domain/types";
 
 /**
  * Deterministic fake commit history for the playback lab. It exists only to
@@ -38,16 +38,17 @@ export function generateFakeProfile(seed = 2026): DailyCommits[] {
     if (quietDaysLeft === 0 && random() < 0.006) {
       quietDaysLeft = 10 + Math.floor(random() * 25);
     }
-    let count = 0;
+    let commits = 0;
     if (quietDaysLeft > 0) {
       quietDaysLeft -= 1;
     } else {
       const pace = (YEARLY_PACE[year] ?? 2) * (weekend ? 0.25 : 1);
       // Squaring skews toward small days with the odd big one.
       const burst = random() ** 2 * 2.6 + 0.15;
-      count = random() < (weekend ? 0.35 : 0.85) ? Math.round(pace * burst) : 0;
+      commits =
+        random() < (weekend ? 0.35 : 0.85) ? Math.round(pace * burst) : 0;
     }
-    days.push({ date: date.toISOString().slice(0, 10), count });
+    days.push({ date: date.toISOString().slice(0, 10), commits });
   }
   return days;
 }

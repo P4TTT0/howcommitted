@@ -20,8 +20,8 @@ COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 
 1. **Landing.** One centered search. Exact-username lookup with avatar preview, debounced.
 2. **Add developers.** A "+ vs" control adds more search columns, up to 5 developers. One developer is solo; two or more is versus. There is no mode toggle.
-3. **Prefetch.** Selecting a user starts fetching their data.
-4. **Start.** A big "How Committed?" button. The click is the user gesture that also unlocks audio.
+3. **Start.** A big "How Committed?" button. The click is the user gesture that also unlocks audio, then it navigates to `/{login}`.
+4. **Fetch on intent, not on preview.** The preview lookup is the only request while typing. The history is fetched on that click (or on the start button of a direct visit to `/{login}`), never before, to protect the anonymous quota of 2 cold generations a day. Loading is a designed moment, not a spinner.
 5. **Scenes.** The animation plays through the scenes below.
 6. **Final poster.** Actions: Share, Challenge someone (adds a user and goes to versus), Replay.
 
@@ -59,4 +59,5 @@ COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 ## Decisions
 
 - Radar chart rejected: mismatched scales, and it reads as a performance review, violating the core principle.
+- Commits not attributed to a day are shown as an explicit step, never spread across days: GitHub can truncate per-day detail while the yearly total stays exact. The line draws only real daily commits; the missing amount appears at the end of its year as one dashed step with the label "+N not attributed to a day" and a soft, distinct sound cue, and a note says so. Counter and year blocks end on the official totals. If the daily detail ever exceeds a yearly total it is not scaled down: the official total wins and the year is flagged. A milestone crossed inside a step fires at the step.
 - Exact-username lookup instead of fuzzy search: GitHub's user search API allows only 30 requests/minute.

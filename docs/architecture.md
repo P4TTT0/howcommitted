@@ -1,6 +1,6 @@
 # Architecture
 
-Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. `playback/` and `features/timeline/` hold the playback spike, reachable at `/lab` outside production; the product pages are not built yet.
+Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. The solo vertical slice works end to end: landing search (`features/search`), `/{login}` (`features/experience`) and the timeline scene driven by real history (`features/timeline`). `/lab` keeps the generated profile for playback work outside production. Versus, the other scenes, share and sign-in are not built yet.
 
 ## Stack
 
@@ -22,8 +22,8 @@ Not in the MVP (deliberate scope decision): Three.js/WebGL, a database, a global
 ```
 src/app/              Thin Next routes only
   page.tsx            Landing
-  [...users]/page.tsx /torvalds = solo, /a/b/c = versus
-  [...users]/opengraph-image.tsx
+  [...users]/page.tsx /torvalds = solo; /a/b/c = versus (404 until it exists)
+  [...users]/opengraph-image.tsx (planned)
   api/user/[login]/       Exact-login preview, rate limited per IP
   api/history/[login]/    Full profile history (cache, coalescing, quota)
   lab/page.tsx            Playback lab: previews and local dev only, 404 in production
@@ -31,7 +31,7 @@ src/domain/           Pure TS types and metrics
 src/github/           Server-only GraphQL client, queries, cache
 src/playback/         One clock driving GSAP and Tone.js (clock.ts), pure scheduling
                       helpers (aggregate, schedule, pitch), sound/ engine
-src/features/         timeline, stats, versus
+src/features/         search (landing lookup), experience (/{login} states), timeline (scene, plan), stats, versus
 src/ui/               Shared presentational components
 public/sounds/        Kenney CC0 chip samples as .ogg with .mp3 fallback, CREDITS.md
 e2e/                  Playwright
@@ -42,6 +42,10 @@ LICENSE               MIT
 ```
 
 GitHub usernames cannot contain "/", so path segments map unambiguously to users.
+
+Reserved logins: `lab` and `api` collide with app routes (static routes win over the catch-all), so those users cannot be opened at `/{login}`. `parseSoloLogin` rejects them explicitly (404) and the landing search refuses them before any request. Add a name to `RESERVED_LOGINS` in `domain/login.ts` whenever a top-level route is added.
+
+Client flow: the landing click calls `unlockAudio()` (`playback/unlock.ts`) and navigates client-side, so the AudioContext stays running on `/{login}`, which then starts by itself. A fresh load (shared link, reload) shows the start button first. The history is fetched on intent only (see [product.md](product.md)); the preview alone never costs a generation. Auto start needs a one-shot intent recorded only by the landing click (`features/experience/intent.ts`, sessionStorage); back/forward, reloads and shared links show the start button even when audio is still unlocked. Tone.js loads lazily on the landing (`preloadAudio` on input focus) and is started synchronously inside the click. `features/timeline/historyPlan.ts` maps `History` to the scene plan: daily commits drive the line, official yearly totals drive the displayed total and year blocks, and commits a year's official total has beyond its real daily detail become one explicit unattributed step at the end of that year (dashed segment, label, soft cue, note), never scaled or spread across days.
 
 Rules:
 
