@@ -16,14 +16,19 @@ const READ_BUDGET_MS = 2_500;
 export async function loadCachedPoster(
   login: string,
 ): Promise<PosterModel | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const cache = createCache(getRedis(), keyPrefix());
     const cached = await Promise.race([
       readCachedYears(login, cache),
-      new Promise<null>((resolve) => setTimeout(resolve, READ_BUDGET_MS, null)),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(resolve, READ_BUDGET_MS, null);
+      }),
     ]);
     return cached ? buildPosterModel(cached.user, cached.years) : null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }

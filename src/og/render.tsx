@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { blocks, neutrals } from "@/ui/tokens";
+import { FALLBACK_CACHE_CONTROL, firstThatRenders } from "./fallback";
 import {
   contributionsLabel,
   FIXED_LINE,
@@ -17,27 +18,32 @@ const PADDING = 56;
 const DISPLAY = "Big Shoulders";
 const MONO = "Martian Mono";
 
-// Only the two chosen fonts, read once. Satori needs font files, not CSS.
-const fontDir = join(process.cwd(), "src/og/fonts");
-const [displayFont, monoFont] = await Promise.all([
-  readFile(join(fontDir, "big-shoulders-latin-800-normal.woff")),
-  readFile(join(fontDir, "martian-mono-latin-500-normal.woff")),
-]);
+/**
+ * Only the two chosen fonts. Satori needs font files, not CSS. They are read
+ * lazily and once: a missing file fails a render (which then falls back), not
+ * the import of every image route. The files are bundled through
+ * `outputFileTracingIncludes` in next.config.ts.
+ */
+type OgOptions = NonNullable<ConstructorParameters<typeof ImageResponse>[1]>;
+let fontsPromise: Promise<NonNullable<OgOptions["fonts"]>> | undefined;
 
-const fonts = [
-  {
-    name: DISPLAY,
-    data: displayFont,
-    weight: 800 as const,
-    style: "normal" as const,
-  },
-  {
-    name: MONO,
-    data: monoFont,
-    weight: 500 as const,
-    style: "normal" as const,
-  },
-];
+function loadFonts() {
+  fontsPromise ??= (async () => {
+    const dir = join(process.cwd(), "src/og/fonts");
+    const [display, mono] = await Promise.all([
+      readFile(join(dir, "big-shoulders-latin-800-normal.woff")),
+      readFile(join(dir, "martian-mono-latin-500-normal.woff")),
+    ]);
+    return [
+      { name: DISPLAY, data: display, weight: 800, style: "normal" },
+      { name: MONO, data: mono, weight: 500, style: "normal" },
+    ] satisfies NonNullable<OgOptions["fonts"]>;
+  })().catch((error) => {
+    fontsPromise = undefined; // retry on the next render
+    throw error;
+  });
+  return fontsPromise;
+}
 
 /**
  * Crawlers fetch these constantly. A generic poster is short-lived because the
@@ -215,15 +221,28 @@ function CachedPoster({ model }: { model: PosterModel }) {
 export function renderPoster(
   login: string | null,
   model: PosterModel | null,
-): ImageResponse {
-  return new ImageResponse(
-    model ? <CachedPoster model={model} /> : <GenericPoster login={login} />,
-    {
-      ...IMAGE_SIZE,
-      fonts,
-      headers: {
-        "cache-control": model ? CACHE_CONTROL.cached : CACHE_CONTROL.generic,
-      },
-    },
+): Promise<Response> {
+  const element = model ? (
+    <CachedPoster model={model} />
+  ) : (
+    <GenericPoster login={login} />
   );
+  // ImageResponse renders lazily while streaming, so the body is buffered
+  // here: a failure must surface now, where it can still be replaced.
+  const render = async (withFonts: boolean, cacheControl: string) => {
+    const response = new ImageResponse(element, {
+      ...IMAGE_SIZE,
+      ...(withFonts ? { fonts: await loadFonts() } : {}),
+      headers: { "cache-control": cacheControl },
+    });
+    return new Response(await response.arrayBuffer(), {
+      status: 200,
+      headers: response.headers,
+    });
+  };
+  return firstThatRenders([
+    () => render(true, model ? CACHE_CONTROL.cached : CACHE_CONTROL.generic),
+    // Fonts missing or broken: a plain poster in the default font beats a 500.
+    () => render(false, FALLBACK_CACHE_CONTROL),
+  ]);
 }
