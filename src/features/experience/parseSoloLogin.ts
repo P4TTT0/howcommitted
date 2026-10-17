@@ -10,6 +10,11 @@ import { isReservedLogin, isValidLogin } from "@/domain/login";
 export function parseSoloLogin(users: readonly string[]): string | null {
   const [segment] = users;
   if (users.length !== 1 || segment === undefined) return null;
+  return parseLoginSegment(segment);
+}
+
+/** Decodes and validates one route segment as a developer login. */
+export function parseLoginSegment(segment: string): string | null {
   let login: string;
   try {
     login = decodeURIComponent(segment);
