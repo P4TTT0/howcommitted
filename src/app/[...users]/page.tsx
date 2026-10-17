@@ -1,29 +1,22 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Experience } from "@/features/experience/Experience";
-import { parseSoloLogin } from "@/features/experience/parseSoloLogin";
+import { routeLogins } from "@/features/versus/routeLogins";
+import { VersusExperience } from "@/features/versus/VersusExperience";
 import { loadCachedPoster } from "@/og/load";
 import { userMetadata } from "@/og/metadata";
-import { parseVersusLogins } from "@/features/versus/parseVersusLogins";
-import { VersusExperience } from "@/features/versus/VersusExperience";
-import { isVersusEnabled } from "@/features/versus/versusGate";
 
 type Props = { params: Promise<{ users: string[] }> };
 
-/** One login is solo; two to five are versus, outside production only. */
-async function routeLogins(params: Props["params"]): Promise<string[]> {
+async function loginsFor(params: Props["params"]): Promise<string[]> {
   const { users } = await params;
-  const solo = parseSoloLogin(users);
-  if (solo !== null) return [solo];
-  if (isVersusEnabled(process.env)) {
-    const logins = parseVersusLogins(users);
-    if (logins !== null) return logins;
-  }
-  notFound();
+  const logins = routeLogins(users, process.env);
+  if (logins === null) notFound();
+  return logins;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const logins = await routeLogins(params);
+  const logins = await loginsFor(params);
   const [login] = logins;
   if (logins.length > 1) {
     return {
@@ -35,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function UserPage({ params }: Props) {
-  const logins = await routeLogins(params);
+  const logins = await loginsFor(params);
   const [login] = logins;
   if (logins.length > 1) {
     return <VersusExperience key={logins.join("/")} logins={logins} />;
