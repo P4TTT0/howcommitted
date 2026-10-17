@@ -34,6 +34,15 @@ describe("interpretHistory", () => {
         years: [{ ...history.years[0], dailyContributions: [{ date: 1 }] }],
       },
       { ...history, years: [{ ...history.years[0], totalContributions: "x" }] },
+      {
+        ...history,
+        years: [
+          {
+            ...history.years[0],
+            dailyContributions: [{ date: "yesterday", count: 1 }],
+          },
+        ],
+      },
       { ...history, totalContributions: undefined },
       {
         ...history,

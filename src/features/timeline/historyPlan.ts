@@ -69,9 +69,10 @@ export function incompleteDetailNote(gaps: readonly YearGap[]): string | null {
  * the account's creation) to the last, with quiet days as zeros. The calendar
  * yearly totals (public and shared private contributions) are the truth for
  * the counter and the year blocks, while the days carry only the calendar's
- * daily counts. Whatever a year's calendar total has beyond them becomes one explicit step at the end of that year (see
- * UnattributedStep): never spread across days, never scaled. Days beyond the
- * official total are never scaled down either; the year is flagged instead.
+ * daily counts. Whatever a year's calendar total has beyond them becomes one
+ * explicit step at the end of that year (see UnattributedStep): never spread
+ * across days, never scaled. Days beyond the calendar total are never scaled
+ * down either; the year is flagged instead.
  */
 export function planFromHistory(
   history: History,

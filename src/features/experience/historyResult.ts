@@ -32,9 +32,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const isNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 function isDailyContributions(value: unknown): boolean {
   return (
-    isRecord(value) && typeof value.date === "string" && isNumber(value.count)
+    isRecord(value) &&
+    typeof value.date === "string" &&
+    ISO_DAY.test(value.date) &&
+    isNumber(value.count)
   );
 }
 

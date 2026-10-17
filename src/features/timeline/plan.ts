@@ -106,7 +106,7 @@ export type LinePoint = {
 };
 
 export type Plan = {
-  /** Real daily commits only: never scaled, never padded with invented ones. */
+  /** Real daily counts only: never scaled, never padded with invented ones. The per-day `commits` field carries contributions (rename deferred). */
   days: DailyCommits[];
   /** Running total per day, including unattributed steps. */
   cumulative: number[];
