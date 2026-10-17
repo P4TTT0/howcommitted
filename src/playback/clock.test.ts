@@ -151,6 +151,35 @@ describe("PlaybackClock", () => {
     expect(visibility).toHaveLength(1);
   });
 
+  it("keeps the pause when a scene is skipped while paused", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    clock.start();
+    clock.pause();
+    clock.skip();
+    clock.loadScene({ duration: 4, bpm: 120 });
+    clock.start();
+    expect(clock.status).toBe("paused");
+    // The hold is used up: after resuming and skipping, the next scene plays.
+    clock.resume();
+    clock.skip();
+    clock.loadScene({ duration: 4, bpm: 120 });
+    clock.start();
+    expect(clock.status).toBe("playing");
+  });
+
+  it("plays the next scene after a skip while playing, and resetHold clears a hold", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    clock.start();
+    clock.skip();
+    clock.start();
+    expect(clock.status).toBe("playing");
+    clock.pause();
+    clock.skip();
+    clock.resetHold();
+    clock.start();
+    expect(clock.status).toBe("playing");
+  });
+
   it("clamps visible time to the duration and removes listeners on dispose", () => {
     const clock = new PlaybackClock({ duration: 10, bpm: 120 });
     transport.seconds = 99;

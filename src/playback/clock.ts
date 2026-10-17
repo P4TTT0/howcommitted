@@ -52,6 +52,8 @@ export class PlaybackClock {
     if (document.hidden) this.pause();
   };
   private frameHandle = 0;
+  /** A skip while paused: the next `start()` begins paused too. */
+  private holdPaused = false;
 
   constructor({ duration, bpm }: ClockOptions) {
     this.duration = duration;
@@ -117,9 +119,17 @@ export class PlaybackClock {
   }
 
   start(): void {
+    const hold = this.holdPaused;
+    this.holdPaused = false;
     this.setStatus("playing");
     Tone.getTransport().start();
     this.runFrames();
+    if (hold) this.pause();
+  }
+
+  /** Forgets a pending hold, so the next `start()` plays (used by replay). */
+  resetHold(): void {
+    this.holdPaused = false;
   }
 
   pause(): void {
@@ -137,6 +147,7 @@ export class PlaybackClock {
   }
 
   restart(): void {
+    this.holdPaused = false;
     const transport = Tone.getTransport();
     transport.stop();
     transport.position = 0;
@@ -156,7 +167,10 @@ export class PlaybackClock {
 
   /** Jumps to the end state. Hits not yet played are dropped. */
   skip(): void {
-    if (this.current === "playing" || this.current === "paused") this.finish();
+    if (this.current !== "playing" && this.current !== "paused") return;
+    // Skipping while paused keeps the pause: the next scene loads paused.
+    this.holdPaused = this.current === "paused";
+    this.finish();
   }
 
   private finish(): void {
