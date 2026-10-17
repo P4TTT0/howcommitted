@@ -20,6 +20,8 @@ export type TimelineProps = {
   plan: Plan;
   /** Shown under the start button. */
   caption: string;
+  /** Visually hidden page heading. */
+  title?: string;
   /** Start as soon as mounted. Only valid after a user gesture unlocked audio. */
   autoStart?: boolean;
   /** Shown in place of the start button while an auto start is loading. */
@@ -36,6 +38,7 @@ const MAX_YEAR_LABELS = 8;
 export function Timeline({
   plan,
   caption,
+  title,
   autoStart = false,
   starting,
   note,
@@ -115,6 +118,7 @@ export function Timeline({
       ref={rootRef}
       className="relative h-dvh w-full overflow-hidden bg-paper text-ink"
     >
+      {title && <h1 className="sr-only">{title}</h1>}
       <div className="absolute inset-0">
         <section
           data-role="block"
