@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  buildSequence,
-  sceneOffsets,
-  sceneTicks,
-  sequenceProgress,
-} from "./sequence";
+import { buildSequence, sceneTicks, sequenceProgress } from "./sequence";
 import type { SceneData, SceneDefinition, SceneInstance } from "./types";
 
 const data = {} as SceneData;
@@ -56,28 +51,22 @@ describe("buildSequence", () => {
   });
 });
 
-describe("sequence timeline", () => {
-  const durations = [4, 6, 10];
-
-  it("places each scene after the previous ones", () => {
-    expect(sceneOffsets(durations)).toEqual([0, 4, 10]);
+describe("sequence track", () => {
+  it("places ticks on the equal boundaries between scenes", () => {
+    expect(sceneTicks(4)).toEqual([0.25, 0.5, 0.75]);
+    expect(sceneTicks(1)).toEqual([]);
+    expect(sceneTicks(0)).toEqual([]);
   });
 
-  it("places ticks on the boundaries between scenes", () => {
-    expect(sceneTicks(durations)).toEqual([0.2, 0.5]);
-    expect(sceneTicks([5])).toEqual([]);
-    expect(sceneTicks([])).toEqual([]);
+  it("maps a scene and how far into it to progress along the track", () => {
+    expect(sequenceProgress(4, 0, 0)).toBe(0);
+    expect(sequenceProgress(4, 1, 0.5)).toBeCloseTo(0.375);
+    expect(sequenceProgress(4, 3, 1)).toBe(1);
   });
 
-  it("maps scene time to overall progress", () => {
-    expect(sequenceProgress(durations, 0, 0)).toBe(0);
-    expect(sequenceProgress(durations, 1, 3)).toBeCloseTo(0.35);
-    expect(sequenceProgress(durations, 2, 10)).toBe(1);
-  });
-
-  it("clamps local time to the scene", () => {
-    expect(sequenceProgress(durations, 0, 99)).toBeCloseTo(0.2);
-    expect(sequenceProgress(durations, 1, -3)).toBeCloseTo(0.2);
-    expect(sequenceProgress([], 0, 1)).toBe(0);
+  it("clamps the fraction to the scene", () => {
+    expect(sequenceProgress(4, 0, 9)).toBeCloseTo(0.25);
+    expect(sequenceProgress(4, 1, -3)).toBeCloseTo(0.25);
+    expect(sequenceProgress(0, 0, 1)).toBe(0);
   });
 });

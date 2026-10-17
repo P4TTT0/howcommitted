@@ -23,7 +23,7 @@ export function StartGate({
   onBegin,
 }: StartGateProps) {
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-paper p-4 pb-20">
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-paper p-4 pb-28 md:pb-20">
       {autoStart && !failed ? (
         starting
       ) : (

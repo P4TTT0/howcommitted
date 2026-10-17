@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FINALE, SCENES } from "@/features/scenes/registry";
+import { recordPrefill } from "@/features/search/prefill";
 import { planFromHistory } from "@/features/sequencer/model/historyPlan";
 import { Sequencer } from "@/features/sequencer/Sequencer";
+import { shortcutFor } from "@/features/sequencer/shortcuts";
 import type { SceneData } from "@/features/sequencer/types";
+import { fetchHistory } from "@/features/versus/loadHistories";
 import { isAudioUnlocked, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
 import { ScreenMain } from "@/ui/ScreenMain";
@@ -14,7 +18,6 @@ import {
   failureCopy,
   type HistoryFailure,
   type HistoryOutcome,
-  interpretHistory,
 } from "./historyResult";
 import { consumeIntent } from "./intent";
 import { LoadingMoment, Poster } from "./Poster";
@@ -27,20 +30,6 @@ type Phase =
   | { name: "failed"; failure: HistoryFailure }
   | { name: "empty"; login: string }
   | { name: "scene"; login: string; data: SceneData };
-
-async function fetchHistory(login: string): Promise<HistoryOutcome> {
-  try {
-    const response = await fetch(`/api/history/${encodeURIComponent(login)}`);
-    const body: unknown = await response.json().catch(() => null);
-    return interpretHistory(
-      response.status,
-      body,
-      response.headers.get("retry-after"),
-    );
-  } catch {
-    return { kind: "network" };
-  }
-}
 
 /** Maps a fetched history to the next screen; a bad payload degrades, never throws. */
 function sceneOrEmpty(outcome: HistoryOutcome & { kind: "ok" }): Phase {
@@ -95,15 +84,19 @@ export function Experience({ login }: { login: string }) {
   const mountedRef = useRef(true);
   const decidedRef = useRef(false);
   const inFlightRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const router = useRouter();
 
   async function begin() {
     // One request at a time: a double click or a retry mid-flight is a no-op.
     if (inFlightRef.current) return;
     inFlightRef.current = true;
+    const request = new AbortController();
+    abortRef.current = request;
     setPhase({ name: "loading" });
     try {
-      const outcome = await fetchHistory(login);
-      if (!mountedRef.current) return;
+      const outcome = await fetchHistory(login, request.signal);
+      if (!mountedRef.current || request.signal.aborted) return;
       setPhase(
         outcome.kind === "ok"
           ? sceneOrEmpty(outcome)
@@ -126,8 +119,36 @@ export function Experience({ login }: { login: string }) {
     }
     return () => {
       mountedRef.current = false;
+      // Leaving mid-request must not keep a cold run going for nobody.
+      abortRef.current?.abort();
     };
   }, []);
+
+  /**
+   * Cancel and go back: abort an in-flight request and return to the landing
+   * with this login in the search. Always a plain navigation to "/", so it also
+   * works on a shared-link visit with nothing to go back to.
+   */
+  function cancel() {
+    abortRef.current?.abort();
+    inFlightRef.current = false;
+    recordPrefill(login);
+    router.push("/");
+  }
+
+  const cancelRef = useRef(cancel);
+  cancelRef.current = cancel;
+  const loading = phase.name === "loading";
+  useEffect(() => {
+    if (!loading) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (shortcutFor(event) !== "cancel") return;
+      event.preventDefault();
+      cancelRef.current();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [loading]);
 
   // Each screen change moves focus to its heading so assistive tech follows.
   useEffect(() => {
@@ -146,12 +167,17 @@ export function Experience({ login }: { login: string }) {
       <p role="status" aria-live="polite" className="sr-only">
         {announcement(phase, login)}
       </p>
-      {screen(phase, login, start)}
+      {screen(phase, login, start, cancel)}
     </div>
   );
 }
 
-function screen(phase: Phase, login: string, start: () => void) {
+function screen(
+  phase: Phase,
+  login: string,
+  start: () => void,
+  cancel: () => void,
+) {
   switch (phase.name) {
     case "init":
       return (
@@ -178,6 +204,15 @@ function screen(phase: Phase, login: string, start: () => void) {
           <LoadingMoment
             login={login}
             label="Reading the contribution history"
+            action={
+              <button
+                type="button"
+                onClick={cancel}
+                className={`${actionClass} self-start`}
+              >
+                Cancel
+              </button>
+            }
           />
         </ScreenMain>
       );
@@ -236,6 +271,7 @@ function screen(phase: Phase, login: string, start: () => void) {
           finale={FINALE}
           title={`@${phase.login} contribution history`}
           caption="Turn sound on."
+          onCancel={cancel}
           autoStart
           starting={
             <LoadingMoment

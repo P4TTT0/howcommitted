@@ -110,3 +110,20 @@ body {
     animation: wipe-in 0.3s cubic-bezier(0.23, 1, 0.32, 1) both;
   }
 }
+
+/* The Next control after a scene ends: its arrow nudges forward a few times. */
+@keyframes nudge-forward {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nudge-forward {
+    animation: nudge-forward 0.7s cubic-bezier(0.45, 0, 0.2, 1) 3;
+  }
+}

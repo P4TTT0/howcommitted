@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { FINALE, SCENES } from "@/features/scenes/registry";
 import { Sequencer } from "@/features/sequencer/Sequencer";
@@ -10,6 +11,7 @@ import { labSceneData } from "./labData";
  * `sceneId` previews one scene on its own; an unknown id plays them all.
  */
 export function LabScenes({ sceneId }: { sceneId?: string }) {
+  const router = useRouter();
   const data = useMemo(() => labSceneData(), []);
   const scenes = useMemo(() => {
     const only = SCENES.filter((scene) => scene.id === sceneId);
@@ -26,6 +28,7 @@ export function LabScenes({ sceneId }: { sceneId?: string }) {
       data={data}
       scenes={scenes}
       finale={FINALE}
+      onCancel={() => router.push("/")}
       caption={`Lab. Generated profile, ${data.model.plan.years.length} years of contributions. Turn sound on.`}
     />
   );

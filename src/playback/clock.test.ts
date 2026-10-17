@@ -85,21 +85,12 @@ describe("PlaybackClock", () => {
     expect(transport.pause).not.toHaveBeenCalled();
   });
 
-  it("skips to the end only while playing or paused", () => {
-    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
-    clock.skip();
-    expect(clock.status).toBe("idle");
-    clock.start();
-    clock.skip();
-    expect(clock.status).toBe("ended");
-  });
-
   it("emits an exact last frame on finish", () => {
     const clock = new PlaybackClock({ duration: 10, bpm: 120 });
     const seen: number[] = [];
     clock.onFrame((seconds) => seen.push(seconds));
     clock.start();
-    clock.skip();
+    clock.jumpToEnd();
     expect(seen.at(-1)).toBe(10);
   });
 
@@ -113,16 +104,6 @@ describe("PlaybackClock", () => {
     runFrame();
     expect(clock.status).toBe("ended");
     expect(transport.pause).toHaveBeenCalled();
-  });
-
-  it("restarts from zero and plays again", () => {
-    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
-    clock.start();
-    clock.skip();
-    clock.restart();
-    expect(transport.stop).toHaveBeenCalled();
-    expect(transport.position).toBe(0);
-    expect(clock.status).toBe("playing");
   });
 
   it("pauses when the tab is hidden and does not resume by itself", () => {
@@ -141,7 +122,7 @@ describe("PlaybackClock", () => {
     const statuses: string[] = [];
     clock.onStatus((status) => statuses.push(status));
     clock.start();
-    clock.skip();
+    clock.jumpToEnd();
     clock.loadScene({ duration: 4, bpm: 140 });
     expect(clock.status).toBe("idle");
     expect(clock.duration).toBe(4);
@@ -153,35 +134,6 @@ describe("PlaybackClock", () => {
     runFrame();
     expect(statuses.at(-1)).toBe("ended");
     expect(visibility).toHaveLength(1);
-  });
-
-  it("keeps the pause when a scene is skipped while paused", () => {
-    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
-    clock.start();
-    clock.pause();
-    clock.skip();
-    clock.loadScene({ duration: 4, bpm: 120 });
-    clock.start();
-    expect(clock.status).toBe("paused");
-    // The hold is used up: after resuming and skipping, the next scene plays.
-    clock.resume();
-    clock.skip();
-    clock.loadScene({ duration: 4, bpm: 120 });
-    clock.start();
-    expect(clock.status).toBe("playing");
-  });
-
-  it("plays the next scene after a skip while playing, and resetHold clears a hold", () => {
-    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
-    clock.start();
-    clock.skip();
-    clock.start();
-    expect(clock.status).toBe("playing");
-    clock.pause();
-    clock.skip();
-    clock.resetHold();
-    clock.start();
-    expect(clock.status).toBe("playing");
   });
 
   it("clamps visible time to the duration and removes listeners on dispose", () => {

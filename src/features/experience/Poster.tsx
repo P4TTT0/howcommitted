@@ -80,14 +80,18 @@ export function LoadingMoment({
   login,
   label,
   heading = true,
+  action,
 }: {
   login: string;
   label: string;
   heading?: boolean;
+  /** A way out while it loads, for example Cancel. */
+  action?: ReactNode;
 }) {
   return (
     <Poster login={login} heading={heading} wipe>
       <p className="font-mono text-xs">{label}</p>
+      {action}
       <div className="loading-baseline mt-auto h-3 w-full bg-ink" />
     </Poster>
   );
