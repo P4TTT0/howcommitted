@@ -17,6 +17,7 @@ const year = (y: number, commits: number, priv: number) =>
       [{ occurredAt: `${y}-12-31T00:00:00Z`, commitCount: commits }],
     ],
     calendar: [{ date: `${y}-12-31`, count: commits, weekday: 1 }],
+    totalContributions: commits + priv,
   });
 
 describe("buildHistory", () => {
@@ -49,8 +50,13 @@ describe("buildHistory", () => {
       privateContributions: 3,
     });
     expect(history.yearBlocks).toEqual([
-      { year: 2022, commits: 4 },
-      { year: 2023, commits: 6 },
+      { year: 2022, contributions: 6 },
+      { year: 2023, contributions: 7 },
+    ]);
+    expect(history.totalContributions).toBe(13);
+    expect(history.years[0]?.totalContributions).toBe(6);
+    expect(history.years[0]?.dailyContributions).toEqual([
+      { date: "2022-12-31", count: 4 },
     ]);
     expect(history.years[0]?.heatmap[0]?.contributions).toBe(4);
     expect(history.years[0]).not.toHaveProperty("calendar");
@@ -58,6 +64,41 @@ describe("buildHistory", () => {
     expect(history.repoFlags[0]?.reason).toBe("first");
     // 2022-12-31 and 2023-12-31 are not consecutive days.
     expect(history.longestStreak.length).toBe(1);
+  });
+
+  it("exposes the calendar for a profile with only private contributions", () => {
+    const history = buildHistory({
+      ...profile,
+      years: [
+        buildYearSummary({
+          year: 2026,
+          totals: {
+            commits: 0,
+            pullRequests: 0,
+            reviews: 0,
+            issues: 0,
+            privateContributions: 1912,
+          },
+          commitContributionsByRepo: [],
+          calendar: [
+            { date: "2026-03-02", count: 900, weekday: 1 },
+            { date: "2026-03-03", count: 1012, weekday: 2 },
+            { date: "2026-03-04", count: 0, weekday: 3 },
+          ],
+          totalContributions: 1912,
+        }),
+      ],
+    });
+    const [only] = history.years;
+    expect(only?.dailyContributions).toEqual([
+      { date: "2026-03-02", count: 900 },
+      { date: "2026-03-03", count: 1012 },
+    ]);
+    expect(only?.totalContributions).toBe(1912);
+    expect(only?.dailyCommits).toEqual([]);
+    expect(history.totals.commits).toBe(0);
+    expect(history.totals.privateContributions).toBe(1912);
+    expect(history.totalContributions).toBe(1912);
   });
 
   it("handles a profile without contribution years", () => {
@@ -69,6 +110,7 @@ describe("buildHistory", () => {
     expect(history.years).toEqual([]);
     expect(history.yearBlocks).toEqual([]);
     expect(history.totals.commits).toBe(0);
+    expect(history.totalContributions).toBe(0);
     expect(history.longestStreak).toEqual({
       length: 0,
       start: null,
@@ -95,6 +137,7 @@ describe("buildHistory", () => {
           count,
           weekday,
         })),
+        totalContributions: days.reduce((sum, [, count]) => sum + count, 0),
       });
     const history = buildHistory({
       ...profile,

@@ -4,7 +4,7 @@ Rules for contributors and AI coding agents. Detail lives in `docs/`; this file 
 
 ## Core principle
 
-COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value. Canonical statement: [docs/product.md](docs/product.md#core-principle).
+CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value. Canonical statement: [docs/product.md](docs/product.md#core-principle).
 
 ## Project state
 

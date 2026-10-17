@@ -6,26 +6,28 @@ import { buildPlan, type Plan, type StepInput } from "./plan";
 
 const MS_PER_DAY = 86_400_000;
 
-/** A year where the real daily commits and the official total disagree. */
+/** A year where the daily contributions and the calendar total disagree. */
 export type YearGap = {
   year: number;
-  /** Official total minus the real daily commits placed on that year. */
+  /** Calendar total minus the daily contributions placed on that year. */
   unattributed: number;
 };
 
 export type HistoryPlan = {
   plan: Plan;
-  /** Official yearly commit totals, oldest first. */
+  /** Calendar yearly totals, oldest first. */
   yearBlocks: YearBlock[];
   /** Null when the history has no years at all. */
   firstYear: number | null;
   lastYear: number | null;
-  /** Years whose daily detail does not add up to the official total. */
+  /** Years whose daily detail does not add up to the calendar total. */
   gaps: YearGap[];
   /** The years of `gaps`. */
   incompleteYears: number[];
   /** Honest note about incomplete daily detail, or null. */
   note: string | null;
+  /** Private contributions included in the total (a count only), 0 when none. */
+  privateContributions: number;
 };
 
 function dayStart(date: string): number {
@@ -47,12 +49,12 @@ export function incompleteDetailNote(gaps: readonly YearGap[]): string | null {
     return `Daily detail incomplete for ${gaps.length} years; yearly totals are exact.`;
   }
   if (gap.unattributed > 0) {
-    const commits =
+    const contributions =
       gap.unattributed === 1
-        ? "1 commit"
-        : `${formatCount(gap.unattributed)} commits`;
+        ? "1 contribution"
+        : `${formatCount(gap.unattributed)} contributions`;
     const verb = gap.unattributed === 1 ? "is" : "are";
-    return `${commits} in ${gap.year} ${verb} not attributed to a day; yearly totals are exact.`;
+    return `${contributions} in ${gap.year} ${verb} not attributed to a day; yearly totals are exact.`;
   }
   if (gap.unattributed < 0) {
     return `Daily detail for ${gap.year} exceeds its yearly total by ${formatCount(-gap.unattributed)}; yearly totals are exact.`;
@@ -64,12 +66,13 @@ export function incompleteDetailNote(gaps: readonly YearGap[]): string | null {
  * Maps the history API payload onto the timeline plan.
  *
  * The line is drawn over every calendar day from the first active year (or
- * the account's creation) to the last, with quiet days as zeros. The official
- * yearly totals are the truth for the counter and the year blocks, while the
- * days carry only real daily commits. Whatever a year's official total has
- * beyond them becomes one explicit step at the end of that year (see
- * UnattributedStep): never spread across days, never scaled. Days beyond the
- * official total are never scaled down either; the year is flagged instead.
+ * the account's creation) to the last, with quiet days as zeros. The calendar
+ * yearly totals (public and shared private contributions) are the truth for
+ * the counter and the year blocks, while the days carry only the calendar's
+ * daily counts. Whatever a year's calendar total has beyond them becomes one
+ * explicit step at the end of that year (see UnattributedStep): never spread
+ * across days, never scaled. Days beyond the calendar total are never scaled
+ * down either; the year is flagged instead.
  */
 export function planFromHistory(
   history: History,
@@ -87,23 +90,24 @@ export function planFromHistory(
       gaps: [],
       incompleteYears: [],
       note: null,
+      privateContributions: 0,
     };
   }
 
   const byYear = new Map(history.years.map((entry) => [entry.year, entry]));
-  const commitDates = history.years
-    .flatMap((entry) => entry.dailyCommits.map((day) => day.date))
+  const activeDates = history.years
+    .flatMap((entry) => entry.dailyContributions.map((day) => day.date))
     .sort();
-  const firstCommit = commitDates[0];
-  const lastCommit = commitDates.at(-1);
+  const firstActive = activeDates[0];
+  const lastActive = activeDates.at(-1);
 
   const created = history.user.createdAt.slice(0, 10);
   let rangeStart = Date.UTC(first.year, 0, 1);
   if (Number(created.slice(0, 4)) === first.year) {
     rangeStart = Math.max(rangeStart, dayStart(created));
   }
-  if (firstCommit && Number(firstCommit.slice(0, 4)) === first.year) {
-    rangeStart = Math.min(rangeStart, dayStart(firstCommit));
+  if (firstActive && Number(firstActive.slice(0, 4)) === first.year) {
+    rangeStart = Math.min(rangeStart, dayStart(firstActive));
   }
   let rangeEnd = Date.UTC(last.year, 11, 31);
   if (last.year >= today.getUTCFullYear()) {
@@ -115,7 +119,7 @@ export function planFromHistory(
           today.getUTCMonth(),
           today.getUTCDate(),
         ),
-        lastCommit ? dayStart(lastCommit) : 0,
+        lastActive ? dayStart(lastActive) : 0,
       ),
     );
   }
@@ -126,27 +130,26 @@ export function planFromHistory(
   for (let year = first.year; year <= last.year; year += 1) {
     const entry = byYear.get(year);
     const counts = new Map(
-      entry?.dailyCommits.map((day) => [day.date, day.commits]) ?? [],
+      entry?.dailyContributions.map((day) => [day.date, day.count]) ?? [],
     );
     const from = Math.max(rangeStart, Date.UTC(year, 0, 1));
     const to = Math.min(rangeEnd, Date.UTC(year, 11, 31));
     const dates: string[] = [];
     for (let ms = from; ms <= to; ms += MS_PER_DAY) dates.push(isoDay(ms));
 
-    // Real commits only. Entries dated outside the range are not placed.
-    const commits = dates.map((date) => counts.get(date) ?? 0);
+    // Calendar counts only. Entries dated outside the range are not placed.
+    // The playback day shape still names its count `commits`.
+    const contributions = dates.map((date) => counts.get(date) ?? 0);
     for (const [index, date] of dates.entries()) {
-      days.push({ date, commits: commits[index] ?? 0 });
+      days.push({ date, commits: contributions[index] ?? 0 });
     }
 
-    // The plan's own comparison decides, not only the API's reconciliation.
-    const unattributed = (entry?.totals.commits ?? 0) - sum(commits);
+    // The difference to the calendar total is an explicit step, never spread.
+    const unattributed = (entry?.totalContributions ?? 0) - sum(contributions);
     if (unattributed !== 0 && days.length > 0) {
       steps.push({ year, dayIndex: days.length - 1, amount: unattributed });
     }
-    if (unattributed !== 0 || (entry && !entry.reconciliation.matches)) {
-      gaps.push({ year, unattributed });
-    }
+    if (unattributed !== 0) gaps.push({ year, unattributed });
   }
 
   return {
@@ -157,5 +160,6 @@ export function planFromHistory(
     gaps,
     incompleteYears: gaps.map((gap) => gap.year),
     note: incompleteDetailNote(gaps),
+    privateContributions: history.totals.privateContributions,
   };
 }

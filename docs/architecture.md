@@ -45,7 +45,7 @@ GitHub usernames cannot contain "/", so path segments map unambiguously to users
 
 Reserved logins: `lab` and `api` collide with app routes (static routes win over the catch-all), so those users cannot be opened at `/{login}`. `parseSoloLogin` rejects them explicitly (404) and the landing search refuses them before any request. Add a name to `RESERVED_LOGINS` in `domain/login.ts` whenever a top-level route is added.
 
-Client flow: the landing click calls `unlockAudio()` (`playback/unlock.ts`) and navigates client-side, so the AudioContext stays running on `/{login}`, which then starts by itself. A fresh load (shared link, reload) shows the start button first. The history is fetched on intent only (see [product.md](product.md)); the preview alone never costs a generation. Auto start needs a one-shot intent recorded only by the landing click (`features/experience/intent.ts`, sessionStorage); back/forward, reloads and shared links show the start button even when audio is still unlocked. Tone.js loads lazily on the landing (`preloadAudio` on input focus) and is started synchronously inside the click. `features/timeline/historyPlan.ts` maps `History` to the scene plan: daily commits drive the line, official yearly totals drive the displayed total and year blocks, and commits a year's official total has beyond its real daily detail become one explicit unattributed step at the end of that year (dashed segment, label, soft cue, note), never scaled or spread across days.
+Client flow: the landing click calls `unlockAudio()` (`playback/unlock.ts`) and navigates client-side, so the AudioContext stays running on `/{login}`, which then starts by itself. A fresh load (shared link, reload) shows the start button first. The history is fetched on intent only (see [product.md](product.md)); the preview alone never costs a generation. Auto start needs a one-shot intent recorded only by the landing click (`features/experience/intent.ts`, sessionStorage); back/forward, reloads and shared links show the start button even when audio is still unlocked. Tone.js loads lazily on the landing (`preloadAudio` on input focus) and is started synchronously inside the click. `features/timeline/historyPlan.ts` maps `History` to the scene plan: daily calendar contributions (public and shared private) drive the line, the calendar's yearly totals drive the displayed total and year blocks, and contributions a year's calendar total has beyond its daily detail become one explicit unattributed step at the end of that year (dashed segment, label, soft cue, note), never scaled or spread across days.
 
 Rules:
 
@@ -77,7 +77,12 @@ Profile cost is about contribution years + 2 points, so about 280 uncached profi
 - `contributionCalendar` counts all contribution types (2023 example: calendar 4,924 vs commits 4,458). Never label it as commits.
 - Per-repo daily nodes cap at 100 per `contributionsCollection` window, so a repo with commits on more than 100 days in a year was under-counted (torvalds 2024: 888 summed vs 2,888 official). Each year is therefore fetched as 4 quarters in one query (same 1-point cost), with totals and calendar from a full-year alias.
 - `maxRepositories` caps at 100 repos per quarter window, so a repo outside the top 100 in a quarter can still cause a mismatch. Compare summed daily commits against the official total; if they differ, show the real total with a notice.
-- Private contributions appear only if the user enabled sharing them. Show as "+N private"; never invent their dates.
+- Live check (2026-10-17): for torvalds, mngobbi and gaearon in 2016, 2023 and 2025, the sum of the in-range calendar `contributionCount` equals `contributionCalendar.totalContributions` exactly (for example gaearon 2016: 7,009 = 7,009; mngobbi 2025: 1,002 = 1,002), and the calendar returned no days outside the requested year with a full-year `from`/`to`. `fetchYear` still drops days outside the year defensively, and the "not attributed to a day" step stays as a safety net.
+- Private contributions appear only if the user enabled sharing them. They are inside the calendar's daily counts and total (as an unknown type); never invent their dates or types. The experience plays the calendar, so `restrictedContributionsCount` is only used to state the private share honestly.
+
+### History response (contributions)
+
+Each year of `History` carries the experience's data from the calendar: `dailyContributions: {date, count}[]` (days with at least one contribution) and `totalContributions` (the calendar's own yearly total). `History.totalContributions` sums them and each `yearBlocks` entry is `{year, contributions}`. The public-commit data (`dailyCommits`, `reconciliation`, `totals.commits` and the PR/review/issue/private breakdown) stays in the payload for later scenes, but the line, counter, year blocks and milestones no longer depend on it.
 
 ### GraphQL limits
 
@@ -100,13 +105,13 @@ Upstash Redis, with a versioned key prefix.
 | Repos | 24 h | New repos are infrequent |
 | "User not found" | 1 h | Negative cache |
 
-Key format (bumping the version in `cache.ts` invalidates cached data; v2 dropped entries with truncated daily commits. Lock, breaker and quota keys are versioned separately and stay `v1`):
+Key format (bumping the version in `cache.ts` invalidates cached data; v2 dropped entries with truncated daily commits; v3 added the calendar total per year (`totalContributions`), so older entries without it are never read. Lock, breaker and quota keys are versioned separately and stay `v1`):
 
-- `v2:user:{login}`
-- `v2:year:{login}:{year}`
-- `v2:repos:{login}`
+- `v3:user:{login}`
+- `v3:year:{login}:{year}`
+- `v3:repos:{login}`
 
-Logins are lowercased in keys. Supporting keys: `v2:missing:{login}` (negative cache, 1 h), `v2:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v2:user:{login}`).
+Logins are lowercased in keys. Supporting keys: `v3:missing:{login}` (negative cache, 1 h), `v3:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v3:user:{login}`).
 
 ## Quota and rate limits
 

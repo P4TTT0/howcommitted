@@ -6,7 +6,7 @@ import { formatCount } from "@/features/timeline/scene";
 import { actionClass } from "@/ui/classes";
 
 export const PRINCIPLE =
-  "Commits are not productivity. This is rhythm, not value.";
+  "Contributions are not productivity. This is rhythm, not value.";
 
 type EndCardProps = {
   login: string;
@@ -15,37 +15,39 @@ type EndCardProps = {
   lastYear: number;
   yearBlocks: readonly YearBlock[];
   note: string | null;
+  /** Private contributions included in `total`; the line is hidden at 0. */
+  privateContributions: number;
   onReplay: () => void;
 };
 
-/** One bar per calendar year, height = official commits, color = year identity. */
+/** One bar per calendar year, height = calendar contributions, color = year identity. */
 function YearBars({
   firstYear,
   lastYear,
   yearBlocks,
 }: Pick<EndCardProps, "firstYear" | "lastYear" | "yearBlocks">) {
-  const commitsByYear = new Map(
-    yearBlocks.map((block) => [block.year, block.commits]),
+  const contributionsByYear = new Map(
+    yearBlocks.map((block) => [block.year, block.contributions]),
   );
   const years = Array.from(
     { length: lastYear - firstYear + 1 },
     (_, index) => firstYear + index,
   );
-  const peak = Math.max(1, ...commitsByYear.values());
+  const peak = Math.max(1, ...contributionsByYear.values());
   const label = years
-    .map((year) => `${year} ${formatCount(commitsByYear.get(year) ?? 0)}`)
+    .map((year) => `${year} ${formatCount(contributionsByYear.get(year) ?? 0)}`)
     .join(", ");
 
   return (
     <div>
       <div
         role="img"
-        aria-label={`Commits per year: ${label}`}
+        aria-label={`Contributions per year: ${label}`}
         className="flex h-20 items-end gap-px border-b-2 border-ink"
       >
         {years.map((year, index) => {
           const colors = blockForYearIndex(index);
-          const height = ((commitsByYear.get(year) ?? 0) / peak) * 100;
+          const height = ((contributionsByYear.get(year) ?? 0) / peak) * 100;
           return (
             <div
               key={year}
@@ -74,6 +76,7 @@ export function EndCard({
   lastYear,
   yearBlocks,
   note,
+  privateContributions,
   onReplay,
 }: EndCardProps) {
   const replayRef = useRef<HTMLButtonElement>(null);
@@ -85,7 +88,7 @@ export function EndCard({
   return (
     <div className="flex min-h-full flex-col justify-between gap-4 p-4">
       <p className="font-mono text-xs uppercase">
-        @{login}: {formatCount(total)} commits, {span}
+        @{login}: {formatCount(total)} contributions, {span}
       </p>
       <YearBars
         firstYear={firstYear}
@@ -94,6 +97,11 @@ export function EndCard({
       />
       <div className="flex flex-col gap-2">
         <p className="font-mono text-xs">{PRINCIPLE}</p>
+        {privateContributions > 0 && (
+          <p className="font-mono text-xs leading-4">
+            Includes {formatCount(privateContributions)} private contributions.
+          </p>
+        )}
         {note && <p className="font-mono text-xs leading-4">{note}</p>}
       </div>
       <div className="flex flex-wrap gap-2">

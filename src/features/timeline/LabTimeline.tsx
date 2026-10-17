@@ -11,7 +11,7 @@ export function LabTimeline() {
   return (
     <Timeline
       plan={plan}
-      caption={`Lab. Generated profile, ${plan.years.length} years of commits. Turn sound on.`}
+      caption={`Lab. Generated profile, ${plan.years.length} years of contributions. Turn sound on.`}
     />
   );
 }

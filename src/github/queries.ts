@@ -67,6 +67,7 @@ query Year($login: String!, $from: DateTime!, $to: DateTime!${vars}) {
       totalIssueContributions
       restrictedContributionsCount
       contributionCalendar {
+        totalContributions
         weeks { contributionDays { date contributionCount weekday } }
       }
     }
@@ -127,6 +128,7 @@ type YearData = {
           totalIssueContributions: number;
           restrictedContributionsCount: number;
           contributionCalendar: {
+            totalContributions: number;
             weeks: {
               contributionDays: {
                 date: string;
@@ -240,12 +242,17 @@ export async function fetchYear(
         privateContributions: collection.restrictedContributionsCount,
       },
       commitContributionsByRepo,
+      totalContributions: collection.contributionCalendar.totalContributions,
+      // Defensive: weeks at the edges can pad with days of the neighbouring
+      // years. Only days of the requested year belong to this year.
       calendar: collection.contributionCalendar.weeks.flatMap((week) =>
-        week.contributionDays.map((d) => ({
-          date: d.date,
-          count: d.contributionCount,
-          weekday: d.weekday,
-        })),
+        week.contributionDays
+          .filter((d) => d.date.startsWith(`${year}-`))
+          .map((d) => ({
+            date: d.date,
+            count: d.contributionCount,
+            weekday: d.weekday,
+          })),
       ),
     }),
   };

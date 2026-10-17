@@ -5,6 +5,7 @@ import { longestStreak, type Streak } from "./streaks";
 import type {
   CommitReconciliation,
   DailyCommits,
+  DailyContributions,
   ProfileData,
   UserProfile,
   YearTotals,
@@ -17,6 +18,10 @@ export type HistoryYear = {
   /** True commits per day. May be incomplete when `reconciliation.matches` is false. */
   dailyCommits: DailyCommits[];
   reconciliation: CommitReconciliation;
+  /** Calendar contributions per day (all types, public and shared private). Days with none are omitted. */
+  dailyContributions: DailyContributions[];
+  /** The calendar's total for the year: the number the experience shows. */
+  totalContributions: number;
   /** Contribution calendar grid. These are contributions of all types, not commits. */
   heatmap: HeatmapCell[];
 };
@@ -27,8 +32,10 @@ export type History = {
   /** Oldest first. */
   years: HistoryYear[];
   yearBlocks: YearBlock[];
-  /** Sums of the official yearly totals. */
+  /** Sums of the official yearly totals (commits, PRs, reviews, issues, private). */
   totals: YearTotals;
+  /** Sum of the yearly calendar totals. */
+  totalContributions: number;
   /** Longest run of days with any contribution (not only commits). */
   longestStreak: Streak;
   /** Languages of owned non-fork repos by bytes, not per commit. */
@@ -69,10 +76,19 @@ export function buildHistory({ user, years, repos }: ProfileData): History {
       totals: year.totals,
       dailyCommits: year.dailyCommits,
       reconciliation: year.reconciliation,
+      dailyContributions: year.calendar
+        .filter((day) => day.count > 0)
+        .map((day) => ({ date: day.date, count: day.count }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      totalContributions: year.totalContributions,
       heatmap: buildHeatmap(year.calendar),
     })),
     yearBlocks: yearBlocks(years),
     totals,
+    totalContributions: years.reduce(
+      (sum, year) => sum + year.totalContributions,
+      0,
+    ),
     longestStreak: longestStreak(years.flatMap((year) => year.calendar)),
     languages: languageShares(repos),
     repoFlags: repoCreationFlags(repos),

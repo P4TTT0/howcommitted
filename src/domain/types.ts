@@ -19,6 +19,12 @@ export type DailyCommits = {
   commits: number;
 };
 
+/** Contributions of one day from the GitHub calendar (all types, public and shared private). */
+export type DailyContributions = {
+  date: string;
+  count: number;
+};
+
 /** One contribution calendar day. Counts ALL contribution types, never only commits. */
 export type CalendarDay = {
   date: string;
@@ -55,6 +61,8 @@ export type YearSummary = {
   dailyCommits: DailyCommits[];
   reconciliation: CommitReconciliation;
   calendar: CalendarDay[];
+  /** The calendar's own total for the year (all contribution types, public and shared private). */
+  totalContributions: number;
 };
 
 export type LanguageSize = {

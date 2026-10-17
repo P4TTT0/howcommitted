@@ -31,14 +31,24 @@ describe("interpretHistory", () => {
       { ...history, years: [{ year: 2024 }] },
       {
         ...history,
-        years: [{ ...history.years[0], dailyCommits: [{ date: 1 }] }],
+        years: [{ ...history.years[0], dailyContributions: [{ date: 1 }] }],
       },
+      { ...history, years: [{ ...history.years[0], totalContributions: "x" }] },
+      {
+        ...history,
+        years: [
+          {
+            ...history.years[0],
+            dailyContributions: [{ date: "yesterday", count: 1 }],
+          },
+        ],
+      },
+      { ...history, totalContributions: undefined },
       {
         ...history,
         years: [{ ...history.years[0], totals: { commits: "many" } }],
       },
-      { ...history, years: [{ ...history.years[0], reconciliation: null }] },
-      { ...history, yearBlocks: [{ year: 2024 }] },
+      { ...history, yearBlocks: [{ year: 2024, commits: 5 }] },
       { ...history, totals: {} },
       { ...history, user: { login: "ada" } },
     ];

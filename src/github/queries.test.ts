@@ -78,6 +78,7 @@ describe("fetchYear", () => {
     totalIssueContributions: 3,
     restrictedContributionsCount: 9,
     contributionCalendar: {
+      totalContributions: 11,
       weeks: [
         {
           contributionDays: [
@@ -129,6 +130,7 @@ describe("fetchYear", () => {
     });
     expect(result.data.totals.privateContributions).toBe(9);
     expect(result.data.calendar).toHaveLength(2);
+    expect(result.data.totalContributions).toBe(11);
     expect(sentVariables(fetchMock, 0)).toEqual({
       login: "a",
       from: "2023-01-01T00:00:00Z",
@@ -142,6 +144,35 @@ describe("fetchYear", () => {
       q4From: "2023-10-01T00:00:00Z",
       q4To: "2023-12-31T23:59:59Z",
     });
+  });
+
+  it("drops calendar days outside the requested year", async () => {
+    const padded = structuredClone(yearBody);
+    const calendar = padded.data.user.year.contributionCalendar;
+    calendar.weeks[0]?.contributionDays.unshift({
+      date: "2022-12-31",
+      contributionCount: 3,
+      weekday: 6,
+    });
+    calendar.weeks[0]?.contributionDays.push({
+      date: "2024-01-01",
+      contributionCount: 2,
+      weekday: 1,
+    });
+    stubFetchSequence(padded);
+    const result = await fetchYear("t", "a", 2023, undefined, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.calendar.map((day) => day.date)).toEqual([
+      "2023-05-01",
+      "2023-05-02",
+    ]);
+    // In-year days still add up to the calendar total: no false step.
+    const sum = result.data.calendar.reduce(
+      (total, day) => total + day.count,
+      0,
+    );
+    expect(sum).toBe(result.data.totalContributions);
   });
 
   it("requests one full-year window and four quarter windows in one query", async () => {

@@ -43,10 +43,10 @@ describe("incompleteDetailNote", () => {
 
   it("says how many commits a single year left unattributed", () => {
     expect(incompleteDetailNote([{ year: 2019, unattributed: 1880 }])).toBe(
-      "1,880 commits in 2019 are not attributed to a day; yearly totals are exact.",
+      "1,880 contributions in 2019 are not attributed to a day; yearly totals are exact.",
     );
     expect(incompleteDetailNote([{ year: 2019, unattributed: 1 }])).toBe(
-      "1 commit in 2019 is not attributed to a day; yearly totals are exact.",
+      "1 contribution in 2019 is not attributed to a day; yearly totals are exact.",
     );
   });
 
@@ -75,12 +75,12 @@ describe("planFromHistory", () => {
       makeYear(2024, steadyDays(2024, 1)),
     ]);
     const result = planFromHistory(history, TODAY);
-    expect(result.plan.total).toBe(history.totals.commits);
+    expect(result.plan.total).toBe(history.totalContributions);
     expect(result.plan.years.map((span) => span.year)).toEqual([
       2022, 2023, 2024,
     ]);
-    expect(result.yearBlocks.map((block) => block.commits)).toEqual(
-      history.years.map((year) => year.totals.commits),
+    expect(result.yearBlocks.map((block) => block.contributions)).toEqual(
+      history.years.map((year) => year.totalContributions),
     );
     expect(result.note).toBeNull();
     expect(result.plan.milestones.at(-1)?.kind).toBe("final");
@@ -92,8 +92,11 @@ describe("planFromHistory", () => {
     expect(plan.years).toHaveLength(1);
     expect(firstYear).toBe(2021);
     expect(lastYear).toBe(2021);
-    expect(plan.total).toBe(history.totals.commits);
+    expect(plan.total).toBe(history.totalContributions);
   });
+
+  const sumOfDays = (days: { count: number }[]) =>
+    days.reduce((total, day) => total + day.count, 0);
 
   const dailySum = (plan: { days: { commits: number }[] }) =>
     plan.days.reduce((total, day) => total + day.commits, 0);
@@ -106,36 +109,35 @@ describe("planFromHistory", () => {
     ]);
     const result = planFromHistory(history, TODAY);
     const { plan } = result;
-    expect(truncated.reconciliation.matches).toBe(false);
+    const truncatedSum = sumOfDays(truncated.dailyContributions);
+    expect(truncatedSum).toBeLessThan(truncated.totalContributions);
 
     // Days stay real: 122 commits on the days of 2019, nothing invented.
     const daysOf2019 = plan.days.filter((d) => d.date.startsWith("2019"));
-    expect(daysOf2019.reduce((t, d) => t + d.commits, 0)).toBe(
-      truncated.reconciliation.summed,
-    );
+    expect(daysOf2019.reduce((t, d) => t + d.commits, 0)).toBe(truncatedSum);
 
     const [step] = plan.steps;
     expect(plan.steps).toHaveLength(1);
     expect(step?.year).toBe(2019);
-    expect(step?.amount).toBe(2000 - truncated.reconciliation.summed);
+    expect(step?.amount).toBe(2000 - truncatedSum);
     expect(plan.days[step?.dayIndex ?? 0]?.date).toBe("2019-12-31");
     expect(step?.to).toBe((step?.from ?? 0) + (step?.amount ?? 0));
 
     expect(result.incompleteYears).toEqual([2019]);
     expect(result.note).toBe(
-      "1,878 commits in 2019 are not attributed to a day; yearly totals are exact.",
+      "1,878 contributions in 2019 are not attributed to a day; yearly totals are exact.",
     );
-    expect(plan.total).toBe(history.totals.commits);
-    expect(plan.cumulative.at(-1)).toBe(history.totals.commits);
+    expect(plan.total).toBe(history.totalContributions);
+    expect(plan.cumulative.at(-1)).toBe(history.totalContributions);
   });
 
   it("never scales down when daily detail exceeds the yearly total", () => {
     const over = makeYear(2020, steadyDays(2020, 2), 100);
     const history = makeHistory("ada", [over]);
     const result = planFromHistory(history, TODAY);
-    expect(dailySum(result.plan)).toBe(over.reconciliation.summed);
+    expect(dailySum(result.plan)).toBe(sumOfDays(over.dailyContributions));
     const [step] = result.plan.steps;
-    expect(step?.amount).toBe(100 - over.reconciliation.summed);
+    expect(step?.amount).toBe(100 - sumOfDays(over.dailyContributions));
     expect(result.plan.total).toBe(100);
     expect(result.plan.cumulative.at(-1)).toBe(100);
     expect(result.incompleteYears).toEqual([2020]);
@@ -155,19 +157,18 @@ describe("planFromHistory", () => {
     expect(result.incompleteYears).toEqual([2020]);
   });
 
-  it("notices a mismatch the API reconciliation missed", () => {
-    // Reconciliation says the year matches, yet one entry is dated outside
-    // the year and cannot be placed on any of its days.
+  it("notices a day that cannot be placed inside its year", () => {
+    // The totals add up, yet one entry is dated outside the year and cannot
+    // be placed on any of its days.
     const stray = makeYear(2020, [
-      { date: "2020-03-01", commits: 2 },
-      { date: "2021-01-05", commits: 3 },
+      { date: "2020-03-01", count: 2 },
+      { date: "2021-01-05", count: 3 },
     ]);
-    expect(stray.reconciliation.matches).toBe(true);
     const result = planFromHistory(makeHistory("ada", [stray]), TODAY);
     expect(result.plan.steps[0]?.amount).toBe(3);
     expect(result.incompleteYears).toEqual([2020]);
     expect(result.note).toBe(
-      "3 commits in 2020 are not attributed to a day; yearly totals are exact.",
+      "3 contributions in 2020 are not attributed to a day; yearly totals are exact.",
     );
     expect(result.plan.total).toBe(5);
   });
@@ -196,7 +197,7 @@ describe("planFromHistory", () => {
 
   it("fires a milestone crossed inside a step at the step", () => {
     const history = makeHistory("ada", [
-      makeYear(2020, [{ date: "2020-02-01", commits: 10 }], 2600),
+      makeYear(2020, [{ date: "2020-02-01", count: 10 }], 2600),
       makeYear(2021, steadyDays(2021, 1)),
     ]);
     const { plan } = planFromHistory(history, TODAY);
@@ -210,6 +211,30 @@ describe("planFromHistory", () => {
     const history = makeHistory("ada", [makeYear(2020, [], 365)]);
     const { plan } = planFromHistory(history, TODAY);
     expect(plan.days.every((day) => day.commits === 0)).toBe(true);
+  });
+
+  it("plays a profile with only private contributions to the calendar total", () => {
+    // mngobbi-like: no public commits, a full calendar of private work.
+    const days = steadyDays(2026, 8, 1).filter(
+      (day) => day.date <= "2026-08-26",
+    );
+    const total = days.reduce((sum, day) => sum + day.count, 0);
+    const history = makeHistory("mngobbi", [
+      makeYear(2026, days, {
+        official: total,
+        commits: 0,
+        privateContributions: total,
+      }),
+    ]);
+    expect(history.totals.commits).toBe(0);
+    const result = planFromHistory(history, TODAY);
+    expect(result.plan.total).toBe(total);
+    expect(result.plan.cumulative.at(-1)).toBe(total);
+    expect(result.plan.slots.length).toBeGreaterThan(0);
+    expect(result.plan.milestones.at(-1)?.kind).toBe("final");
+    expect(result.yearBlocks).toEqual([{ year: 2026, contributions: total }]);
+    expect(result.privateContributions).toBe(total);
+    expect(result.note).toBeNull();
   });
 
   it("has an empty plan for zero contributions", () => {
@@ -242,7 +267,7 @@ describe("planFromHistory", () => {
   it("stops the current year at today", () => {
     const history = makeHistory("ada", [
       makeYear(2025, steadyDays(2025, 2)),
-      makeYear(2026, [{ date: "2026-03-01", commits: 5 }]),
+      makeYear(2026, [{ date: "2026-03-01", count: 5 }]),
     ]);
     const { plan } = planFromHistory(history, TODAY);
     expect(plan.days.at(-1)?.date).toBe("2026-10-17");
@@ -251,7 +276,7 @@ describe("planFromHistory", () => {
   it("starts the first year at account creation", () => {
     const history = makeHistory(
       "ada",
-      [makeYear(2020, [{ date: "2020-11-10", commits: 3 }])],
+      [makeYear(2020, [{ date: "2020-11-10", count: 3 }])],
       "2020-10-01T00:00:00Z",
     );
     const { plan } = planFromHistory(history, TODAY);
@@ -265,7 +290,7 @@ describe("planFromHistory", () => {
     });
     const history = makeHistory("torvalds", years);
     const { plan } = planFromHistory(history, TODAY);
-    expect(plan.total).toBe(history.totals.commits);
+    expect(plan.total).toBe(history.totalContributions);
     expect(plan.total).toBeGreaterThan(30_000);
     // Hits stay on the tempo grid: at most one per cell of the drawing window.
     expect(plan.slots.length).toBeLessThanOrEqual(

@@ -15,6 +15,7 @@ export type RawYear = {
   totals: YearTotals;
   commitContributionsByRepo: CommitContribution[][];
   calendar: CalendarDay[];
+  totalContributions: number;
 };
 
 export function buildYearSummary(raw: RawYear): YearSummary {
@@ -28,17 +29,21 @@ export function buildYearSummary(raw: RawYear): YearSummary {
       raw.totals.commits,
     ),
     calendar: raw.calendar,
+    totalContributions: raw.totalContributions,
   };
 }
 
 export type YearBlock = {
   year: number;
-  commits: number;
+  contributions: number;
 };
 
-/** One block per year, oldest first. Height = official commit total. */
+/** One block per year, oldest first. Height = the calendar total of the year. */
 export function yearBlocks(years: YearSummary[]): YearBlock[] {
   return years
-    .map(({ year, totals }) => ({ year, commits: totals.commits }))
+    .map(({ year, totalContributions }) => ({
+      year,
+      contributions: totalContributions,
+    }))
     .sort((a, b) => a.year - b.year);
 }
