@@ -17,10 +17,12 @@ export function StartButton({
   ...props
 }: StartButtonProps) {
   // Hover flips to the other fill so the change reads on any block color.
+  // Active: solid fill with paper text, hover flips to the other fill.
+  // Disabled (aria-disabled): transparent, ink text, dashed border, same size.
   const fill =
     tone === "block"
-      ? "bg-block-ultramarine not-aria-disabled:hover:bg-ink"
-      : "bg-ink not-aria-disabled:hover:bg-block-ultramarine";
+      ? "border-block-ultramarine bg-block-ultramarine text-paper not-aria-disabled:hover:border-ink not-aria-disabled:hover:bg-ink"
+      : "border-ink bg-ink text-paper not-aria-disabled:hover:border-block-ultramarine not-aria-disabled:hover:bg-block-ultramarine";
   const sizing =
     size === "cta"
       ? "min-h-16 px-8 font-mono text-base font-bold uppercase tracking-[0.06em]"
@@ -29,7 +31,7 @@ export function StartButton({
     <button
       type="button"
       {...props}
-      className={`${fill} ${sizing} text-center text-paper aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:active:translate-y-0 ${pressable} ${focusRing} ${className}`}
+      className={`${fill} ${sizing} border-2 text-center aria-disabled:cursor-not-allowed aria-disabled:border-dashed aria-disabled:border-ink aria-disabled:bg-transparent aria-disabled:text-ink aria-disabled:active:translate-y-0 ${pressable} ${focusRing} ${className}`}
     >
       {children}
     </button>

@@ -82,26 +82,22 @@ body {
   }
 }
 
-/* Landing signature: the cumulative line draws itself, then loops. */
+/* Landing signature: the cumulative line is drawn once, left to right. */
 @keyframes draw-line {
-  0% {
-    stroke-dashoffset: 1;
+  from {
+    clip-path: inset(-4px 100% -4px 0);
   }
-  70%,
-  100% {
-    stroke-dashoffset: 0;
+  to {
+    clip-path: inset(-4px 0 -4px 0);
   }
 }
 
 .signature-line {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: draw-line 9s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  animation: draw-line 5s cubic-bezier(0.45, 0, 0.2, 1) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .signature-line {
     animation: none;
-    stroke-dashoffset: 0;
   }
 }
