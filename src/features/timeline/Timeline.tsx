@@ -4,8 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClockStatus } from "@/playback/clock";
 import { CHART_HEIGHT, CHART_WIDTH, linePath } from "./chart";
 import { generateFakeProfile } from "./fakeProfile";
-import { blockForYearIndex, buildPlan, DRAW_SECONDS } from "./plan";
-import { createScene, formatCount, type Scene, yearIndexAt } from "./scene";
+import {
+  blockForYearIndex,
+  buildPlan,
+  displayedYearIndex,
+  yearReveals,
+} from "./plan";
+import { createScene, formatCount, type Scene } from "./scene";
 
 type Phase = "start" | "loading" | "running";
 
@@ -64,7 +69,7 @@ export function Timeline() {
   }
 
   const clock = sceneRef.current?.clock;
-  const first = blockForYearIndex(0);
+  const reveals = useMemo(() => yearReveals(plan), [plan]);
   const firstYear = plan.years[0]?.year ?? 0;
   const lastYear = plan.years.at(-1)?.year ?? firstYear;
   const chartLabel = `Cumulative commits from ${firstYear} to ${lastYear}, ${formatCount(plan.total)} in total`;
@@ -74,30 +79,39 @@ export function Timeline() {
       ref={rootRef}
       className="relative h-dvh w-full overflow-hidden bg-paper text-ink"
     >
-      <div data-role="shake" className="absolute inset-0">
+      <div className="absolute inset-0">
         <section
           data-role="block"
-          className="absolute inset-x-0 top-0 flex h-[42dvh] flex-col justify-between overflow-hidden p-4 landscape:flex-row landscape:items-end"
-          style={{
-            backgroundColor: first.background,
-            color: first.foreground,
-          }}
+          className="absolute inset-x-0 top-0 h-[42dvh] overflow-hidden"
         >
-          <p
-            data-role="year"
-            className="font-display text-[min(26vw,15dvh)] font-black leading-[0.8] landscape:text-[min(15vw,34dvh)]"
-          >
-            {firstYear}
-          </p>
-          <div className="landscape:text-right">
-            <p
-              data-role="total"
-              className="font-display text-[min(26vw,15dvh)] font-black leading-[0.8] tabular-nums landscape:text-[min(15vw,34dvh)]"
-            >
-              0
-            </p>
-            <p className="mt-4 font-mono text-xs uppercase">Commits</p>
-          </div>
+          {plan.years.map((span, index) => {
+            const colors = blockForYearIndex(index);
+            return (
+              <div
+                key={span.year}
+                data-year-layer={index}
+                className="absolute inset-0 flex flex-col justify-between p-4 landscape:flex-row landscape:items-end"
+                style={{
+                  backgroundColor: colors.background,
+                  color: colors.foreground,
+                  clipPath: index === 0 ? undefined : "inset(0% 100% 0% 0%)",
+                }}
+              >
+                <p className="font-display text-[min(26vw,15dvh)] font-black leading-[0.8] landscape:text-[min(15vw,34dvh)]">
+                  {span.year}
+                </p>
+                <div className="landscape:text-right">
+                  <p
+                    data-role="total"
+                    className="font-display text-[min(26vw,15dvh)] font-black leading-[0.8] tabular-nums landscape:text-[min(15vw,34dvh)]"
+                  >
+                    0
+                  </p>
+                  <p className="mt-4 font-mono text-xs uppercase">Commits</p>
+                </div>
+              </div>
+            );
+          })}
         </section>
 
         <div className="absolute inset-x-0 bottom-14 top-[42dvh] flex flex-col px-4 pb-2 pt-6">
@@ -159,7 +173,7 @@ export function Timeline() {
 
       {plan.milestones.map((milestone, index) => {
         const colors = blockForYearIndex(
-          yearIndexAt(plan, milestone.time / DRAW_SECONDS),
+          displayedYearIndex(reveals, milestone.time),
         );
         return (
           <div
@@ -174,7 +188,10 @@ export function Timeline() {
               transformOrigin: "50% 100%",
             }}
           >
-            <span className="font-display text-[min(34vw,36dvh)] font-black leading-[0.8] tabular-nums">
+            <span
+              data-flood-number
+              className="font-display text-[min(34vw,36dvh)] font-black leading-[0.8] tabular-nums"
+            >
               {formatCount(milestone.value)}
             </span>
             <span className="mt-4 font-mono text-sm uppercase">Commits</span>

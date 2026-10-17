@@ -1,15 +1,17 @@
 import gsap from "gsap";
-import { cumulativeAt, yearAt } from "@/playback/aggregate";
+import { cumulativeAt } from "@/playback/aggregate";
 import { PlaybackClock } from "@/playback/clock";
-import { degreeForAccumulation, semitonesForDegree } from "@/playback/pitch";
+import { semitonesForDegree } from "@/playback/pitch";
 import { SoundEngine } from "@/playback/sound/engine";
 import { CHART_WIDTH, topPercent } from "./chart";
 import {
   BPM,
-  blockForYearIndex,
   DRAW_SECONDS,
+  FLOOD,
   type Plan,
   TOTAL_SECONDS,
+  YEAR_WIPE_SECONDS,
+  yearReveals,
 } from "./plan";
 
 /**
@@ -36,15 +38,6 @@ const numberFormat = new Intl.NumberFormat("en-US");
 
 export function formatCount(value: number): string {
   return numberFormat.format(value);
-}
-
-/** Index of the year in effect at a progress, for block color rotation. */
-export function yearIndexAt(plan: Plan, progress: number): number {
-  const year = yearAt(plan.years, progress);
-  return Math.max(
-    0,
-    plan.years.findIndex((span) => span.year === year),
-  );
 }
 
 function find<T extends Element>(root: HTMLElement, selector: string): T {
@@ -78,6 +71,7 @@ export async function createScene({
     scheduleSound(clock, () => engine, plan);
 
     timeline = gsap.timeline({ paused: true });
+    addYearMotion(timeline, root, plan, reducedMotion);
     if (!reducedMotion) addPayoffMotion(timeline, root, plan);
   } catch (error) {
     timeline?.kill();
@@ -112,9 +106,7 @@ function scheduleSound(
   for (const slot of plan.slots) {
     // A payoff takes over its own beat.
     if (payoffTimes.has(slot.time)) continue;
-    const semitones = semitonesForDegree(
-      degreeForAccumulation(slot.runAccumulated),
-    );
+    const semitones = semitonesForDegree(slot.degree);
     clock.at(slot.time, (time) =>
       getEngine()?.playTick({ time, semitones, intensity: slot.intensity }),
     );
@@ -124,75 +116,88 @@ function scheduleSound(
       getEngine()?.playPayoff({ time, kind: milestone.kind }),
     );
   }
+  for (const reveal of yearReveals(plan).slice(1)) {
+    clock.at(reveal.time, (time) => getEngine()?.playAccent(time));
+  }
 }
 
-/** Floods and shakes, placed on the timeline at each payoff time. */
+/** Each year's block wipes in from the left with a decisive, no-bounce ease. */
+function addYearMotion(
+  timeline: gsap.core.Timeline,
+  root: HTMLElement,
+  plan: Plan,
+  reducedMotion: boolean,
+) {
+  const hidden = "inset(0% 100% 0% 0%)";
+  const shown = "inset(0% 0% 0% 0%)";
+  for (const reveal of yearReveals(plan).slice(1)) {
+    const layer = find<HTMLElement>(
+      root,
+      `[data-year-layer="${reveal.index}"]`,
+    );
+    if (reducedMotion) {
+      timeline.set(layer, { clipPath: hidden }, 0);
+      timeline.set(layer, { clipPath: shown }, reveal.time);
+    } else {
+      timeline.fromTo(
+        layer,
+        { clipPath: hidden },
+        { clipPath: shown, duration: YEAR_WIPE_SECONDS, ease: "power4.out" },
+        reveal.time,
+      );
+    }
+  }
+}
+
+/** Floods, placed on the timeline at each payoff time. */
 function addPayoffMotion(
   timeline: gsap.core.Timeline,
   root: HTMLElement,
   plan: Plan,
 ) {
-  const shake = find<HTMLElement>(root, '[data-role="shake"]');
   plan.milestones.forEach((milestone, index) => {
     const layer = find<HTMLElement>(root, `[data-flood="${index}"]`);
-    const final = milestone.kind === "final";
-    const rise = 0.12;
-    const hold = final ? 1.4 : 0.35;
-    const fall = final ? 0.7 : 0.5;
+    const number = find<HTMLElement>(layer, "[data-flood-number]");
+    const { hold, fall } = FLOOD[milestone.kind];
     const start = milestone.time;
-    const recede = start + rise + hold;
-    const amount = final ? 22 : 12;
+    const recede = start + FLOOD.rise + hold;
 
     timeline
       .set(layer, { transformOrigin: "50% 100%", scaleY: 0 }, 0)
       .fromTo(
         layer,
         { scaleY: 0 },
-        { scaleY: 1, duration: rise, ease: "power4.out" },
+        { scaleY: 1, duration: FLOOD.rise, ease: "power4.out" },
+        start,
+      )
+      // The number lands with a quick scale-down: impact without overshoot.
+      .fromTo(
+        number,
+        { scale: 1.2 },
+        { scale: 1, duration: 0.25, ease: "power4.out" },
         start,
       )
       .set(layer, { transformOrigin: "50% 0%" }, recede)
-      .to(layer, { scaleY: 0, duration: fall, ease: "power3.in" }, recede)
-      .fromTo(
-        shake,
-        { x: 0 },
-        {
-          keyframes: { x: [-amount, amount, -amount * 0.6, amount * 0.3, 0] },
-          duration: 0.28,
-          ease: "none",
-        },
-        recede + fall - 0.05,
-      );
+      .to(layer, { scaleY: 0, duration: fall, ease: "power3.in" }, recede);
   });
 }
 
-/** Values that are a pure function of clock time; written only on change. */
+/** The running total is a pure function of clock time; written on change. */
 function createRenderer(root: HTMLElement, plan: Plan) {
-  const block = find<HTMLElement>(root, '[data-role="block"]');
-  const yearLabel = find<HTMLElement>(root, '[data-role="year"]');
-  const totalLabel = find<HTMLElement>(root, '[data-role="total"]');
+  const totals = [...root.querySelectorAll<HTMLElement>('[data-role="total"]')];
   const clip = find<SVGRectElement>(root, '[data-role="clip"]');
   const head = find<HTMLElement>(root, '[data-role="head"]');
-  let lastYear = Number.NaN;
   let lastTotal = Number.NaN;
 
   return (seconds: number) => {
     const progress = Math.min(1, seconds / DRAW_SECONDS);
 
-    const year = yearAt(plan.years, progress);
-    if (year !== lastYear) {
-      lastYear = year;
-      const colors = blockForYearIndex(yearIndexAt(plan, progress));
-      block.style.backgroundColor = colors.background;
-      block.style.color = colors.foreground;
-      yearLabel.textContent = String(year);
-    }
-
     const running = cumulativeAt(plan.cumulative, progress);
     const rounded = Math.round(running);
     if (rounded !== lastTotal) {
       lastTotal = rounded;
-      totalLabel.textContent = formatCount(rounded);
+      const text = formatCount(rounded);
+      for (const total of totals) total.textContent = text;
     }
 
     clip.setAttribute("width", String(progress * CHART_WIDTH));

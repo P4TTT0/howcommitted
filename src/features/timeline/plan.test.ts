@@ -4,7 +4,10 @@ import {
   blockForYearIndex,
   buildPlan,
   DRAW_SECONDS,
+  displayedYearIndex,
+  floodSpan,
   GRID_SECONDS,
+  yearReveals,
 } from "./plan";
 
 describe("generateFakeProfile", () => {
@@ -57,5 +60,34 @@ describe("blockForYearIndex", () => {
   it("rotates through the six blocks", () => {
     expect(blockForYearIndex(0)).toBe(blockForYearIndex(6));
     expect(blockForYearIndex(0)).not.toBe(blockForYearIndex(1));
+  });
+});
+
+describe("yearReveals", () => {
+  const plan = buildPlan(generateFakeProfile());
+  const reveals = yearReveals(plan);
+
+  it("reveals every year in order, the first at time zero", () => {
+    expect(reveals).toHaveLength(plan.years.length);
+    expect(reveals[0]?.time).toBe(0);
+    for (let i = 1; i < reveals.length; i += 1) {
+      expect(reveals[i]?.time).toBeGreaterThan(reveals[i - 1]?.time ?? 0);
+    }
+  });
+
+  it("never lands inside a flood", () => {
+    for (const reveal of reveals.slice(1)) {
+      for (const milestone of plan.milestones) {
+        const end = milestone.time + floodSpan(milestone.kind);
+        const inside = reveal.time > milestone.time && reveal.time < end;
+        expect(inside).toBe(false);
+      }
+    }
+  });
+
+  it("resolves the year block on screen at a time", () => {
+    expect(displayedYearIndex(reveals, 0)).toBe(0);
+    const last = reveals.at(-1);
+    expect(displayedYearIndex(reveals, last?.time ?? 0)).toBe(last?.index);
   });
 });

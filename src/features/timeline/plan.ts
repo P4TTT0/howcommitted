@@ -9,6 +9,7 @@ import {
   buildTickSlots,
   findMilestones,
   type Milestone,
+  quantizeUp,
   type TickSlot,
 } from "@/playback/schedule";
 import { blocks, neutrals } from "@/ui/tokens";
@@ -25,6 +26,23 @@ export const GRID_SECONDS = 60 / BPM / 4;
 export const MILESTONE_STEP = 1000;
 /** ...except the first, which comes early so the payoff lands sooner. */
 export const MILESTONE_FIRST = 500;
+
+/** Quiet weeks in a row that end a run; holidays should not. */
+export const RUN_GAP_WEEKS = 6;
+
+/** Flood timing in seconds. The year change never overlaps this window. */
+export const FLOOD = {
+  rise: 0.12,
+  step: { hold: 0.35, fall: 0.5 },
+  final: { hold: 1.4, fall: 0.7 },
+} as const;
+/** Seconds the incoming year takes to wipe in. */
+export const YEAR_WIPE_SECONDS = 0.3;
+
+/** Seconds a flood covers the screen, from impact to fully receded. */
+export function floodSpan(kind: Milestone["kind"]): number {
+  return FLOOD.rise + FLOOD[kind].hold + FLOOD[kind].fall;
+}
 
 /** Block colors in rotation order with the text color that passes contrast. */
 export const BLOCK_SEQUENCE = [
@@ -64,7 +82,7 @@ export function buildPlan(days: DailyCommits[]): Plan {
   const slots = buildTickSlots(aggregateWeekly(days), weekSpan(days), {
     duration: DRAW_SECONDS,
     grid: GRID_SECONDS,
-    runGapWeeks: 3,
+    runGapWeeks: RUN_GAP_WEEKS,
     resetTimes: milestones.map((milestone) => milestone.time),
   });
 
@@ -87,4 +105,37 @@ export function buildPlan(days: DailyCommits[]): Plan {
     milestones,
     linePoints,
   };
+}
+
+export type YearReveal = { year: number; index: number; time: number };
+
+/**
+ * When each year's block wipes in. Normally at the year boundary, on the
+ * tempo grid; if a flood would cover that moment it waits until the flood
+ * has receded, so the change is always seen.
+ */
+export function yearReveals(plan: Plan): YearReveal[] {
+  return plan.years.map((span, index) => {
+    let time = quantizeUp(span.startProgress * DRAW_SECONDS, GRID_SECONDS);
+    if (index === 0) return { year: span.year, index, time: 0 };
+    for (const milestone of plan.milestones) {
+      const end = milestone.time + floodSpan(milestone.kind);
+      if (time > milestone.time - YEAR_WIPE_SECONDS && time < end) {
+        time = quantizeUp(end, GRID_SECONDS);
+      }
+    }
+    return { year: span.year, index, time };
+  });
+}
+
+/** Index of the year block on screen at `time` (for flood color). */
+export function displayedYearIndex(
+  reveals: readonly YearReveal[],
+  time: number,
+): number {
+  let shown = 0;
+  for (const reveal of reveals) {
+    if (reveal.time <= time) shown = reveal.index;
+  }
+  return shown;
 }
