@@ -19,6 +19,8 @@ type RivalsRowProps = {
   main: PreviewUser;
   rivals: readonly PreviewUser[];
   onChange: (rivals: PreviewUser[]) => void;
+  /** Start with the rival input open (arriving from "Challenge someone"). */
+  initialOpen?: boolean;
 };
 
 const DUPLICATE = "Already in the lineup.";
@@ -30,8 +32,13 @@ const FULL = `Up to ${MAX_DEVELOPERS} developers.`;
  * same exact-username preview lookup the question uses; nothing else is
  * fetched. Enter never reaches the surrounding form, so it cannot start Play.
  */
-export function RivalsRow({ main, rivals, onChange }: RivalsRowProps) {
-  const [open, setOpen] = useState(false);
+export function RivalsRow({
+  main,
+  rivals,
+  onChange,
+  initialOpen = false,
+}: RivalsRowProps) {
+  const [open, setOpen] = useState(initialOpen);
   const [value, setValue] = useState("");
   const [state, setState] = useState<LookupState>({ kind: "idle" });
   const [note, setNote] = useState<string | null>(null);

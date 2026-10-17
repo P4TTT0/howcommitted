@@ -326,6 +326,12 @@ test.describe("versus on the landing", () => {
     ).toBeVisible();
   });
 
+  test("/?vs=ada looks up @ada and opens the rival input", async ({ page }) => {
+    await page.goto("/?vs=ada");
+    await expect(page.getByLabel("GitHub username")).toHaveValue("ada");
+    await expect(page.getByLabel("Rival login")).toBeFocused();
+  });
+
   test("a rival cannot repeat the main developer or be reserved", async ({
     page,
   }) => {
