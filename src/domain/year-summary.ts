@@ -47,3 +47,21 @@ export function yearBlocks(years: YearSummary[]): YearBlock[] {
     }))
     .sort((a, b) => a.year - b.year);
 }
+
+/**
+ * Every year from `firstYear` to `lastYear`, oldest first. A year with no
+ * block (nothing fetched, nothing contributed) is an explicit zero so the
+ * position of a year never shifts and its color identity stays stable.
+ */
+export function yearBlocksInRange(
+  blocks: readonly YearBlock[],
+  firstYear: number,
+  lastYear: number,
+): YearBlock[] {
+  const byYear = new Map(blocks.map((block) => [block.year, block]));
+  const length = Math.max(0, lastYear - firstYear + 1);
+  return Array.from({ length }, (_, index) => {
+    const year = firstYear + index;
+    return { year, contributions: byYear.get(year)?.contributions ?? 0 };
+  });
+}

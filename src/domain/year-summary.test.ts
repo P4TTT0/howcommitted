@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { YearTotals } from "./types";
-import { buildYearSummary, yearBlocks } from "./year-summary";
+import {
+  buildYearSummary,
+  yearBlocks,
+  yearBlocksInRange,
+} from "./year-summary";
 
 describe("buildYearSummary and yearBlocks", () => {
   const totals = (commits: number): YearTotals => ({
@@ -41,5 +45,29 @@ describe("buildYearSummary and yearBlocks", () => {
       { year: 2022, contributions: 90 },
       { year: 2024, contributions: 50 },
     ]);
+  });
+});
+
+describe("yearBlocksInRange", () => {
+  it("fills missing years with explicit zeros", () => {
+    expect(
+      yearBlocksInRange(
+        [
+          { year: 2022, contributions: 9 },
+          { year: 2024, contributions: 5 },
+        ],
+        2022,
+        2025,
+      ),
+    ).toEqual([
+      { year: 2022, contributions: 9 },
+      { year: 2023, contributions: 0 },
+      { year: 2024, contributions: 5 },
+      { year: 2025, contributions: 0 },
+    ]);
+  });
+
+  it("is empty for an inverted range", () => {
+    expect(yearBlocksInRange([], 2024, 2022)).toEqual([]);
   });
 });

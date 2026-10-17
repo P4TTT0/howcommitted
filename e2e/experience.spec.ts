@@ -61,6 +61,19 @@ async function mockApi(
   return mocks;
 }
 
+const pauseButton = (page: Page) => page.getByRole("button", { name: "Pause" });
+/** Scenes played before the end card: year blocks, cumulative line. */
+const SCENE_COUNT = 2;
+
+/** Skips every scene in turn; the end card follows the last one. */
+async function skipAllScenes(page: Page) {
+  const skip = page.getByRole("button", { name: "Skip scene" });
+  for (let scene = 0; scene < SCENE_COUNT; scene += 1) {
+    await expect(skip).toBeEnabled();
+    await skip.click();
+  }
+}
+
 const startButton = (page: Page) =>
   page.getByRole("button", { name: "Play", exact: true });
 /** The landing call to action: "Play", or "Play @login" once a user is found. */
@@ -89,7 +102,7 @@ test("search shows a preview, then the click opens the experience", async ({
   await expect.poll(() => mocks.historyRequests.length).toBe(1);
 
   // Audio was unlocked by the landing click, so the scene starts by itself.
-  await expect(page.locator('[data-role="block"]')).toBeVisible();
+  await expect(pauseButton(page)).toBeEnabled();
   await expect(page.getByRole("button", { name: "Pause" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Mute" })).toBeVisible();
 });
@@ -185,8 +198,56 @@ test("a direct visit waits for a click and fetches nothing before it", async ({
   expect(mocks.historyRequests).toHaveLength(0);
 
   await startButton(page).click();
-  await expect(page.locator('[data-role="block"]')).toBeVisible();
+  await expect(pauseButton(page)).toBeEnabled();
   expect(mocks.historyRequests).toHaveLength(1);
+});
+
+test("scenes play in order, with a progress bar that names the scene", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto("/ada");
+  await startButton(page).click();
+
+  const progress = page.getByRole("progressbar", {
+    name: "Playback progress",
+  });
+  await expect(pauseButton(page)).toBeEnabled();
+  await expect(progress).toHaveAttribute(
+    "aria-valuetext",
+    "Scene 1 of 2: Year blocks",
+  );
+  // One block per year: height is the calendar total of the year.
+  const perYear = history.years
+    .map(
+      (year) =>
+        `${year.year} ${year.totalContributions.toLocaleString("en-US")}`,
+    )
+    .join(", ");
+  await expect(
+    page.getByRole("img", { name: `Contributions per year: ${perYear}` }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Skip scene" }).click();
+  await expect(progress).toHaveAttribute(
+    "aria-valuetext",
+    "Scene 2 of 2: Cumulative line",
+  );
+  await expect(
+    page.getByRole("img", { name: /^Cumulative contributions/ }),
+  ).toBeVisible();
+});
+
+test("pausing keeps the scene where it is and resuming continues", async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.goto("/ada");
+  await startButton(page).click();
+  await pauseButton(page).click();
+  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+  await page.getByRole("button", { name: "Resume" }).click();
+  await expect(pauseButton(page)).toBeVisible();
 });
 
 test("skipping to the end shows the total and the principle", async ({
@@ -195,9 +256,7 @@ test("skipping to the end shows the total and the principle", async ({
   await mockApi(page);
   await page.goto("/ada");
   await startButton(page).click();
-  const skip = page.getByRole("button", { name: "Skip" });
-  await expect(skip).toBeEnabled();
-  await skip.click();
+  await skipAllScenes(page);
 
   await expect(
     page.getByText(
@@ -279,7 +338,7 @@ test("a rate limited history offers a retry that can succeed", async ({
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.locator('[data-role="block"]')).toBeVisible();
+  await expect(pauseButton(page)).toBeEnabled();
   expect(mocks.historyRequests).toHaveLength(2);
 });
 
@@ -316,7 +375,7 @@ test("back and forward never spend a run without a click", async ({ page }) => {
   await page.getByLabel("GitHub username").fill("ada");
   await expect(page.getByText("Ada Lovelace")).toBeVisible();
   await listenButton(page).click();
-  await expect(page.locator('[data-role="block"]')).toBeVisible();
+  await expect(pauseButton(page)).toBeEnabled();
   expect(mocks.historyRequests).toHaveLength(1);
 
   await page.goBack();
@@ -352,9 +411,7 @@ test("contributions not attributed to a day show as a labelled step with an hone
   });
   await page.goto("/ada");
   await startButton(page).click();
-  const skip = page.getByRole("button", { name: "Skip" });
-  await expect(skip).toBeEnabled();
-  await skip.click();
+  await skipAllScenes(page);
 
   await expect(
     page.getByText(`+${missing} not attributed to a day`),
@@ -390,9 +447,7 @@ test("a profile with only private contributions plays the full calendar", async 
   });
   await page.goto("/ada");
   await startButton(page).click();
-  const skip = page.getByRole("button", { name: "Skip" });
-  await expect(skip).toBeEnabled();
-  await skip.click();
+  await skipAllScenes(page);
 
   const formatted = total.toLocaleString("en-US");
   await expect(

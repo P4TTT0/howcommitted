@@ -1,4 +1,5 @@
 import { endCardFinale } from "@/features/experience/endCardFinale";
+import { yearBlocksScene } from "@/features/scenes/year-blocks";
 import type {
   FinaleDefinition,
   SceneDefinition,
@@ -10,7 +11,10 @@ import { cumulativeLineScene } from "@/features/timeline/cumulativeLineScene";
  * here; the sequencer is never edited. The contract is in
  * `features/sequencer/types.ts` and docs/architecture.md.
  */
-export const SCENES: readonly SceneDefinition[] = [cumulativeLineScene];
+export const SCENES: readonly SceneDefinition[] = [
+  yearBlocksScene,
+  cumulativeLineScene,
+];
 
 /** What follows the last scene. The final poster replaces this one entry. */
 export const FINALE: FinaleDefinition = endCardFinale;
