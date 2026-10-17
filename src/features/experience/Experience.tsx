@@ -18,6 +18,7 @@ import {
 } from "./historyResult";
 import { consumeIntent } from "./intent";
 import { LoadingMoment, Poster } from "./Poster";
+import { SignInLink } from "./SignInLink";
 
 type Phase =
   | { name: "init" }
@@ -188,6 +189,7 @@ function screen(phase: Phase, login: string, start: () => void) {
           <Poster login={login} tone="ink">
             <p className="font-mono text-sm">{copy.message}</p>
             <div className="flex flex-wrap gap-2">
+              {copy.signIn && <SignInLink returnTo={`/${login}`} />}
               {copy.retry && (
                 <button
                   type="button"

@@ -326,21 +326,42 @@ test("a user with no contributions gets a calm empty state", async ({
   ).toBeVisible();
 });
 
-test("history errors become designed states", async ({ page }) => {
+test("used free runs offer GitHub sign-in, never before", async ({ page }) => {
   await mockApi(page, {
     status: 401,
     body: { error: { code: "login_required", message: "Free runs used." } },
   });
   await page.goto("/ada");
+  // The prompt is not shown upfront.
+  await expect(
+    page.getByRole("link", { name: "Sign in with GitHub" }),
+  ).toHaveCount(0);
+
   await startButton(page).click();
   await expect(
     page
       .getByRole("main")
       .getByText(
-        "Free runs used for today. Sign in with GitHub is coming soon.",
+        "Free runs used. Sign in with GitHub to keep going — it uses your own quota, and we only read public data.",
       ),
   ).toBeVisible();
   await expect(page.getByText(/login_required|"error"/)).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Sign in with GitHub" }),
+  ).toHaveAttribute("href", "/api/auth/github?returnTo=%2Fada");
+});
+
+test("other history errors do not offer sign-in", async ({ page }) => {
+  await mockApi(page, {
+    status: 503,
+    body: { error: { code: "degraded", message: "Busy.", reason: "busy" } },
+  });
+  await page.goto("/ada");
+  await startButton(page).click();
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Sign in with GitHub" }),
+  ).toHaveCount(0);
 });
 
 test("a rate limited history offers a retry that can succeed", async ({

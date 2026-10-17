@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ConfigError, coldGenerationsPerDay } from "./config";
+import {
+  authCookieSecret,
+  ConfigError,
+  coldGenerationsPerDay,
+  githubOAuthApp,
+} from "./config";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -25,5 +30,29 @@ describe("coldGenerationsPerDay", () => {
       vi.stubEnv("QUOTA_COLD_PER_DAY", value);
       expect(() => coldGenerationsPerDay(2)).toThrow(ConfigError);
     }
+  });
+});
+
+describe("authCookieSecret", () => {
+  it("requires the variable and at least 32 characters", () => {
+    vi.stubEnv("AUTH_COOKIE_SECRET", "");
+    expect(() => authCookieSecret()).toThrow(ConfigError);
+    vi.stubEnv("AUTH_COOKIE_SECRET", "too-short");
+    expect(() => authCookieSecret()).toThrow("at least 32 characters");
+    vi.stubEnv("AUTH_COOKIE_SECRET", "x".repeat(32));
+    expect(authCookieSecret()).toBe("x".repeat(32));
+  });
+});
+
+describe("githubOAuthApp", () => {
+  it("requires both the client id and the client secret", () => {
+    vi.stubEnv("GITHUB_OAUTH_CLIENT_ID", "id");
+    vi.stubEnv("GITHUB_OAUTH_CLIENT_SECRET", "");
+    expect(() => githubOAuthApp()).toThrow("GITHUB_OAUTH_CLIENT_SECRET");
+    vi.stubEnv("GITHUB_OAUTH_CLIENT_SECRET", "secret");
+    expect(githubOAuthApp()).toEqual({
+      clientId: "id",
+      clientSecret: "secret",
+    });
   });
 });

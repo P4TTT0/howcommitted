@@ -22,6 +22,8 @@ vi.mock("@upstash/ratelimit", () => {
 });
 
 import {
+  AUTH_ATTEMPTS_PER_MINUTE,
+  AUTH_ATTEMPTS_PER_MINUTE_UNKNOWN_IP,
   CHARGE_SCRIPT,
   COLD_ATTEMPTS_PER_MINUTE,
   COLD_GENERATIONS_PER_DAY,
@@ -216,5 +218,24 @@ describe("preview rate limit", () => {
       expect(await quota.allowPreview("unknown")).toBe(true);
     }
     expect(await quota.allowPreview("unknown")).toBe(false);
+  });
+});
+
+describe("auth attempt rate limit", () => {
+  it("blocks an IP after its burst, and is tighter without a usable IP", async () => {
+    const quota = createQuota(fakeRedis().redis, "");
+    for (let i = 0; i < AUTH_ATTEMPTS_PER_MINUTE; i++) {
+      expect(await quota.allowAuthAttempt("7.7.7.7")).toBe(true);
+    }
+    expect(await quota.allowAuthAttempt("7.7.7.7")).toBe(false);
+    expect(await quota.allowAuthAttempt("8.8.8.8")).toBe(true);
+
+    expect(AUTH_ATTEMPTS_PER_MINUTE_UNKNOWN_IP).toBeLessThan(
+      AUTH_ATTEMPTS_PER_MINUTE,
+    );
+    for (let i = 0; i < AUTH_ATTEMPTS_PER_MINUTE_UNKNOWN_IP; i++) {
+      expect(await quota.allowAuthAttempt("unknown")).toBe(true);
+    }
+    expect(await quota.allowAuthAttempt("unknown")).toBe(false);
   });
 });

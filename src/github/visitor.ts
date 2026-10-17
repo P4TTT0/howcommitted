@@ -96,7 +96,7 @@ export function clientIp(headers: Headers): string {
   return UNKNOWN_IP;
 }
 
-function readCookie(headers: Headers, name: string): string | undefined {
+export function readCookie(headers: Headers, name: string): string | undefined {
   const header = headers.get("cookie");
   if (!header) return undefined;
   for (const part of header.split(";")) {

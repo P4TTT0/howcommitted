@@ -647,3 +647,302 @@ describe("getPreview", () => {
     });
   });
 });
+
+describe("getProfile for a signed-in visitor", () => {
+  const USER_TOKEN = "gho_user_own_token_0000000000000000";
+  type Kind = "Preview" | "Year" | "Repos";
+
+  /** Like stubGithub, but a handler can answer any HTTP status, and bearer tokens are recorded. */
+  function stubWithAuth(handler: (kind: Kind) => Response) {
+    const bearers: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        bearers.push(
+          (init.headers as Record<string, string>).authorization ?? "",
+        );
+        const { query } = JSON.parse(String(init.body)) as { query: string };
+        const kind = (["Preview", "Year", "Repos"] as const).find((k) =>
+          query.includes(`query ${k}(`),
+        ) as Kind;
+        return handler(kind);
+      }),
+    );
+    return bearers;
+  }
+  const ok = (body: unknown) => new Response(JSON.stringify(body));
+  const happy = (kind: Kind) => ok(happyPath(kind));
+  const unauthorized = () =>
+    new Response(JSON.stringify({ message: "Bad credentials" }), {
+      status: 401,
+    });
+
+  it("generates with their own token, skipping the anonymous quota and the server token", async () => {
+    const bearers = stubWithAuth(happy);
+    const getToken = vi.fn(() => "server-token");
+    const chargeColdGeneration = vi.fn(async () => null);
+    const { deps } = setup({ getToken, chargeColdGeneration });
+
+    const result = await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+
+    expect(result).toMatchObject({ status: "ok", source: "fresh" });
+    expect(chargeColdGeneration).not.toHaveBeenCalled();
+    expect(getToken).not.toHaveBeenCalled();
+    expect(bearers.length).toBeGreaterThan(0);
+    expect(new Set(bearers)).toEqual(new Set([`bearer ${USER_TOKEN}`]));
+  });
+
+  it("keeps anonymous visitors gated: the quota still applies without a token", async () => {
+    stubWithAuth(happy);
+    const { deps } = setup({ chargeColdGeneration: async () => null });
+    expect(await getProfile("ada", visitor, deps)).toEqual({
+      status: "login_required",
+      reason: "quota_exhausted",
+    });
+    expect(await getProfile("ada", visitor, deps, { userToken: null })).toEqual(
+      { status: "login_required", reason: "quota_exhausted" },
+    );
+  });
+
+  it("populates the shared cache for everyone", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps } = setup({ chargeColdGeneration: async () => null });
+    await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    const before = { ...calls };
+
+    const anonymous = await getProfile("ada", visitor, deps);
+    expect(anonymous).toMatchObject({ status: "ok", source: "cache" });
+    expect(calls).toEqual(before);
+  });
+
+  it("still uses the coalescing lock", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps } = setup();
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        getProfile("ada", visitor, deps, {
+          userToken: USER_TOKEN,
+          viewerLogin: "viewer",
+        }),
+      ),
+    );
+    expect(results.every((r) => r.status === "ok")).toBe(true);
+    expect(calls).toEqual({ Preview: 1, Year: 3, Repos: 1 });
+
+    const busy = setup();
+    await busy.deps.lock.acquire("grace");
+    let clock = NOW.getTime();
+    expect(
+      await getProfile(
+        "grace",
+        visitor,
+        {
+          ...busy.deps,
+          now: () => new Date(clock),
+          sleep: async () => {
+            clock += GENERATION_DEADLINE_MS;
+          },
+        },
+        { userToken: USER_TOKEN, viewerLogin: "viewer" },
+      ),
+    ).toEqual({ status: "degraded", reason: "busy" });
+  });
+
+  it("is not stopped by an open circuit breaker, which only guards the server token", async () => {
+    stubWithAuth(happy);
+    const { deps } = setup();
+    await deps.breaker.record({ ...rateLimit, remaining: 100 }, NOW);
+    expect(await deps.breaker.isOpen(NOW)).toBe(true);
+
+    expect(
+      await getProfile("ada", visitor, deps, {
+        userToken: USER_TOKEN,
+        viewerLogin: "viewer",
+      }),
+    ).toMatchObject({ status: "ok", source: "fresh" });
+    // The same request without a token is stopped.
+    expect(await getProfile("grace", visitor, deps)).toEqual({
+      status: "degraded",
+      reason: "circuit_open",
+    });
+  });
+
+  it("never lets their budget open the breaker, even when it is nearly spent or rate limited", async () => {
+    const low = { ...rateLimit, remaining: 10 };
+    stubWithAuth((kind) => {
+      const body = happyPath(kind) as { data: object };
+      return ok({ data: { ...body.data, rateLimit: low } });
+    });
+    const first = setup();
+    await getProfile("ada", visitor, first.deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(await first.deps.breaker.isOpen(NOW)).toBe(false);
+    expect(first.values.has("v1:budget:server")).toBe(false);
+
+    stubWithAuth((kind) => (kind === "Year" ? ok(rateLimited) : happy(kind)));
+    const second = setup();
+    const result = await getProfile("ada", visitor, second.deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(result).toMatchObject({ status: "rate_limited" });
+    expect(await second.deps.breaker.isOpen(NOW)).toBe(false);
+  });
+
+  it("does not record their rate limit as a failure served to everyone else", async () => {
+    stubWithAuth((kind) => (kind === "Year" ? ok(rateLimited) : happy(kind)));
+    const { deps } = setup();
+    await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(await deps.cache.getFailure("ada")).toBeNull();
+  });
+
+  it("falls back to anonymous when GitHub rejects their token, and reports it once", async () => {
+    const bearers: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const bearer = (init.headers as Record<string, string>).authorization;
+        bearers.push(bearer ?? "");
+        const { query } = JSON.parse(String(init.body)) as { query: string };
+        const kind = (["Preview", "Year", "Repos"] as const).find((k) =>
+          query.includes(`query ${k}(`),
+        ) as Kind;
+        return bearer === `bearer ${USER_TOKEN}` ? unauthorized() : happy(kind);
+      }),
+    );
+    const onTokenRejected = vi.fn();
+    const { deps, charge } = setup();
+
+    const result = await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+      onTokenRejected,
+    });
+
+    expect(result).toMatchObject({ status: "ok", source: "fresh" });
+    expect(onTokenRejected).toHaveBeenCalledTimes(1);
+    // The retry is anonymous: server token and quota.
+    expect(bearers.at(-1)).toBe("bearer token");
+    expect(charge).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks an exhausted anonymous visitor to sign in again after a rejected token", async () => {
+    stubWithAuth(() => unauthorized());
+    const onTokenRejected = vi.fn();
+    const { deps } = setup({ chargeColdGeneration: async () => null });
+    const result = await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+      onTokenRejected,
+    });
+    expect(result).toEqual({
+      status: "login_required",
+      reason: "quota_exhausted",
+    });
+    expect(onTokenRejected).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not poison shared state when a token is rejected", async () => {
+    stubWithAuth(() => unauthorized());
+    const { deps } = setup({ chargeColdGeneration: async () => null });
+    await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(await deps.cache.getFailure("ada")).toBeNull();
+    expect(await deps.cache.isMissing("ada")).toBe(false);
+    expect(await deps.breaker.isOpen(NOW)).toBe(false);
+  });
+
+  it("reports a rejected server token as an upstream error, not as a visitor problem", async () => {
+    stubWithAuth(() => unauthorized());
+    const onTokenRejected = vi.fn();
+    const result = await getProfile("ada", visitor, setup().deps, {
+      onTokenRejected,
+    });
+    expect(result).toMatchObject({ status: "upstream_error" });
+    expect(onTokenRejected).not.toHaveBeenCalled();
+  });
+
+  it("fetches their own profile with the server token, so owner-only data never enters the shared cache", async () => {
+    for (const requested of ["ada", "Ada", "ADA"]) {
+      const bearers = stubWithAuth(happy);
+      const chargeColdGeneration = vi.fn(async () => null);
+      const { deps } = setup({ chargeColdGeneration });
+      const result = await getProfile(requested, visitor, deps, {
+        userToken: USER_TOKEN,
+        viewerLogin: "aDa",
+      });
+      expect(result).toMatchObject({ status: "ok", source: "fresh" });
+      expect(bearers.length).toBeGreaterThan(0);
+      expect(new Set(bearers)).toEqual(new Set(["bearer token"]));
+      // Still skips the anonymous quota.
+      expect(chargeColdGeneration).not.toHaveBeenCalled();
+    }
+  });
+
+  it("keeps the breaker rules for their own profile, since the server token pays", async () => {
+    stubWithAuth(happy);
+    const { deps } = setup();
+    await deps.breaker.record({ ...rateLimit, remaining: 100 }, NOW);
+    expect(
+      await getProfile("ada", visitor, deps, {
+        userToken: USER_TOKEN,
+        viewerLogin: "ada",
+      }),
+    ).toEqual({ status: "degraded", reason: "circuit_open" });
+  });
+
+  it("treats a session without a login as anonymous", async () => {
+    const bearers = stubWithAuth(happy);
+    const chargeColdGeneration = vi.fn(async () => null);
+    const { deps } = setup({ chargeColdGeneration });
+    expect(
+      await getProfile("grace", visitor, deps, {
+        userToken: USER_TOKEN,
+        viewerLogin: null,
+      }),
+    ).toEqual({ status: "login_required", reason: "quota_exhausted" });
+    expect(chargeColdGeneration).toHaveBeenCalledTimes(1);
+    expect(bearers).toEqual([]);
+  });
+
+  it("does not record any failure of their token for everyone else", async () => {
+    stubWithAuth((kind) =>
+      kind === "Year"
+        ? new Response(JSON.stringify({ message: "boom" }), { status: 500 })
+        : happy(kind),
+    );
+    const { deps } = setup();
+    const result = await getProfile("grace", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(result).toMatchObject({ status: "upstream_error" });
+    expect(await deps.cache.getFailure("grace")).toBeNull();
+  });
+
+  it("never logs the token", async () => {
+    stubWithAuth(happy);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    await getProfile("ada", visitor, setup().deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(
+      info.mock.calls.map((call) => String(call[0])).join("\n"),
+    ).not.toContain(USER_TOKEN);
+    expect(loggedEvents(info).at(-1)).toMatchObject({ auth: "user" });
+  });
+});

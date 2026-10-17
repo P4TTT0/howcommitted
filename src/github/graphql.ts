@@ -16,6 +16,8 @@ export type GithubError =
   | { kind: "not_found" }
   | { kind: "rate_limited"; resetAt: string | null }
   | { kind: "timeout" }
+  /** The token was rejected (revoked, expired or invalid). */
+  | { kind: "unauthorized" }
   | { kind: "upstream"; message: string };
 
 export type GraphqlResult<T> =
@@ -61,6 +63,7 @@ export async function githubGraphql<T>(
   if (response.status === 429 || isHeaderRateLimited(response)) {
     return fail({ kind: "rate_limited", resetAt: resetFromHeaders(response) });
   }
+  if (response.status === 401) return fail({ kind: "unauthorized" });
 
   let body: GraphqlBody<T>;
   try {

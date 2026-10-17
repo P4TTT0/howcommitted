@@ -74,6 +74,16 @@ export type ProfileDeps = {
 /** now/sleep/random/deadline resolved once per request. */
 type Context = {
   deps: ProfileDeps;
+  /**
+   * The signed-in visitor's own GitHub token, or null for the server token.
+   * It never touches the shared breaker or the anonymous quota, and its
+   * failures are never recorded for other visitors.
+   */
+  userToken: string | null;
+  /** A signed-in visitor (even when the server token is used): skips the anonymous quota. */
+  signedIn: boolean;
+  /** Set when GitHub rejected `userToken` (revoked or expired). */
+  tokenRejected: boolean;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
   random: () => number;
@@ -88,17 +98,29 @@ function newTally(): Tally {
   return { cost: 0, remaining: null, years: 0 };
 }
 
-function createContext(deps: ProfileDeps): Context {
+function createContext(
+  deps: ProfileDeps,
+  userToken: string | null = null,
+  signedIn = false,
+): Context {
   const now = deps.now ?? (() => new Date());
   const deadlineMs = deps.deadlineMs ?? GENERATION_DEADLINE_MS;
   return {
     deps,
+    userToken,
+    signedIn,
+    tokenRejected: false,
     now,
     sleep: deps.sleep ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms))),
     random: deps.random ?? Math.random,
     deadline: now().getTime() + deadlineMs,
     signal: AbortSignal.timeout(deadlineMs),
   };
+}
+
+/** The token for this request's GitHub calls: the visitor's own, else the server's. */
+function tokenFor(ctx: Context): string {
+  return ctx.userToken ?? ctx.deps.getToken();
 }
 
 /** A Redis failure on a path that must not proceed without Redis. */
@@ -152,6 +174,14 @@ async function fetchAndRecord<T>(
 ): Promise<GraphqlResult<T>> {
   const result = await call();
   recordCost(tally, result.rateLimit);
+  if (ctx.userToken) {
+    // The circuit breaker guards the server token's budget only: a visitor's
+    // own budget must neither open nor close it.
+    if (!result.ok && result.error.kind === "unauthorized") {
+      ctx.tokenRejected = true;
+    }
+    return result;
+  }
   const { breaker } = ctx.deps;
   await orElse(
     "breaker",
@@ -212,7 +242,7 @@ async function fetchUser(
 ): Promise<{ status: "ok"; user: UserProfile } | Failure> {
   const { cache } = ctx.deps;
   const result = await fetchAndRecord(ctx, tally, () =>
-    fetchUserPreview(ctx.deps.getToken(), login, ctx.signal),
+    fetchUserPreview(tokenFor(ctx), login, ctx.signal),
   );
   if (!result.ok) return failureFrom(login, result.error, ctx);
   await orElse("setUser", () => cache.setUser(result.data), undefined);
@@ -297,17 +327,70 @@ async function lookup(login: string, ctx: Context): Promise<Lookup> {
   return { snapshot, result: { status: "ok", source: "cache", ...complete } };
 }
 
+export type ProfileOptions = {
+  /**
+   * The signed-in visitor's own GitHub token. A cold generation then spends
+   * their GitHub budget instead of the anonymous quota and the server token,
+   * and stays out of the circuit breaker. The lock and the shared cache still
+   * apply, and what they fetch lands in the shared cache.
+   */
+  userToken?: string | null;
+  /**
+   * The login `userToken` belongs to. Required for the token to be used: without
+   * it the visitor counts as anonymous. When it equals the requested login
+   * (case-insensitive) the server token fetches instead, so anything only the
+   * owner can see (such as private contribution counts) can never reach the
+   * shared cache. They still skip the anonymous quota.
+   */
+  viewerLogin?: string | null;
+  /** Called when GitHub rejected `userToken`; the request is then served as anonymous. */
+  onTokenRejected?: () => void;
+};
+
+/** Internal: the visitor's own token was rejected by GitHub (revoked or expired). */
+type TokenRejected = { status: "token_rejected" };
+
+const TOKEN_REJECTED: TokenRejected = { status: "token_rejected" };
+
 /**
  * Full profile. Served from cache when complete. Otherwise one request holds a
  * Redis lock and generates it; concurrent requests for the same login poll the
  * lock cheaply, then read what the leader cached (or the failure it recorded).
+ * A rejected visitor token degrades to the anonymous path instead of failing.
  */
 export async function getProfile(
   login: string,
   visitor: Visitor,
   deps: ProfileDeps,
+  options: ProfileOptions = {},
 ): Promise<ProfileResult> {
-  const ctx = createContext(deps);
+  const signedIn = Boolean(options.userToken && options.viewerLogin);
+  const ownProfile =
+    signedIn && options.viewerLogin?.toLowerCase() === login.toLowerCase();
+  const first = await resolveProfile(
+    login,
+    visitor,
+    createContext(
+      deps,
+      signedIn && !ownProfile ? (options.userToken ?? null) : null,
+      signedIn,
+    ),
+  );
+  if (first.status !== "token_rejected") return first;
+  options.onTokenRejected?.();
+  const retry = await resolveProfile(login, visitor, createContext(deps));
+  // Unreachable: an anonymous context has no visitor token to reject.
+  return retry.status === "token_rejected"
+    ? { status: "upstream_error", message: "Unexpected token rejection" }
+    : retry;
+}
+
+async function resolveProfile(
+  login: string,
+  visitor: Visitor,
+  ctx: Context,
+): Promise<ProfileResult | TokenRejected> {
+  const { deps } = ctx;
 
   const cached = await lookup(login, ctx);
   if (cached.result) return cached.result;
@@ -352,10 +435,10 @@ async function generate(
   login: string,
   visitor: Visitor,
   ctx: Context,
-): Promise<ProfileResult> {
+): Promise<ProfileResult | TokenRejected> {
   const startedAt = ctx.now().getTime();
   const tally = newTally();
-  let result: ProfileResult;
+  let result: ProfileResult | TokenRejected;
   try {
     result = await generateCold(login, visitor, ctx, tally);
   } catch (error) {
@@ -365,6 +448,8 @@ async function generate(
   }
   logEvent("generation", {
     login: login.toLowerCase(),
+    auth: ctx.userToken ? "user" : "server",
+    signedIn: ctx.signedIn,
     status: result.status,
     source: result.status === "ok" ? result.source : null,
     years: tally.years,
@@ -380,7 +465,7 @@ async function generateCold(
   visitor: Visitor,
   ctx: Context,
   tally: Tally,
-): Promise<ProfileResult> {
+): Promise<ProfileResult | TokenRejected> {
   const { cache, breaker } = ctx.deps;
 
   // Another request may have finished while we waited for the lock.
@@ -395,17 +480,21 @@ async function generateCold(
   );
   if (failed) return failed;
 
-  if (await mustSucceed(() => breaker.isOpen(ctx.now()))) {
+  // The breaker protects the server token only; a signed-in visitor spends
+  // their own budget and is not stopped by it.
+  if (!ctx.userToken && (await mustSucceed(() => breaker.isOpen(ctx.now())))) {
     return { status: "degraded", reason: "circuit_open" };
   }
 
   // Only a profile with no history cached at all is a new cold generation.
   // The preview route caches the user for free, so the user does not count.
   // Completing partial data or refreshing a year is free for the visitor.
-  const charge = hasHistoryCached(snapshot)
-    ? null
-    : await mustSucceed(() => ctx.deps.chargeColdGeneration(visitor));
-  if (!hasHistoryCached(snapshot) && !charge) {
+  // Signed-in visitors skip the anonymous quota: their own token pays.
+  const needsCharge = !ctx.signedIn && !hasHistoryCached(snapshot);
+  const charge = needsCharge
+    ? await mustSucceed(() => ctx.deps.chargeColdGeneration(visitor))
+    : null;
+  if (needsCharge && !charge) {
     return { status: "login_required", reason: "quota_exhausted" };
   }
 
@@ -424,16 +513,22 @@ async function generateCold(
   }
   if ("failure" in outcome) {
     const { failure } = outcome;
+    // Nothing is cached for others: the failure belongs to this visitor's token.
+    if (ctx.tokenRejected) return TOKEN_REJECTED;
     // A failed generation hands the run back, except for unknown users:
     // refunding those would make probing logins free.
     // Unknown users already have the longer negative cache instead of a marker.
     if (failure.status !== "not_found") {
       await refund();
-      await orElse(
-        "setFailure",
-        () => cache.setFailure(login, failure),
-        undefined,
-      );
+      // Failures of a visitor's own token (limits, errors) are theirs alone:
+      // never served to everyone else.
+      if (!ctx.userToken) {
+        await orElse(
+          "setFailure",
+          () => cache.setFailure(login, failure),
+          undefined,
+        );
+      }
     }
     return failure;
   }
@@ -509,7 +604,7 @@ async function fetchMissingYears(
     async (year) => {
       tally.years += 1;
       const result = await fetchAndRecord(ctx, tally, () =>
-        fetchYear(ctx.deps.getToken(), login, year, signal),
+        fetchYear(tokenFor(ctx), login, year, signal),
       );
       if (result.ok) {
         done.add(year);
@@ -525,7 +620,8 @@ async function fetchMissingYears(
       state.failure ??= result.error;
       if (
         result.error.kind === "rate_limited" ||
-        result.error.kind === "timeout"
+        result.error.kind === "timeout" ||
+        result.error.kind === "unauthorized"
       ) {
         fanOut.abort();
       }
@@ -549,7 +645,7 @@ async function fetchMissingRepos(
 ): Promise<{ repos: ReposResult } | { failure: Failure }> {
   if (snapshot.repos) return { repos: snapshot.repos };
   const result = await fetchAndRecord(ctx, tally, () =>
-    fetchRepos(ctx.deps.getToken(), login, ctx.signal),
+    fetchRepos(tokenFor(ctx), login, ctx.signal),
   );
   if (!result.ok) {
     return { failure: await failureFrom(login, result.error, ctx) };

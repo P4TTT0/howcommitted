@@ -315,6 +315,26 @@ describe("fetchRepos", () => {
     languages: { edges: [{ size: 100, node: { name: "TypeScript" } }] },
   });
 
+  it("asks for public repositories only, so private names never reach the shared cache", async () => {
+    const fetchMock = stubFetchSequence({
+      data: {
+        rateLimit,
+        user: {
+          repositories: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [node("a")],
+          },
+        },
+      },
+    });
+    await fetchRepos("t", "a");
+    const init = (
+      fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    )[1];
+    const { query } = JSON.parse(String(init.body)) as { query: string };
+    expect(query).toContain("privacy: PUBLIC");
+  });
+
   it("follows pagination and maps languages", async () => {
     const fetchMock = stubFetchSequence(
       {

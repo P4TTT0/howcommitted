@@ -1,6 +1,6 @@
 # Architecture
 
-Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. The solo vertical slice works end to end: landing search (`features/search`), `/{login}` (`features/experience`) and a scene sequencer (`features/sequencer`) playing year blocks, then the cumulative line driven by real history, then the end card (`features/scenes`). `/lab` keeps the generated profile for playback work outside production. Versus, the other scenes, share and sign-in are not built yet.
+Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. The solo vertical slice works end to end: landing search (`features/search`), `/{login}` (`features/experience`) and a scene sequencer (`features/sequencer`) playing year blocks, then the cumulative line driven by real history, then the end card (`features/scenes`). `/lab` keeps the generated profile for playback work outside production. GitHub sign-in works (see Auth). Versus, the other scenes and share are not built yet.
 
 ## Stack
 
@@ -26,6 +26,8 @@ src/app/              Thin Next routes only
   [...users]/opengraph-image.tsx (planned)
   api/user/[login]/       Exact-login preview, rate limited per IP
   api/history/[login]/    Full profile history (cache, coalescing, quota)
+  api/auth/github/        Sign-in start; callback/ finishes it
+  api/auth/signout/       POST, clears the session cookie
   lab/page.tsx            Playback lab: previews and local dev only, 404 in production
 src/domain/           Pure TS types and metrics
 src/github/           Server-only GraphQL client, queries, cache
@@ -89,11 +91,13 @@ GitHub GraphQL with a server token. Costs measured live in October 2026 against 
 |------|-------|------|------|
 | Preview | `user(login){login name avatarUrl createdAt contributionsCollection{contributionYears}}`. Exact lookup, no search API | 1 point | ~0.6 s |
 | Contributions | One request per contribution year, in parallel (concurrency cap ~6): totals (commits, PRs, reviews, issues, restricted/private count) and the calendar from a full-year window, plus, from four quarter windows, `commitContributionsByRepository(maxRepositories:100){contributions(first:100){nodes{occurredAt commitCount}}}`, summed by date for true commits per day | 1 point each | ~1.8 s each |
-| Repos | `repositories(ownerAffiliations:OWNER, isFork:false, orderBy CREATED_AT, first:100)`, paginated, with `createdAt`, `stargazerCount`, `languages(first:10 by SIZE)` | 1 point | ~2.2 s |
+| Repos | `repositories(ownerAffiliations:OWNER, isFork:false, privacy:PUBLIC, orderBy CREATED_AT, first:100)`, paginated, with `createdAt`, `stargazerCount`, `languages(first:10 by SIZE)` | 1 point | ~2.2 s |
 
 For the measured year (2023), summed daily commits matched `totalCommitContributions` exactly (4,458).
 
 Profile cost is about contribution years + 2 points, so about 280 uncached profiles per hour for a 16-year profile, and about 500 for an 8-year profile (per 5,000-point token).
+
+Public repositories only: the repos query filters `privacy: PUBLIC`, so no token (a visitor's or the server PAT) can put a private repository's name, dates, stars or languages in the shared cache. No other query reads repository details.
 
 ### Gotchas
 
@@ -134,7 +138,7 @@ Key format (bumping the version in `cache.ts` invalidates cached data; v2 droppe
 
 - `v3:user:{login}`
 - `v3:year:{login}:{year}`
-- `v3:repos:{login}`
+- `v4:repos:{login}` (v4 because v3 entries came from a query without the public-only filter)
 
 Logins are lowercased in keys. Supporting keys: `v3:missing:{login}` (negative cache, 1 h), `v3:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v3:user:{login}`).
 
@@ -144,8 +148,8 @@ Logins are lowercased in keys. Supporting keys: `v3:missing:{login}` (negative c
 - Anonymous visitors get 2 cold generations per day. The optional `QUOTA_COLD_PER_DAY` env var overrides it (a whole number; 0 turns anonymous cold runs off): previews set it higher for testing, production keeps the default. A generation is cold only when no year and no repos are cached (a cached preview does not count, so preview then history is still charged); completing partial data or refreshing a year is free. A failed generation refunds the run, except for unknown users, so probing logins is not free. Each identity is charged first and checked after, and everything is rolled back when either is over its limit, so concurrent requests cannot exceed the limit. Cold attempts are also limited per IP per minute. Only after the runs are used is the GitHub sign-in prompt shown, never upfront.
 - Identity: the signed `hc_visitor` cookie (HMAC with `QUOTA_COOKIE_SECRET`, at least 32 characters) plus the client IP. The IP comes from `x-real-ip`, then `x-vercel-forwarded-for`, then `x-forwarded-for`, validated as an IP. IPv6 clients are keyed by their /64. Requests with no usable IP count against the cookie only for cold runs and share stricter preview and cold-attempt limits. Visitors behind a shared IP (offices, CGNAT) share its daily runs. The header trust above assumes Vercel; self-hosting needs a trusted proxy that sets `x-real-ip` itself.
 - The cookie and IP quota is a soft gate (bypassable by clearing cookies or using a VPN). The global circuit breaker is the hard gate.
-- Signed-in visitors use their own token (5,000 points/hour each). Profiles they fetch populate the shared cache.
-- Global circuit breaker: when the server token's remaining points drop below 20%, anonymous cold generations and uncached previews stop (cache only, plus the sign-in prompt).
+- Signed-in visitors skip the anonymous quota and use their own token (5,000 points/hour each) for cold generations of other people's profiles; they still go through the coalescing lock, and the profiles they fetch populate the shared cache. Their own profile is the exception: it is fetched with the server token (so it is under the breaker), because their token may see owner-only data that must never enter the shared cache. Uncached previews still use the server token. A failure of a visitor's own token is never cached for others.
+- Global circuit breaker: when the server token's remaining points drop below 20%, anonymous cold generations and uncached previews stop (cache only, plus the sign-in prompt). It protects the server token only: a signed-in visitor is not stopped by it, and their own token's budget and rate limits never open or close it nor reach the shared failure marker.
 - The breaker reads `rateLimit { cost remaining limit resetAt }` from every GitHub response, keeps the lowest value reported per window, and opens at once on a rate limit error (reset time from GitHub, or 60 s). It closes again once the reported window resets. Open and close transitions are logged.
 - Request coalescing: a Redis lock ensures simultaneous requests for the same uncached profile trigger one fetch. Other requests poll the lock with 0.5 to 2 s jittered backoff, then read the cache (or the leader's failure, kept for 30 s so nobody retries a failing upstream). One 50 s deadline covers waiting and fetching; past it, or with under 5 s left when a waiter wins the lock, they answer `degraded` (503). `maxDuration` of the history route is 60 s.
 - A cold generation stops launching years and aborts in-flight requests on the first rate limit or timeout. Years that already landed stay cached, so a retry only pays for the rest.
@@ -160,6 +164,38 @@ Logins are lowercased in keys. Supporting keys: `v3:missing:{login}` (negative c
 "Sign in with GitHub", public data only (no extra scopes). No database. The token lives in an encrypted httpOnly cookie.
 
 Gate copy: "Free runs used. Sign in with GitHub to keep going — it uses your own quota, and we only read public data."
+
+It appears only after the free runs are used (the `login_required` 401), never upfront, as one small link (`features/experience/SignInLink.tsx`) on the failed screen.
+
+### Flow
+
+1. `GET /api/auth/github?returnTo=/ada` mints a random `state`, stores it with the return path in a sealed `hc_oauth` cookie (HttpOnly, SameSite=Lax, 10 minutes, path `/api/auth`) and redirects to GitHub's authorize URL. No `scope` and no `redirect_uri` are sent: public data only, and GitHub uses the callback registered on the app.
+2. `GET /api/auth/github/callback` verifies `state` against the cookie in constant time before anything else (a mismatch, a missing or an expired cookie is a 400 and the code is never redeemed), exchanges the code server side, looks up the token's owner (`GET /user`), and stores token and login in the sealed `hc_session` cookie. It then redirects to the return path. Denied access, a failed exchange or an unknown owner returns to the page with no session.
+3. `POST /api/auth/signout` revokes the token at GitHub (`DELETE /applications/{client_id}/token`, basic auth with the app credentials; best effort with a 3 s timeout, never blocks or fails the sign-out, never logs the token), clears `hc_session` and redirects. It refuses a cross-site `Origin`, and a request with no `Origin` unless `Sec-Fetch-Site` is `same-origin`.
+
+Both the start and the callback are rate limited per IP (10 per minute, 3 for requests with no usable IP; Upstash sliding window like the other limits), before anything reaches GitHub, so a replayed state cannot make the server hammer GitHub's token endpoint.
+
+### Privacy: the viewer's own profile
+
+The session stores the viewer's login. When the requested login equals it (case-insensitive), the history is fetched with the server token, never the visitor's, so owner-only data (for example private contribution counts the owner has not made public) cannot reach the shared cache; the visitor still skips the anonymous quota, and the breaker applies as for any server-token fetch. A session without a stored login counts as anonymous.
+
+`returnTo` only accepts a same-origin path made of URL-safe characters, not starting with `//` and not under `/api/`; anything else becomes `/` (checked at sign-in and again at the callback).
+
+### Session cookie
+
+`hc_session` holds the visitor's own GitHub token, sealed with AES-256-GCM (`github/seal.ts`, `node:crypto`: no extra dependency, and cookies are only handled by Node route handlers). The key is derived with HKDF from `AUTH_COOKIE_SECRET` per purpose, the purpose is bound as additional authenticated data, and the expiry lives inside the ciphertext, so a tampered, truncated, expired or cross-purpose value is rejected. HttpOnly, SameSite=Lax, Secure in production, 7 days. The token never reaches the browser, a response body or a log line, and each request only ever uses the token in its own cookie (tokens are never pooled).
+
+A token GitHub rejects (revoked, expired) clears the cookie and the request is served as anonymous, never a 500: cached data, or the anonymous quota, or the sign-in prompt again. A missing `AUTH_COOKIE_SECRET` with a session cookie present is logged and treated as anonymous.
+
+### Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `GITHUB_OAUTH_CLIENT_ID` | Client id of the GitHub OAuth app |
+| `GITHUB_OAUTH_CLIENT_SECRET` | Its client secret (server only) |
+| `AUTH_COOKIE_SECRET` | Encrypts the session and state cookies. At least 32 characters, random, different from `QUOTA_COOKIE_SECRET`. Rotating it signs everyone out |
+
+Production uses an OAuth app whose callback URL is `https://www.howcommitted.com/api/auth/github/callback` (the apex redirects to `www`, and the state cookie is host-bound, so sign-in must start and finish on `www`). Preview deployments need their own OAuth app, since Vercel preview URLs vary: register it with the callback of a stable preview alias (or a branch URL) and give previews that app's credentials and their own `AUTH_COOKIE_SECRET`. A preview must never hold the production OAuth secret.
 
 ## Environments
 

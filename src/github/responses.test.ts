@@ -30,7 +30,7 @@ describe("historyResponse status mapping", () => {
     [{ status: "timeout" }, 504, "timeout"],
     [{ status: "upstream_error", message: "boom" }, 502, "upstream_error"],
   ])("maps %j to %i", async (result, status, code) => {
-    const response = historyResponse(result, null);
+    const response = historyResponse(result, []);
     expect(response.status).toBe(status);
     expect(await codeOf(response)).toBe(code);
     expect(response.headers.get("cache-control")).toBe("no-store");
@@ -39,7 +39,7 @@ describe("historyResponse status mapping", () => {
   it("names the degraded reason and the preview limit in the body", async () => {
     const degraded = historyResponse(
       { status: "degraded", reason: "circuit_open" },
-      null,
+      [],
     );
     expect(
       ((await degraded.json()) as { error: { reason: string } }).error.reason,
@@ -53,13 +53,13 @@ describe("historyResponse status mapping", () => {
   it("tells clients when to retry while degraded", () => {
     const response = historyResponse(
       { status: "degraded", reason: "circuit_open" },
-      null,
+      [],
     );
     expect(response.headers.get("retry-after")).toBe("60");
   });
 
   it("keeps the visitor cookie on error responses", () => {
-    const response = historyResponse({ status: "not_found" }, "hc_visitor=x");
+    const response = historyResponse({ status: "not_found" }, ["hc_visitor=x"]);
     expect(response.headers.get("set-cookie")).toBe("hc_visitor=x");
   });
 
@@ -81,7 +81,7 @@ describe("historyResponse status mapping", () => {
           repos: [],
         },
       },
-      "hc_visitor=y",
+      ["hc_visitor=y"],
     );
     expect(response.status).toBe(200);
     expect(response.headers.get("set-cookie")).toBe("hc_visitor=y");
@@ -139,7 +139,7 @@ describe("history response contract", () => {
           ],
         },
       },
-      null,
+      [],
     );
     // biome-ignore lint/suspicious/noExplicitAny: ad-hoc JSON walking in a contract test
     const body = (await response.json()) as Record<string, any>;

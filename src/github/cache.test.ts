@@ -85,17 +85,17 @@ describe("createCache", () => {
     expect([...values.keys()].sort()).toEqual([
       "preview:v3:failed:ghost",
       "preview:v3:missing:ghost",
-      "preview:v3:repos:torvalds",
       "preview:v3:user:torvalds",
       "preview:v3:year:torvalds:2024",
       "preview:v3:year:torvalds:2026",
+      "preview:v4:repos:torvalds",
     ]);
     expect(ttls.get("preview:v3:user:torvalds")).toBe(TTL.user);
     expect(ttls.get("preview:v3:year:torvalds:2024")).toBe(TTL.yearPast);
     expect(ttls.get("preview:v3:year:torvalds:2026")).toBe(
       TTL.yearCurrentRetained,
     );
-    expect(ttls.get("preview:v3:repos:torvalds")).toBe(TTL.repos);
+    expect(ttls.get("preview:v4:repos:torvalds")).toBe(TTL.repos);
     expect(ttls.get("preview:v3:missing:ghost")).toBe(TTL.missing);
     expect(ttls.get("preview:v3:failed:ghost")).toBe(TTL.failure);
   });

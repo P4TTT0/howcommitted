@@ -83,6 +83,7 @@ query Repos($login: String!, $after: String) {
     repositories(
       ownerAffiliations: OWNER
       isFork: false
+      privacy: PUBLIC
       orderBy: { field: CREATED_AT, direction: ASC }
       first: 100
       after: $after

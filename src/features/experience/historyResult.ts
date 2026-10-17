@@ -116,6 +116,8 @@ export type FailureCopy = {
   message: string;
   /** Trying again can help, so offer a retry. */
   retry: boolean;
+  /** Offer "Sign in with GitHub": the free runs are used. */
+  signIn?: boolean;
 };
 
 export function failureCopy(
@@ -130,8 +132,9 @@ export function failureCopy(
     case "login_required":
       return {
         message:
-          "Free runs used for today. Sign in with GitHub is coming soon.",
+          "Free runs used. Sign in with GitHub to keep going — it uses your own quota, and we only read public data.",
         retry: false,
+        signIn: true,
       };
     case "breather":
       return {
