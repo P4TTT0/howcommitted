@@ -42,7 +42,24 @@ describe("isYearStale", () => {
   it("only the current year goes stale, after 6 hours", () => {
     expect(isYearStale(entry(2026, "2026-10-16T06:01:00Z"), NOW)).toBe(false);
     expect(isYearStale(entry(2026, "2026-10-16T05:59:00Z"), NOW)).toBe(true);
-    expect(isYearStale(entry(2025, "2020-01-01T00:00:00Z"), NOW)).toBe(false);
+    expect(isYearStale(entry(2025, "2026-03-01T00:00:00Z"), NOW)).toBe(false);
+  });
+
+  it("goes stale across the year boundary when fetched before the year ended", () => {
+    const fetchedInDecember = entry(2026, "2026-12-31T23:00:00Z");
+    expect(
+      isYearStale(fetchedInDecember, new Date("2026-12-31T23:30:00Z")),
+    ).toBe(false);
+    expect(
+      isYearStale(fetchedInDecember, new Date("2027-01-01T00:30:00Z")),
+    ).toBe(true);
+    // A year fetched after it ended is final, and so are older years fetched later.
+    expect(
+      isYearStale(
+        entry(2026, "2027-01-02T00:00:00Z"),
+        new Date("2027-06-01T00:00:00Z"),
+      ),
+    ).toBe(false);
   });
 });
 

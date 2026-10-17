@@ -18,6 +18,8 @@ import {
 export const YEAR_CONCURRENCY = 6;
 /** Single budget for one request: lock waits plus the whole fan-out. Vercel allows 60 s. */
 export const GENERATION_DEADLINE_MS = 50_000;
+/** A new fetch is not started with less than this left of the deadline. */
+export const MIN_GENERATION_BUDGET_MS = 5_000;
 /** Waiters back off between these bounds, with jitter. */
 export const WAIT_MIN_MS = 500;
 export const WAIT_MAX_MS = 2_000;
@@ -55,6 +57,7 @@ export type ProfileDeps = {
   sleep?: (ms: number) => Promise<void>;
   random?: () => number;
   deadlineMs?: number;
+  minBudgetMs?: number;
 };
 
 /** now/sleep/random/deadline resolved once per request. */
@@ -196,8 +199,8 @@ async function loadUser(
 type Snapshot = {
   user: UserProfile | null;
   years: Map<number, YearSummary>;
-  /** The current year is cached but older than its freshness window. */
-  staleCurrentYear: boolean;
+  /** Cached years to refresh: the current year past its window, or a year that ended after it was fetched. */
+  staleYears: number[];
   repos: ReposResult | null;
 };
 
@@ -207,7 +210,7 @@ async function readSnapshot(login: string, ctx: Context): Promise<Snapshot> {
   const now = ctx.now();
   const user = await orElse("getUser", () => cache.getUser(login), null);
   const years = new Map<number, YearSummary>();
-  let staleCurrentYear = false;
+  const staleYears: number[] = [];
   if (user) {
     const entries = await Promise.all(
       yearsNeeded(user, now).map((year) =>
@@ -221,11 +224,11 @@ async function readSnapshot(login: string, ctx: Context): Promise<Snapshot> {
     for (const entry of entries) {
       if (!entry) continue;
       years.set(entry.summary.year, entry.summary);
-      if (isYearStale(entry, now)) staleCurrentYear = true;
+      if (isYearStale(entry, now)) staleYears.push(entry.summary.year);
     }
   }
   const repos = await orElse("getRepos", () => cache.getRepos(login), null);
-  return { user, years, staleCurrentYear, repos };
+  return { user, years, staleYears, repos };
 }
 
 type Complete = { profile: ProfileData; reposTruncated: boolean };
@@ -248,7 +251,7 @@ function completeProfile(snapshot: Snapshot, now: Date): Complete | null {
 
 type Lookup = { snapshot: Snapshot; result: ProfileResult | null };
 
-/** Negative cache, then a complete cached profile. Stale current years are served and refreshed. */
+/** Negative cache, then a complete cached profile. Stale years are served and refreshed. */
 async function lookup(login: string, ctx: Context): Promise<Lookup> {
   const { cache, scheduleRefresh } = ctx.deps;
   const snapshot = await readSnapshot(login, ctx);
@@ -257,8 +260,16 @@ async function lookup(login: string, ctx: Context): Promise<Lookup> {
   }
   const complete = completeProfile(snapshot, ctx.now());
   if (!complete) return { snapshot, result: null };
-  if (snapshot.staleCurrentYear && scheduleRefresh) {
-    scheduleRefresh(() => refreshCurrentYear(login, ctx.deps));
+  if (snapshot.staleYears.length > 0 && scheduleRefresh) {
+    // After a failed refresh, serve stale data quietly instead of retrying on every view.
+    const backedOff = await orElse(
+      "hasRefreshFailure",
+      () => cache.hasRefreshFailure(login),
+      true,
+    );
+    if (!backedOff) {
+      scheduleRefresh(() => refreshYears(login, snapshot.staleYears, ctx.deps));
+    }
   }
   return { snapshot, result: { status: "ok", source: "cache", ...complete } };
 }
@@ -287,6 +298,14 @@ export async function getProfile(
     }
     if (release) {
       try {
+        // Too little budget left to finish a fetch: do not start one that
+        // would only be cut off and leave a misleading failure marker.
+        if (
+          ctx.deadline - ctx.now().getTime() <
+          (deps.minBudgetMs ?? MIN_GENERATION_BUDGET_MS)
+        ) {
+          return { status: "degraded", reason: "busy" };
+        }
         return await generate(login, ctx);
       } finally {
         // A failed release must never replace a good result; the lock TTL heals it.
@@ -417,9 +436,11 @@ async function fetchMissingYears(
   snapshot: Snapshot,
   user: UserProfile,
 ): Promise<Failure | null> {
+  // Years that went stale (for example one that ended since it was fetched) are refetched too.
   const missing = yearsNeeded(user, ctx.now()).filter(
-    (year) => !snapshot.years.has(year),
+    (year) => !snapshot.years.has(year) || snapshot.staleYears.includes(year),
   );
+  const done = new Set<number>();
   const fanOut = new AbortController();
   const signal = AbortSignal.any([ctx.signal, fanOut.signal]);
   const state: { failure: GithubError | null } = { failure: null };
@@ -433,6 +454,7 @@ async function fetchMissingYears(
         fetchYear(ctx.deps.getToken(), login, year, signal),
       );
       if (result.ok) {
+        done.add(year);
         snapshot.years.set(year, result.data);
         await orElse(
           "setYear",
@@ -455,7 +477,7 @@ async function fetchMissingYears(
 
   if (state.failure) return failureFrom(login, state.failure, ctx);
   // Launches were skipped because the deadline passed.
-  if (missing.some((year) => !snapshot.years.has(year))) {
+  if (missing.some((year) => !done.has(year))) {
     return { status: "timeout" };
   }
   return null;
@@ -483,26 +505,42 @@ async function fetchMissingRepos(
   return { repos: result.data };
 }
 
-/** Background refresh of a stale current year. Skips when someone else is generating or the breaker is open. */
-async function refreshCurrentYear(
+/**
+ * Background refresh of stale years. Skips when someone else is generating or
+ * the breaker is open. A failure leaves a short marker so refreshes back off.
+ */
+async function refreshYears(
   login: string,
+  years: number[],
   deps: ProfileDeps,
 ): Promise<void> {
   const ctx = createContext(deps);
-  const year = ctx.now().getUTCFullYear();
+  const markFailed = () =>
+    orElse(
+      "markRefreshFailure",
+      () => deps.cache.markRefreshFailure(login),
+      undefined,
+    );
   try {
     const release = await deps.lock.acquire(login);
     if (!release) return;
     try {
       if (await deps.breaker.isOpen(ctx.now())) return;
-      const result = await fetchAndRecord(ctx, newTally(), () =>
-        fetchYear(deps.getToken(), login, year, ctx.signal),
-      );
-      if (result.ok) await deps.cache.setYear(login, result.data, ctx.now());
+      for (const year of years) {
+        const result = await fetchAndRecord(ctx, newTally(), () =>
+          fetchYear(deps.getToken(), login, year, ctx.signal),
+        );
+        if (!result.ok) {
+          await markFailed();
+          return;
+        }
+        await deps.cache.setYear(login, result.data, ctx.now());
+      }
     } finally {
       await orElse("unlock", release, undefined);
     }
   } catch (error) {
     logEvent("refresh_error", { login, message: String(error) });
+    await markFailed();
   }
 }

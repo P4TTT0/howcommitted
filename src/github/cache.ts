@@ -21,6 +21,8 @@ export const TTL = {
   missing: HOUR,
   /** Short cooldown so waiters and retries do not hammer a failing upstream. */
   failure: 30,
+  /** After a failed background refresh, stop scheduling refreshes for a while. */
+  refreshFailure: 5 * 60,
 } as const;
 
 /** Bump the version segment to invalidate everything at once. */
@@ -38,12 +40,18 @@ export function ttlForYear(year: number, now: Date): number {
   return isCurrentYear(year, now) ? TTL.yearCurrentRetained : TTL.yearPast;
 }
 
-/** Past years never go stale; the current year does after `TTL.yearCurrent`. */
+/**
+ * The current year goes stale after `TTL.yearCurrent`. A year fetched while it
+ * was still running (or earlier) is also stale once the year is over, so
+ * late-December commits get picked up. Entries fetched after the year ended
+ * are final.
+ */
 export function isYearStale(entry: CachedYear, now: Date): boolean {
-  return (
-    isCurrentYear(entry.summary.year, now) &&
-    now.getTime() - Date.parse(entry.fetchedAt) > TTL.yearCurrent * 1000
-  );
+  const { year } = entry.summary;
+  if (isCurrentYear(year, now)) {
+    return now.getTime() - Date.parse(entry.fetchedAt) > TTL.yearCurrent * 1000;
+  }
+  return new Date(entry.fetchedAt).getUTCFullYear() <= year;
 }
 
 export function createCache(store: Store, prefix: string) {
@@ -81,6 +89,12 @@ export function createCache(store: Store, prefix: string) {
       (await store.get(key("missing", login))) !== null,
     markMissing: (login: string) =>
       store.set(key("missing", login), 1, { ex: TTL.missing }),
+
+    /** Set when a background refresh failed; refreshes are not scheduled while it lives. */
+    hasRefreshFailure: async (login: string) =>
+      (await store.get(key("refresh-failed", login))) !== null,
+    markRefreshFailure: (login: string) =>
+      store.set(key("refresh-failed", login), 1, { ex: TTL.refreshFailure }),
 
     /** Last failed generation, served to waiters instead of retrying. */
     getFailure: (login: string) => store.get<Failure>(key("failed", login)),

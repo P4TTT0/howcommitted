@@ -253,7 +253,10 @@ describe("getProfile", () => {
           }),
       ),
     );
-    const result = await getProfile("ada", setup({ deadlineMs: 5 }).deps);
+    const result = await getProfile(
+      "ada",
+      setup({ deadlineMs: 5, minBudgetMs: 0 }).deps,
+    );
     expect(result).toEqual({ status: "timeout" });
     expect(GENERATION_DEADLINE_MS).toBeLessThan(60_000);
   });
@@ -388,6 +391,70 @@ describe("getProfile", () => {
     // Fresh again: no further refresh is scheduled.
     await getProfile("ada", stale);
     expect(tasks).toHaveLength(1);
+  });
+
+  it("refetches a year that ended after it was cached, together with the new year", async () => {
+    const calls = stubGithub((kind) =>
+      kind === "Preview" ? userBody([2026, 2025, 2024]) : happyPath(kind),
+    );
+    const { deps } = setup({ now: () => new Date("2026-12-31T23:00:00Z") });
+    await getProfile("ada", deps);
+    expect(calls.Year).toBe(3);
+
+    const newYear: ProfileDeps = {
+      ...deps,
+      now: () => new Date("2027-01-01T01:00:00Z"),
+    };
+    expect(await getProfile("ada", newYear)).toMatchObject({
+      status: "ok",
+      source: "fresh",
+    });
+    // 2027 is new and 2026 went stale; 2025 and 2024 stay cached.
+    expect(calls.Year).toBe(5);
+    expect(await getProfile("ada", newYear)).toMatchObject({ source: "cache" });
+    expect(calls.Year).toBe(5);
+  });
+
+  it("backs off from refreshes after a failed refresh", async () => {
+    stubGithub(happyPath);
+    const { deps } = setup();
+    await getProfile("ada", deps);
+
+    const tasks: (() => Promise<void>)[] = [];
+    const stale: ProfileDeps = {
+      ...deps,
+      now: () => new Date(NOW.getTime() + 7 * 60 * 60 * 1000),
+      scheduleRefresh: (task) => tasks.push(task),
+    };
+    await getProfile("ada", stale);
+    expect(tasks).toHaveLength(1);
+
+    stubGithub((kind) =>
+      kind === "Year" ? { errors: [{ message: "boom" }] } : happyPath(kind),
+    );
+    await tasks[0]?.();
+
+    // The failed refresh left a marker: stale data keeps being served quietly.
+    expect(await getProfile("ada", stale)).toMatchObject({ source: "cache" });
+    expect(tasks).toHaveLength(1);
+  });
+
+  it("does not start a fetch when the lock is won with almost no budget left", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps, values } = setup();
+    const held = await deps.lock.acquire("ada");
+    let clock = NOW.getTime();
+    const result = await getProfile("ada", {
+      ...deps,
+      now: () => new Date(clock),
+      sleep: async () => {
+        clock += GENERATION_DEADLINE_MS - 2_000;
+        await held?.();
+      },
+    });
+    expect(result).toEqual({ status: "degraded", reason: "busy" });
+    expect(calls).toEqual({ Preview: 0, Year: 0, Repos: 0 });
+    expect(values.has(deps.cache.key("failed", "ada"))).toBe(false);
   });
 
   it("logs one structured line per generation with cost and remaining budget", async () => {
