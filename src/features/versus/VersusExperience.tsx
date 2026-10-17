@@ -9,6 +9,7 @@ import {
 } from "@/features/experience/historyResult";
 import { consumeIntent } from "@/features/experience/intent";
 import { LoadingMoment, Poster } from "@/features/experience/Poster";
+import { SignInLink } from "@/features/experience/SignInLink";
 import { isAudioUnlocked, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
 import { ScreenMain } from "@/ui/ScreenMain";
@@ -127,6 +128,7 @@ export function VersusExperience({ logins }: { logins: string[] }) {
               {copy.message}
             </p>
             <div className="flex flex-wrap gap-2">
+              {copy.signIn && <SignInLink returnTo={`/${logins.join("/")}`} />}
               {copy.retry && (
                 <button
                   type="button"

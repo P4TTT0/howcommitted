@@ -69,6 +69,12 @@ test("it stops at the first login_required and requests nothing more", async ({
   const requests = await mockHistory(page, ["grace"]);
   await page.goto("/ada/grace/linus");
   await play(page).click();
-  await expect(page.getByText(/Free runs used for today/)).toBeVisible();
+  await expect(page.getByText(/^Free runs used\./)).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Sign in with GitHub" }),
+  ).toHaveAttribute(
+    "href",
+    `/api/auth/github?returnTo=${encodeURIComponent("/ada/grace/linus")}`,
+  );
   expect(requests).toEqual(["ada", "grace"]);
 });
