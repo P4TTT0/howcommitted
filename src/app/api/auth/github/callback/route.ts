@@ -1,5 +1,6 @@
 import { authCookieSecret, githubOAuthApp } from "@/github/config";
-import { clearStateCookie, finishSignIn } from "@/github/oauth";
+import { logEvent } from "@/github/log";
+import { clearStateCookie, finishSignIn, savedReturnTo } from "@/github/oauth";
 import {
   authRateLimited,
   redirectResponse,
@@ -17,10 +18,18 @@ export async function GET(request: Request) {
     const secret = authCookieSecret();
     const app = githubOAuthApp();
     // Before anything that can reach GitHub's token endpoint.
-    if (
-      !(await getServices().quota.allowAuthAttempt(clientIp(request.headers)))
-    ) {
-      return authRateLimited();
+    try {
+      if (
+        !(await getServices().quota.allowAuthAttempt(clientIp(request.headers)))
+      ) {
+        return authRateLimited();
+      }
+    } catch (error) {
+      // The limiter store is down: never redeem the code, send the visitor back.
+      logEvent("auth_limiter_error", { message: String(error) });
+      return redirectResponse(savedReturnTo(request.headers, secret), [
+        clearStateCookie(),
+      ]);
     }
     const outcome = await finishSignIn(
       {

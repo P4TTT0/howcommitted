@@ -100,6 +100,15 @@ function readState(
   return { state: data.state, returnTo: safeReturnTo(data.returnTo) };
 }
 
+/** The return path saved at sign-in start, or "/" when there is no valid state cookie. */
+export function savedReturnTo(
+  headers: Headers,
+  secret: string,
+  now: Date = new Date(),
+): string {
+  return readState(headers, secret, now)?.returnTo ?? DEFAULT_RETURN_TO;
+}
+
 /** Constant-time comparison; hashing first makes the lengths equal. */
 function sameState(a: string, b: string): boolean {
   const digest = (value: string) => createHash("sha256").update(value).digest();

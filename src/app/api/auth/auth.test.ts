@@ -88,6 +88,20 @@ describe("sign-in start", () => {
     expect(await response.text()).not.toContain("GITHUB_OAUTH_CLIENT_ID");
   });
 
+  it("redirects back without starting sign-in when the limiter store is down", async () => {
+    allowAuthAttempt.mockRejectedValue(new Error("redis down"));
+    const response = await signIn(
+      new Request(`${ORIGIN}/api/auth/github?returnTo=/ada`),
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/ada");
+    expect(cookiesOf(response)).toEqual([]);
+    const hostile = await signIn(
+      new Request(`${ORIGIN}/api/auth/github?returnTo=https://evil.example`),
+    );
+    expect(hostile.headers.get("location")).toBe("/");
+  });
+
   it("is rate limited per IP", async () => {
     allowAuthAttempt.mockResolvedValue(false);
     const response = await signIn(
@@ -133,6 +147,24 @@ describe("callback", () => {
     const response = await callback(callbackRequest(state, cookie));
     expect(response.status).toBe(429);
     expect(github).not.toHaveBeenCalled();
+  });
+
+  it("redirects back, clears the state cookie and never redeems the code when the limiter store is down", async () => {
+    const { state, cookie } = await start("/ada");
+    const github = stubGithub();
+    allowAuthAttempt.mockRejectedValue(new Error("redis down code=abc123"));
+    const response = await callback(callbackRequest(state, cookie));
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/ada");
+    expect(cookiesOf(response).some((c) => c.startsWith("hc_oauth=;"))).toBe(
+      true,
+    );
+    expect(
+      cookiesOf(response).some((c) => c.startsWith(`${SESSION_COOKIE}=`)),
+    ).toBe(false);
+    expect(github).not.toHaveBeenCalled();
+    const noState = await callback(callbackRequest("x"));
+    expect(noState.headers.get("location")).toBe("/");
   });
 
   it("rejects a forged state with a 400 and no session", async () => {

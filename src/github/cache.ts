@@ -27,6 +27,11 @@ export const TTL = {
 
 /** Bump the version segment to invalidate everything at once. */
 const VERSION = "v3";
+/**
+ * Per-kind overrides. Repos are v4: v3 entries came from a query without the
+ * public-only filter and could hold private repository names.
+ */
+const KIND_VERSION: Record<string, string> = { repos: "v4" };
 
 /** A cached year plus when it was fetched, so the current year can go stale. */
 export type CachedYear = { summary: YearSummary; fetchedAt: string };
@@ -57,7 +62,12 @@ export function isYearStale(entry: CachedYear, now: Date): boolean {
 export function createCache(store: Store, prefix: string) {
   // GitHub logins are case-insensitive: normalize so "Torvalds" and "torvalds" share keys.
   const key = (kind: string, login: string, ...rest: (string | number)[]) =>
-    [`${prefix}${VERSION}`, kind, login.toLowerCase(), ...rest].join(":");
+    [
+      `${prefix}${KIND_VERSION[kind] ?? VERSION}`,
+      kind,
+      login.toLowerCase(),
+      ...rest,
+    ].join(":");
 
   return {
     key,

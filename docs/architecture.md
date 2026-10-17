@@ -91,11 +91,13 @@ GitHub GraphQL with a server token. Costs measured live in October 2026 against 
 |------|-------|------|------|
 | Preview | `user(login){login name avatarUrl createdAt contributionsCollection{contributionYears}}`. Exact lookup, no search API | 1 point | ~0.6 s |
 | Contributions | One request per contribution year, in parallel (concurrency cap ~6): totals (commits, PRs, reviews, issues, restricted/private count) and the calendar from a full-year window, plus, from four quarter windows, `commitContributionsByRepository(maxRepositories:100){contributions(first:100){nodes{occurredAt commitCount}}}`, summed by date for true commits per day | 1 point each | ~1.8 s each |
-| Repos | `repositories(ownerAffiliations:OWNER, isFork:false, orderBy CREATED_AT, first:100)`, paginated, with `createdAt`, `stargazerCount`, `languages(first:10 by SIZE)` | 1 point | ~2.2 s |
+| Repos | `repositories(ownerAffiliations:OWNER, isFork:false, privacy:PUBLIC, orderBy CREATED_AT, first:100)`, paginated, with `createdAt`, `stargazerCount`, `languages(first:10 by SIZE)` | 1 point | ~2.2 s |
 
 For the measured year (2023), summed daily commits matched `totalCommitContributions` exactly (4,458).
 
 Profile cost is about contribution years + 2 points, so about 280 uncached profiles per hour for a 16-year profile, and about 500 for an 8-year profile (per 5,000-point token).
+
+Public repositories only: the repos query filters `privacy: PUBLIC`, so no token (a visitor's or the server PAT) can put a private repository's name, dates, stars or languages in the shared cache. No other query reads repository details.
 
 ### Gotchas
 
@@ -136,7 +138,7 @@ Key format (bumping the version in `cache.ts` invalidates cached data; v2 droppe
 
 - `v3:user:{login}`
 - `v3:year:{login}:{year}`
-- `v3:repos:{login}`
+- `v4:repos:{login}` (v4 because v3 entries came from a query without the public-only filter)
 
 Logins are lowercased in keys. Supporting keys: `v3:missing:{login}` (negative cache, 1 h), `v3:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v3:user:{login}`).
 
