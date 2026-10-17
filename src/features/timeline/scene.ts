@@ -62,7 +62,7 @@ export async function createScene({
 
     // Sound is optional: if the samples fail to load the scene still plays.
     try {
-      engine = await SoundEngine.load();
+      engine = await SoundEngine.load("marimba");
       engine.setMuted(muted);
     } catch {
       engine = null;
