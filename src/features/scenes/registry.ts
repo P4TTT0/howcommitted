@@ -1,5 +1,6 @@
 import { cumulativeLineScene } from "@/features/scenes/cumulative-line";
 import { endCardFinale } from "@/features/scenes/finale";
+import { heatmapScene } from "@/features/scenes/heatmap";
 import { yearBlocksScene } from "@/features/scenes/year-blocks";
 import type {
   FinaleDefinition,
@@ -14,7 +15,7 @@ import type {
 export const SCENES: readonly SceneDefinition[] = [
   yearBlocksScene,
   cumulativeLineScene,
-  // 3 Heatmap goes here.
+  heatmapScene,
   // 4 Language mosaic goes here.
   // 5 Big numbers goes here.
 ];
