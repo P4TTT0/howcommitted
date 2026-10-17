@@ -34,16 +34,29 @@ export function VersusExperience({ logins }: { logins: string[] }) {
   const mountedRef = useRef(true);
   const decidedRef = useRef(false);
   const inFlightRef = useRef(false);
+  const controllerRef = useRef<AbortController | null>(null);
 
   async function begin() {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
-      const result = await loadHistories(logins, undefined, (login, index) => {
-        if (mountedRef.current)
-          setPhase({ name: "loading", login, position: index + 1 });
-      });
+      const result = await loadHistories(
+        logins,
+        controller.signal,
+        undefined,
+        (login, index) => {
+          if (mountedRef.current)
+            setPhase({ name: "loading", login, position: index + 1 });
+        },
+      );
       if (!mountedRef.current) return;
+      if (result.kind === "aborted") {
+        // Only a development remount gets here while mounted: back to the gate.
+        setPhase({ name: "gate" });
+        return;
+      }
       setPhase(
         result.kind === "ok"
           ? { name: "summary", histories: result.histories }
@@ -64,6 +77,7 @@ export function VersusExperience({ logins }: { logins: string[] }) {
     }
     return () => {
       mountedRef.current = false;
+      controllerRef.current?.abort();
     };
   }, []);
 
