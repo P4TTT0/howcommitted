@@ -1,6 +1,6 @@
 # Architecture
 
-Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. The solo vertical slice works end to end: landing search (`features/search`), `/{login}` (`features/experience`) and the timeline scene driven by real history (`features/timeline`). `/lab` keeps the generated profile for playback work outside production. Versus, the other scenes, share and sign-in are not built yet.
+Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. The solo vertical slice works end to end: landing search (`features/search`), `/{login}` (`features/experience`) and a scene sequencer (`features/sequencer`) playing year blocks, then the cumulative line driven by real history (`features/timeline`), then the end card. `/lab` keeps the generated profile for playback work outside production. Versus, the other scenes, share and sign-in are not built yet.
 
 ## Stack
 
@@ -31,7 +31,9 @@ src/domain/           Pure TS types and metrics
 src/github/           Server-only GraphQL client, queries, cache
 src/playback/         One clock driving GSAP and Tone.js (clock.ts), pure scheduling
                       helpers (aggregate, schedule, pitch), sound/ engine
-src/features/         search (landing lookup), experience (/{login} states), timeline (scene, plan), stats, versus
+src/features/         search (landing lookup), experience (/{login} states), sequencer (scene
+                      contract and player), scenes (registry, one folder per scene), timeline
+                      (cumulative line scene, plan), stats, versus
 src/ui/               Shared presentational components
 public/sounds/        Kenney CC0 chip samples as .ogg with .mp3 fallback, CREDITS.md
 e2e/                  Playwright
@@ -46,6 +48,21 @@ GitHub usernames cannot contain "/", so path segments map unambiguously to users
 Reserved logins: `lab` and `api` collide with app routes (static routes win over the catch-all), so those users cannot be opened at `/{login}`. `parseSoloLogin` rejects them explicitly (404) and the landing search refuses them before any request. Add a name to `RESERVED_LOGINS` in `domain/login.ts` whenever a top-level route is added.
 
 Client flow: the landing click calls `unlockAudio()` (`playback/unlock.ts`) and navigates client-side, so the AudioContext stays running on `/{login}`, which then starts by itself. A fresh load (shared link, reload) shows the start button first. The history is fetched on intent only (see [product.md](product.md)); the preview alone never costs a generation. Auto start needs a one-shot intent recorded only by the landing click (`features/experience/intent.ts`, sessionStorage); back/forward, reloads and shared links show the start button even when audio is still unlocked. Tone.js loads lazily on the landing (`preloadAudio` on input focus) and is started synchronously inside the click. `features/timeline/historyPlan.ts` maps `History` to the scene plan: daily calendar contributions (public and shared private) drive the line, the calendar's yearly totals drive the displayed total and year blocks, and contributions a year's calendar total has beyond its daily detail become one explicit unattributed step at the end of that year (dashed segment, label, soft cue, note), never scaled or spread across days.
+
+### Scenes and the sequencer
+
+`features/sequencer` plays an ordered list of scenes on the one `PlaybackClock`, then the finale. The clock is re-armed per scene (`clock.loadScene`), so there is a single Transport, status stream and visibility handler for the whole run. The sequencer owns the start gate, the sound engine, pause, skip scene, mute, the progress bar with scene ticks and the hand-off from one scene to the next. A scene never owns any of that.
+
+A scene is a `SceneDefinition` (`sequencer/types.ts`): `{ id, label, create(data) }`. `create` receives `SceneData` (`login`, the history `model` with the plan, calendar year blocks and notes, and the full `history` when available) and returns `null` to be skipped, or a `SceneInstance`: `duration`, `bpm`, `view` (static markup that fills the stage and is correct in its finished state) and `mount(root, runtime)`. `mount` runs once the view is in the DOM: schedule sound with `runtime.clock.at`, drive visuals from `runtime.clock.onFrame` (or `drive` for a paused GSAP timeline), read `runtime.sound()` and `runtime.reducedMotion`, and return a cleanup. No timers or loops of its own (rule 3). A scene that throws while being built is skipped.
+
+To add a scene (3 to 5):
+
+1. Create `features/scenes/<id>/` with the view, a `mount`, pure helpers and colocated tests, and export a `SceneDefinition` from `index.tsx`.
+2. Add one import and one entry to `SCENES` in `features/scenes/registry.ts`, in playback order. Nothing else changes, not the sequencer.
+3. Preview it alone at `/lab?scene=<id>` (the lab feeds the registry the generated profile, with `history: null`; a scene that needs the full history returns `null` there or builds its own fixture).
+4. Extend the scene count in `e2e/experience.spec.ts` (`SCENE_COUNT`).
+
+The final poster replaces the single `FINALE` entry in the registry (`render(data, { replay })`). Today it is the end card.
 
 Rules:
 
