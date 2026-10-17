@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { DailyCommits } from "@/domain/types";
 import {
   aggregateWeekly,
   cumulativeAt,
   cumulativeByDay,
-  type DailyCommits,
   weekSpan,
   yearAt,
   yearSpans,
@@ -11,9 +11,9 @@ import {
 
 function run(start: string, counts: number[]): DailyCommits[] {
   const origin = Date.parse(`${start}T00:00:00Z`);
-  return counts.map((count, index) => ({
+  return counts.map((commits, index) => ({
     date: new Date(origin + index * 86_400_000).toISOString().slice(0, 10),
-    count,
+    commits,
   }));
 }
 

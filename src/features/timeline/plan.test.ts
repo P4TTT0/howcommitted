@@ -19,7 +19,7 @@ describe("generateFakeProfile", () => {
   it("spans eight calendar years with a plausible total", () => {
     const days = generateFakeProfile();
     expect(new Set(days.map((day) => day.date.slice(0, 4))).size).toBe(8);
-    const total = days.reduce((sum, day) => sum + day.count, 0);
+    const total = days.reduce((sum, day) => sum + day.commits, 0);
     expect(total).toBeGreaterThan(3000);
     expect(total).toBeLessThan(20000);
   });

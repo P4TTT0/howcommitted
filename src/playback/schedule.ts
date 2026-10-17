@@ -1,8 +1,5 @@
-import {
-  cumulativeByDay,
-  type DailyCommits,
-  type WeeklyCommits,
-} from "./aggregate";
+import type { DailyCommits } from "@/domain/types";
+import { cumulativeByDay, type WeeklyCommits } from "./aggregate";
 import { degreeInRegister, restartRegister } from "./pitch";
 
 /** One audible hit: every week that lands on the same grid cell merged. */
@@ -135,7 +132,7 @@ export function findMilestones(
   const timeAfterDay = (index: number) =>
     quantizeUp(((index + 1) / dayCount) * duration, grid);
 
-  const finalTime = timeAfterDay(days.findLastIndex((day) => day.count > 0));
+  const finalTime = timeAfterDay(days.findLastIndex((day) => day.commits > 0));
   const milestones: Milestone[] = [];
 
   let nextValue = first;

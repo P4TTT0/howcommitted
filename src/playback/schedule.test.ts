@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { DailyCommits } from "./aggregate";
+import type { DailyCommits } from "@/domain/types";
 import { aggregateWeekly, weekSpan } from "./aggregate";
 import { buildTickSlots, findMilestones, quantizeUp } from "./schedule";
 
 function days(counts: number[]): DailyCommits[] {
   const origin = Date.parse("2024-01-01T00:00:00Z");
-  return counts.map((count, index) => ({
+  return counts.map((commits, index) => ({
     date: new Date(origin + index * 86_400_000).toISOString().slice(0, 10),
-    count,
+    commits,
   }));
 }
 

@@ -6,7 +6,7 @@
  * are independent of the machine time zone.
  */
 
-export type DailyCommits = { date: string; count: number };
+import type { DailyCommits } from "@/domain/types";
 
 /** Commits in one week. `week` counts 7-day buckets from the first day. */
 export type WeeklyCommits = { week: number; count: number };
@@ -39,10 +39,10 @@ export function aggregateWeekly(
   if (!first) return [];
   const origin = dayNumber(first.date);
   const weeks = new Map<number, number>();
-  for (const { date, count } of days) {
-    if (count <= 0) continue;
+  for (const { date, commits } of days) {
+    if (commits <= 0) continue;
     const week = Math.floor((dayNumber(date) - origin) / 7);
-    weeks.set(week, (weeks.get(week) ?? 0) + count);
+    weeks.set(week, (weeks.get(week) ?? 0) + commits);
   }
   return [...weeks.entries()]
     .sort(([a], [b]) => a - b)
@@ -52,8 +52,8 @@ export function aggregateWeekly(
 /** Running total after each day, in input order. */
 export function cumulativeByDay(days: readonly DailyCommits[]): number[] {
   let total = 0;
-  return days.map(({ count }) => {
-    total += Math.max(0, count);
+  return days.map(({ commits }) => {
+    total += Math.max(0, commits);
     return total;
   });
 }

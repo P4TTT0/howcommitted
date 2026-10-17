@@ -1,7 +1,7 @@
+import type { DailyCommits } from "@/domain/types";
 import {
   aggregateWeekly,
   cumulativeByDay,
-  type DailyCommits,
   weekSpan,
   yearSpans,
 } from "@/playback/aggregate";
