@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildYearQuery,
   fetchRepos,
   fetchUserPreview,
   fetchYear,
@@ -209,6 +210,69 @@ describe("fetchYear", () => {
     const vars = sentVariables(fetchMock, 0);
     expect(vars.q3From).toBe("2026-07-01T00:00:00Z");
     expect(vars.q4From).toBeUndefined();
+  });
+  it("tolerates a null quarter and a repo with null nodes", async () => {
+    stubFetchSequence({
+      data: {
+        rateLimit,
+        user: {
+          year: totals(3),
+          q1: {
+            commitContributionsByRepository: [
+              repo([{ occurredAt: "2023-02-01T00:00:00Z", commitCount: 3 }]),
+            ],
+          },
+          q2: null,
+          q3: {
+            commitContributionsByRepository: [
+              { contributions: { nodes: null } },
+            ],
+          },
+          q4: empty,
+        },
+      },
+    });
+    const result = await fetchYear("t", "a", 2023, undefined, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.dailyCommits).toEqual([
+      { date: "2023-02-01", commits: 3 },
+    ]);
+    expect(result.data.reconciliation.matches).toBe(true);
+  });
+
+  it("includes only the quarters that have started at the boundaries", async () => {
+    const sent = async (now: string) => {
+      const fetchMock = stubFetchSequence({
+        data: { rateLimit, user: { year: totals(0) } },
+      });
+      await fetchYear("t", "a", 2026, undefined, new Date(now));
+      return sentVariables(fetchMock, 0);
+    };
+    expect(Object.keys(await sent("2025-12-31T23:59:59Z")).sort()).toEqual([
+      "from",
+      "login",
+      "to",
+    ]);
+    expect((await sent("2026-07-01T00:00:00Z")).q3From).toBe(
+      "2026-07-01T00:00:00Z",
+    );
+    const q1Only = await sent("2026-02-15T00:00:00Z");
+    expect(q1Only.q1From).toBeDefined();
+    expect(q1Only.q2From).toBeUndefined();
+  });
+
+  it("declares exactly the variables used by the quarter aliases for N=0..4", () => {
+    for (let n = 0; n <= 4; n++) {
+      const query = buildYearQuery(n);
+      for (let q = 1; q <= 4; q++) {
+        const present = q <= n;
+        expect(query.includes(`$q${q}From: DateTime!`)).toBe(present);
+        expect(query.includes(`$q${q}To: DateTime!`)).toBe(present);
+        expect(query.includes(`q${q}: contributionsCollection(`)).toBe(present);
+      }
+      expect(query).toContain("year: contributionsCollection(");
+    }
   });
 });
 

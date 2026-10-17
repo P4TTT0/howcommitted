@@ -72,7 +72,7 @@ Profile cost is about contribution years + 2 points, so about 280 uncached profi
 - `contributionsCollection` `from`/`to` spans at most 1 year.
 - `contributionCalendar` counts all contribution types (2023 example: calendar 4,924 vs commits 4,458). Never label it as commits.
 - Per-repo daily nodes cap at 100 per `contributionsCollection` window, so a repo with commits on more than 100 days in a year was under-counted (torvalds 2024: 888 summed vs 2,888 official). Each year is therefore fetched as 4 quarters in one query (same 1-point cost), with totals and calendar from a full-year alias.
-- `maxRepositories` caps at 100 repos per year. Compare summed daily commits against the official total; if they differ, show the real total with a notice.
+- `maxRepositories` caps at 100 repos per quarter window, so a repo outside the top 100 in a quarter can still cause a mismatch. Compare summed daily commits against the official total; if they differ, show the real total with a notice.
 - Private contributions appear only if the user enabled sharing them. Show as "+N private"; never invent their dates.
 
 ### GraphQL limits

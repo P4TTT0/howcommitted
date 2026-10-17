@@ -46,7 +46,7 @@ const QUARTER_FIELDS = `{
     }
   }`;
 
-function buildYearQuery(quarterCount: number): string {
+export function buildYearQuery(quarterCount: number): string {
   const vars = Array.from(
     { length: quarterCount },
     (_, i) => `, $q${i + 1}From: DateTime!, $q${i + 1}To: DateTime!`,
