@@ -30,11 +30,10 @@ src/app/              Thin Next routes only
 src/domain/           Pure TS types and metrics
 src/github/           Server-only GraphQL client, queries, cache
 src/playback/         One clock driving GSAP and Tone.js (clock.ts), pure scheduling
-                      helpers (aggregate, schedule, pitch), sound/ engine with kits
-                      (bubble, chips, marimba)
+                      helpers (aggregate, schedule, pitch), sound/ engine
 src/features/         timeline, stats, versus
 src/ui/               Shared presentational components
-public/sounds/        CC0 samples for the chips and marimba kits (Kenney, VSCO 2 CE) as .ogg with .mp3 fallback, CREDITS.md. The bubble kit is synthesized
+public/sounds/        Kenney CC0 chip samples as .ogg with .mp3 fallback, CREDITS.md
 e2e/                  Playwright
 .github/              workflows/ci.yml, pull_request_template.md, ISSUE_TEMPLATE (planned)
 .env.example          Required env vars

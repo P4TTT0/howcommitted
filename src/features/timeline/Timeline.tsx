@@ -2,16 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClockStatus } from "@/playback/clock";
-import {
-  browserStorage,
-  DEFAULT_KIT,
-  isKitId,
-  KIT_IDS,
-  KIT_LABELS,
-  type KitId,
-  readKit,
-  writeKit,
-} from "@/playback/sound/registry";
 import { CHART_HEIGHT, CHART_WIDTH, linePath } from "./chart";
 import { generateFakeProfile } from "./fakeProfile";
 import {
@@ -37,12 +27,6 @@ export function Timeline() {
   const [status, setStatus] = useState<ClockStatus>("idle");
   const [muted, setMuted] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [kit, setKit] = useState<KitId>(DEFAULT_KIT);
-
-  // Read the remembered kit after mount so server and client markup match.
-  useEffect(() => {
-    setKit(readKit(browserStorage()));
-  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -66,7 +50,6 @@ export function Timeline() {
         root,
         plan,
         muted,
-        kit,
         reducedMotion,
       });
       if (!mountedRef.current) {
@@ -82,13 +65,6 @@ export function Timeline() {
       setFailed(true);
       setPhase("start");
     }
-  }
-
-  function chooseKit(value: string) {
-    if (!isKitId(value)) return;
-    setKit(value);
-    writeKit(browserStorage(), value);
-    void sceneRef.current?.setKit(value);
   }
 
   function toggleMute() {
@@ -284,21 +260,9 @@ export function Timeline() {
         >
           Replay
         </button>
-        <select
-          aria-label="Sound kit"
-          className={`${controlClass} ml-auto bg-paper`}
-          value={kit}
-          onChange={(event) => chooseKit(event.target.value)}
-        >
-          {KIT_IDS.map((id) => (
-            <option key={id} value={id}>
-              {KIT_LABELS[id]}
-            </option>
-          ))}
-        </select>
         <button
           type="button"
-          className={controlClass}
+          className={`${controlClass} ml-auto`}
           aria-pressed={muted}
           onClick={toggleMute}
         >

@@ -1,10 +1,18 @@
 import * as Tone from "tone";
-import { pickFormat } from "./instruments";
 
 const BASE_URL = "/sounds/";
 
 /** Fade applied when a voice is cut, to avoid clicks. */
 const CUT_FADE_SECONDS = 0.02;
+
+export type SampleFormat = "ogg" | "mp3";
+
+/** Vorbis when the browser can decode it, MP3 otherwise. */
+export function pickFormat(
+  canPlayType: (type: string) => string,
+): SampleFormat {
+  return canPlayType('audio/ogg; codecs="vorbis"') === "" ? "mp3" : "ogg";
+}
 
 /** Loads named samples as ogg, or mp3 when the browser cannot decode ogg. */
 export function loadSamples(
