@@ -158,3 +158,70 @@ test("on a phone the question takes three lines and fits", async ({ page }) => {
   expect(b?.y ?? 0).toBeGreaterThan((a?.y ?? 0) + (a?.height ?? 0) - 2);
   expect((b?.x ?? 0) + (b?.width ?? 0)).toBeLessThanOrEqual(390 - 16);
 });
+
+const VIEWPORTS = [
+  [1920, 1080],
+  [1536, 730],
+  [1366, 768],
+  [1280, 720],
+  [1440, 900],
+  [390, 844],
+  [360, 640],
+  [844, 390],
+  [768, 1024],
+] as const;
+
+for (const [width, height] of VIEWPORTS) {
+  for (const state of ["empty", "found"] as const) {
+    test(`never scrolls and shows everything at ${width}x${height} (${state})`, async ({
+      page,
+    }) => {
+      await page.route("**/api/user/*", (route) =>
+        route.fulfill({
+          json: {
+            user: {
+              ...preview.user,
+              login: "sindresorhus",
+              name: "Sindre Sorhus",
+            },
+          },
+        }),
+      );
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      if (state === "found") {
+        await page.getByLabel("GitHub username").fill("sindresorhus");
+        await expect(
+          page.getByRole("button", { name: /Sindre Sorhus/ }),
+        ).toBeVisible();
+      }
+
+      const scroll = await page.evaluate(() => ({
+        h: document.documentElement.scrollHeight - window.innerHeight,
+        w: document.documentElement.scrollWidth - window.innerWidth,
+        body: document.body.scrollHeight - window.innerHeight,
+      }));
+      expect(scroll.h).toBeLessThanOrEqual(0);
+      expect(scroll.w).toBeLessThanOrEqual(0);
+
+      // Nothing is clipped: every part sits fully inside the viewport.
+      const targets = [
+        page.locator("form"),
+        page.getByRole("button", { name: /^Play( @\w+)?$/ }),
+        page.getByRole("heading", { level: 1 }),
+        page.getByText("Type a GitHub username.", { exact: false }),
+      ];
+      if (state === "found") {
+        targets.push(page.getByRole("button", { name: /Sindre Sorhus/ }));
+      }
+      for (const target of targets) {
+        const box = await target.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+        expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
+        expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
+        expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(height);
+      }
+    });
+  }
+}

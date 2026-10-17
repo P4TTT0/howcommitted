@@ -125,8 +125,12 @@ export function Search() {
   }, [sizer]);
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-7">
-      <div className="font-display text-[clamp(40px,12vw,200px)] font-black uppercase leading-[0.86] max-sm:text-[15.5vw]">
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      className="flex flex-col gap-[clamp(10px,3dvh,28px)]"
+    >
+      <div className="font-display text-[clamp(40px,min(12vw,16dvh),200px)] font-black uppercase leading-[0.86] max-sm:text-[max(24px,min(15.5vw,9dvh))]">
         <label id="ask-how" htmlFor="login" className="block whitespace-nowrap">
           <span className="max-sm:block">How</span>{" "}
           <span className="max-sm:block">committed</span>
@@ -169,7 +173,7 @@ export function Search() {
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              className="col-start-1 row-start-1 w-0 min-w-full rounded-none border-0 border-b-[0.07em] border-ink bg-transparent p-0 font-[inherit] uppercase text-[inherit] caret-block-ultramarine outline-none placeholder:text-ink placeholder:opacity-40 focus:border-block-ultramarine focus:shadow-[0_0.05em_0_0_var(--color-block-ultramarine)]"
+              className="col-start-1 row-start-1 w-0 min-w-full rounded-none border-0 border-b-[length:min(0.07em,8px)] border-ink bg-transparent p-0 font-[inherit] uppercase text-[inherit] caret-block-ultramarine outline-none placeholder:text-ink placeholder:opacity-40 focus:border-block-ultramarine focus:shadow-[0_3px_0_0_var(--color-block-ultramarine)]"
             />
           </span>
           <span aria-hidden="true">?</span>

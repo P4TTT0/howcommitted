@@ -8,7 +8,7 @@ export function SignatureLine() {
       viewBox="0 0 1440 160"
       preserveAspectRatio="none"
       aria-hidden="true"
-      className="signature-line mt-8 block h-28 w-full"
+      className="signature-line mt-2 block h-[12dvh] max-h-32 min-h-0 w-full shrink [@media(max-height:520px)]:hidden"
     >
       <polyline
         points={POINTS}
