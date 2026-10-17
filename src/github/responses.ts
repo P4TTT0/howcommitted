@@ -9,14 +9,22 @@ function error(
   status: number,
   code: string,
   message: string,
-  extra: { retryAfterSeconds?: number; headers?: HeadersInit } = {},
+  extra: {
+    retryAfterSeconds?: number;
+    headers?: HeadersInit;
+    /** Machine-readable cause, so clients can word the message honestly. */
+    reason?: string;
+  } = {},
 ): Response {
   const headers = new Headers(extra.headers);
   headers.set("cache-control", "no-store");
   if (extra.retryAfterSeconds) {
     headers.set("retry-after", String(extra.retryAfterSeconds));
   }
-  return Response.json({ error: { code, message } }, { status, headers });
+  return Response.json(
+    { error: { code, message, reason: extra.reason } },
+    { status, headers },
+  );
 }
 
 export const invalidLogin = () =>
@@ -25,6 +33,7 @@ export const invalidLogin = () =>
 export const previewRateLimited = () =>
   error(429, "rate_limited", "Slow down a little and try again.", {
     retryAfterSeconds: 30,
+    reason: "ip_limit",
   });
 
 /** Logs the real cause server-side; the client only sees a generic message. */
@@ -69,6 +78,7 @@ function failure(result: Unsuccessful, headers?: HeadersInit): Response {
       return error(503, "degraded", DEGRADED_MESSAGES[result.reason], {
         retryAfterSeconds: result.reason === "busy" ? 5 : 60,
         headers,
+        reason: result.reason,
       });
     case "rate_limited":
       return error(429, "rate_limited", "GitHub needs a breather.", {

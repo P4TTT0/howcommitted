@@ -5,6 +5,7 @@ import type { ProfileResult } from "./profile";
 import {
   historyResponse,
   invalidLogin,
+  previewRateLimited,
   previewResponse,
   serverError,
 } from "./responses";
@@ -33,6 +34,20 @@ describe("historyResponse status mapping", () => {
     expect(response.status).toBe(status);
     expect(await codeOf(response)).toBe(code);
     expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("names the degraded reason and the preview limit in the body", async () => {
+    const degraded = historyResponse(
+      { status: "degraded", reason: "circuit_open" },
+      null,
+    );
+    expect(
+      ((await degraded.json()) as { error: { reason: string } }).error.reason,
+    ).toBe("circuit_open");
+    const limited = previewRateLimited();
+    expect(
+      ((await limited.json()) as { error: { reason: string } }).error.reason,
+    ).toBe("ip_limit");
   });
 
   it("tells clients when to retry while degraded", () => {
