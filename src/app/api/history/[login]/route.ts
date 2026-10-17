@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: Context) {
       cookieSecret(),
     );
     const result = await getProfile(login, visitor, deps);
-    return historyResponse(result, setCookie);
+    return historyResponse(result, setCookie ? [setCookie] : []);
   } catch (cause) {
     return serverError(cause);
   }

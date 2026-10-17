@@ -36,6 +36,20 @@ export const previewRateLimited = () =>
     reason: "ip_limit",
   });
 
+export const signInExpired = () =>
+  error(400, "invalid_state", "Sign-in expired. Go back and try again.");
+
+/** A redirect that may set cookies. `location` must already be vetted (see `safeReturnTo`). */
+export function redirectResponse(
+  location: string,
+  setCookies: readonly string[],
+  status: 302 | 303 = 302,
+): Response {
+  const headers = new Headers({ location, "cache-control": "no-store" });
+  for (const cookie of setCookies) headers.append("set-cookie", cookie);
+  return new Response(null, { status, headers });
+}
+
 /** Logs the real cause server-side; the client only sees a generic message. */
 export function serverError(cause: unknown): Response {
   console.error(cause);
@@ -107,10 +121,10 @@ export function previewResponse(result: PreviewResult): Response {
 
 export function historyResponse(
   result: ProfileResult,
-  setCookie: string | null,
+  setCookies: readonly string[],
 ): Response {
   const headers = new Headers(NO_STORE);
-  if (setCookie) headers.append("set-cookie", setCookie);
+  for (const cookie of setCookies) headers.append("set-cookie", cookie);
   if (result.status !== "ok") return failure(result, headers);
   return Response.json(
     {
