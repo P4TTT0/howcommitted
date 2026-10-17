@@ -80,6 +80,8 @@ type Context = {
    * failures are never recorded for other visitors.
    */
   userToken: string | null;
+  /** A signed-in visitor (even when the server token is used): skips the anonymous quota. */
+  signedIn: boolean;
   /** Set when GitHub rejected `userToken` (revoked or expired). */
   tokenRejected: boolean;
   now: () => Date;
@@ -99,12 +101,14 @@ function newTally(): Tally {
 function createContext(
   deps: ProfileDeps,
   userToken: string | null = null,
+  signedIn = false,
 ): Context {
   const now = deps.now ?? (() => new Date());
   const deadlineMs = deps.deadlineMs ?? GENERATION_DEADLINE_MS;
   return {
     deps,
     userToken,
+    signedIn,
     tokenRejected: false,
     now,
     sleep: deps.sleep ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms))),
@@ -331,6 +335,14 @@ export type ProfileOptions = {
    * apply, and what they fetch lands in the shared cache.
    */
   userToken?: string | null;
+  /**
+   * The login `userToken` belongs to. Required for the token to be used: without
+   * it the visitor counts as anonymous. When it equals the requested login
+   * (case-insensitive) the server token fetches instead, so anything only the
+   * owner can see (such as private contribution counts) can never reach the
+   * shared cache. They still skip the anonymous quota.
+   */
+  viewerLogin?: string | null;
   /** Called when GitHub rejected `userToken`; the request is then served as anonymous. */
   onTokenRejected?: () => void;
 };
@@ -352,10 +364,17 @@ export async function getProfile(
   deps: ProfileDeps,
   options: ProfileOptions = {},
 ): Promise<ProfileResult> {
+  const signedIn = Boolean(options.userToken && options.viewerLogin);
+  const ownProfile =
+    signedIn && options.viewerLogin?.toLowerCase() === login.toLowerCase();
   const first = await resolveProfile(
     login,
     visitor,
-    createContext(deps, options.userToken ?? null),
+    createContext(
+      deps,
+      signedIn && !ownProfile ? (options.userToken ?? null) : null,
+      signedIn,
+    ),
   );
   if (first.status !== "token_rejected") return first;
   options.onTokenRejected?.();
@@ -430,6 +449,7 @@ async function generate(
   logEvent("generation", {
     login: login.toLowerCase(),
     auth: ctx.userToken ? "user" : "server",
+    signedIn: ctx.signedIn,
     status: result.status,
     source: result.status === "ok" ? result.source : null,
     years: tally.years,
@@ -470,7 +490,7 @@ async function generateCold(
   // The preview route caches the user for free, so the user does not count.
   // Completing partial data or refreshing a year is free for the visitor.
   // Signed-in visitors skip the anonymous quota: their own token pays.
-  const needsCharge = !ctx.userToken && !hasHistoryCached(snapshot);
+  const needsCharge = !ctx.signedIn && !hasHistoryCached(snapshot);
   const charge = needsCharge
     ? await mustSucceed(() => ctx.deps.chargeColdGeneration(visitor))
     : null;
@@ -500,8 +520,9 @@ async function generateCold(
     // Unknown users already have the longer negative cache instead of a marker.
     if (failure.status !== "not_found") {
       await refund();
-      // A visitor's own rate limit must not be served to everyone else.
-      if (!(ctx.userToken && failure.status === "rate_limited")) {
+      // Failures of a visitor's own token (limits, errors) are theirs alone:
+      // never served to everyone else.
+      if (!ctx.userToken) {
         await orElse(
           "setFailure",
           () => cache.setFailure(login, failure),

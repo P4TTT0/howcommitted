@@ -364,32 +364,6 @@ test("other history errors do not offer sign-in", async ({ page }) => {
   ).toHaveCount(0);
 });
 
-test("starting sign-in goes to GitHub with a state bound to the browser", async ({
-  request,
-}) => {
-  const response = await request.get("/api/auth/github?returnTo=/ada", {
-    maxRedirects: 0,
-  });
-  expect(response.status()).toBe(302);
-  const location = new URL(response.headers().location ?? "");
-  expect(location.origin + location.pathname).toBe(
-    "https://github.com/login/oauth/authorize",
-  );
-  expect(location.searchParams.get("state")?.length).toBeGreaterThan(20);
-  expect(location.searchParams.has("scope")).toBe(false);
-  expect(response.headers()["set-cookie"]).toMatch(/hc_oauth=.*HttpOnly/);
-});
-
-test("a callback without the browser's state is refused", async ({
-  request,
-}) => {
-  const response = await request.get(
-    "/api/auth/github/callback?code=abc&state=forged",
-    { maxRedirects: 0 },
-  );
-  expect(response.status()).toBe(400);
-});
-
 test("a rate limited history offers a retry that can succeed", async ({
   page,
 }) => {

@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { isValidLogin } from "@/domain/login";
 import { logEvent } from "./log";
 import { open, seal } from "./seal";
 import { cookieHeader, isPlausibleToken } from "./session";
@@ -145,9 +146,78 @@ export async function exchangeCode(
   }
 }
 
+const VIEWER_URL = "https://api.github.com/user";
+
+/**
+ * Whose token this is. The session remembers it so a visitor's own profile is
+ * always fetched with the server token (their token may see more than the
+ * public does, and that must never reach the shared cache).
+ */
+export async function fetchViewerLogin(
+  token: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  try {
+    const response = await fetchImpl(VIEWER_URL, {
+      headers: {
+        authorization: `bearer ${token}`,
+        accept: "application/vnd.github+json",
+        "user-agent": "howcommitted",
+      },
+      signal: AbortSignal.timeout(EXCHANGE_TIMEOUT_MS),
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const { login } = (await response.json()) as { login?: unknown };
+    return typeof login === "string" && isValidLogin(login) ? login : null;
+  } catch {
+    return null;
+  }
+}
+
+const REVOKE_TIMEOUT_MS = 3_000;
+
+/**
+ * Best-effort: asks GitHub to invalidate the token on sign-out. Bounded by a
+ * short timeout, never throws, never logs the token.
+ */
+export async function revokeToken(
+  token: string,
+  app: { clientId: string; clientSecret: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  try {
+    const basic = Buffer.from(`${app.clientId}:${app.clientSecret}`).toString(
+      "base64",
+    );
+    const response = await fetchImpl(
+      `https://api.github.com/applications/${encodeURIComponent(app.clientId)}/token`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Basic ${basic}`,
+          accept: "application/vnd.github+json",
+          "content-type": "application/json",
+          "user-agent": "howcommitted",
+        },
+        body: JSON.stringify({ access_token: token }),
+        signal: AbortSignal.timeout(REVOKE_TIMEOUT_MS),
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) {
+      logEvent("oauth_revoke_failed", { status: response.status });
+    }
+  } catch (error) {
+    logEvent("oauth_revoke_failed", {
+      reason: error instanceof Error ? error.name : "unknown",
+    });
+  }
+}
+
 export type CallbackOutcome =
   /** Signed in: store the token, then go back. */
-  | { kind: "signed_in"; token: string; returnTo: string }
+  | { kind: "signed_in"; token: string; login: string; returnTo: string }
   /** The state was fine but no session was created (denied, bad code, GitHub down): go back anonymous. */
   | { kind: "failed"; returnTo: string }
   /** Missing, expired or mismatched state: do not trust the request at all. */
@@ -179,7 +249,13 @@ export async function finishSignIn(
     return { kind: "failed", returnTo };
   }
   const token = await exchangeCode(params.code, app, options.fetchImpl);
-  return token
-    ? { kind: "signed_in", token, returnTo }
-    : { kind: "failed", returnTo };
+  if (!token) return { kind: "failed", returnTo };
+  const login = await fetchViewerLogin(token, options.fetchImpl);
+  if (!login) {
+    // A session without a known login would be unsafe to use: do not create one.
+    logEvent("oauth_viewer_failed", {});
+    await revokeToken(token, app, options.fetchImpl);
+    return { kind: "failed", returnTo };
+  }
+  return { kind: "signed_in", token, login, returnTo };
 }

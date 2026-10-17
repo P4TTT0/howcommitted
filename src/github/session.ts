@@ -1,4 +1,5 @@
 import "server-only";
+import { isValidLogin } from "@/domain/login";
 import { authCookieSecret, ConfigError } from "./config";
 import { logEvent } from "./log";
 import { open, seal } from "./seal";
@@ -33,14 +34,26 @@ export function cookieHeader(
   return attributes.join("; ");
 }
 
+export type Session = {
+  token: string;
+  /** The GitHub login the token belongs to. Null for a session written before it was stored. */
+  login: string | null;
+};
+
 export function sessionCookie(
-  token: string,
+  session: { token: string; login: string },
   secret: string,
   now: Date = new Date(),
 ): string {
   return cookieHeader(
     SESSION_COOKIE,
-    seal(SESSION_PURPOSE, { token }, secret, SESSION_MAX_AGE_SECONDS, now),
+    seal(
+      SESSION_PURPOSE,
+      { token: session.token, login: session.login },
+      secret,
+      SESSION_MAX_AGE_SECONDS,
+      now,
+    ),
     { path: "/", maxAge: SESSION_MAX_AGE_SECONDS },
   );
 }
@@ -50,25 +63,41 @@ export function clearSessionCookie(): string {
 }
 
 /**
- * The visitor's own GitHub token, or null for anonymous visitors. A missing,
- * tampered or expired cookie is simply anonymous, and so is a deployment
- * without the auth secret (logged, never a 500 for a plain visitor). The secret
- * is only read when a session cookie is present.
+ * The visitor's session, or null for anonymous visitors. A missing, tampered
+ * or expired cookie is simply anonymous, and so is a deployment without the
+ * auth secret (logged, never a 500 for a plain visitor). The secret is only
+ * read when a session cookie is present.
  */
-export function readSessionToken(
+export function readSession(
   headers: Headers,
   now: Date = new Date(),
   getSecret: () => string = authCookieSecret,
-): string | null {
+): Session | null {
   const value = readCookie(headers, SESSION_COOKIE);
   if (!value) return null;
   try {
-    const data = open(SESSION_PURPOSE, value, getSecret(), now);
-    const token = (data as { token?: unknown } | null)?.token;
-    return isPlausibleToken(token) ? token : null;
+    const data = open(SESSION_PURPOSE, value, getSecret(), now) as {
+      token?: unknown;
+      login?: unknown;
+    } | null;
+    if (!data || !isPlausibleToken(data.token)) return null;
+    const login =
+      typeof data.login === "string" && isValidLogin(data.login)
+        ? data.login
+        : null;
+    return { token: data.token, login };
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
     logEvent("auth_config_error", { message: error.message });
     return null;
   }
+}
+
+/** Just the token (for revoking it on sign-out). */
+export function readSessionToken(
+  headers: Headers,
+  now?: Date,
+  getSecret?: () => string,
+): string | null {
+  return readSession(headers, now, getSecret)?.token ?? null;
 }

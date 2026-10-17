@@ -6,6 +6,7 @@ vi.mock("@/github/services", () => ({
   getServices: () => ({ deps: { marker: "deps" } }),
 }));
 
+import { seal } from "@/github/seal";
 import { sessionCookie } from "@/github/session";
 import { GET } from "./route";
 
@@ -17,7 +18,11 @@ const request = (cookie?: string) =>
     headers: cookie ? { cookie } : undefined,
   });
 const sessionPair = () =>
-  (sessionCookie(TOKEN, SECRET).split(";")[0] as string).trim();
+  (
+    sessionCookie({ token: TOKEN, login: "Ada" }, SECRET).split(
+      ";",
+    )[0] as string
+  ).trim();
 
 const okResult = { status: "login_required", reason: "quota_exhausted" };
 
@@ -33,6 +38,7 @@ afterEach(() => vi.unstubAllEnvs());
 const optionsOf = () =>
   getProfile.mock.calls[0]?.[3] as {
     userToken: string | null;
+    viewerLogin: string | null;
     onTokenRejected: () => void;
   };
 
@@ -42,6 +48,13 @@ describe("history route and the sign-in session", () => {
       params: Promise.resolve({ login: "ada" }),
     });
     expect(optionsOf().userToken).toBe(TOKEN);
+    expect(optionsOf().viewerLogin).toBe("Ada");
+  });
+
+  it("passes no login for a session written without one, which the pipeline treats as anonymous", async () => {
+    const legacy = `hc_session=${seal("session", { token: TOKEN }, SECRET, 60, new Date())}`;
+    await GET(request(legacy), { params: Promise.resolve({ login: "ada" }) });
+    expect(optionsOf().viewerLogin).toBeNull();
   });
 
   it("treats a missing, tampered or foreign cookie as anonymous", async () => {

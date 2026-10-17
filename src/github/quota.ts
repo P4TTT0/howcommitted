@@ -12,6 +12,10 @@ export const PREVIEWS_PER_MINUTE = 30;
 /** Requests with no usable IP all share one bucket, so it is much tighter. */
 export const PREVIEWS_PER_MINUTE_UNKNOWN_IP = 10;
 
+/** OAuth sign-in starts and callbacks per IP per minute. */
+export const AUTH_ATTEMPTS_PER_MINUTE = 10;
+export const AUTH_ATTEMPTS_PER_MINUTE_UNKNOWN_IP = 3;
+
 const COUNTER_TTL_SECONDS = 2 * 24 * 60 * 60;
 
 /** INCR that sets the expiry in the same atomic step, so a counter never lives forever. */
@@ -51,6 +55,11 @@ export function createQuota(
     PREVIEWS_PER_MINUTE_UNKNOWN_IP,
   );
   const coldBurst = limiter("cold-burst", COLD_ATTEMPTS_PER_MINUTE);
+  const auth = limiter("auth", AUTH_ATTEMPTS_PER_MINUTE);
+  const authUnknown = limiter(
+    "auth-unknown",
+    AUTH_ATTEMPTS_PER_MINUTE_UNKNOWN_IP,
+  );
 
   // Daily counters per identity: plain counters (not a rate limiter) so a
   // failed generation can hand its run back.
@@ -100,6 +109,15 @@ export function createQuota(
           await refund(keys);
         },
       };
+    },
+
+    /**
+     * Sign-in start and callback, per IP. Keeps a replayed state from making
+     * the server hammer GitHub's token endpoint and get the OAuth app throttled.
+     */
+    async allowAuthAttempt(ip: string): Promise<boolean> {
+      const active = ip === UNKNOWN_IP ? authUnknown : auth;
+      return (await active.limit(`ip:${ip}`)).success;
     },
 
     async allowPreview(ip: string): Promise<boolean> {

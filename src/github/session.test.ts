@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfigError } from "./config";
+import { seal } from "./seal";
 import {
   clearSessionCookie,
   isPlausibleToken,
+  readSession,
   readSessionToken,
   SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
@@ -13,6 +15,7 @@ const SECRET = "k".repeat(40);
 const NOW = new Date("2026-10-17T12:00:00Z");
 const TOKEN = "gho_16C7e42F292c6912E7710c838347Ae178B4a";
 
+const sess = (token = TOKEN, login = "ada") => ({ token, login });
 const cookiePair = (setCookie: string) => setCookie.split(";")[0] as string;
 const request = (cookie?: string) =>
   new Headers(cookie ? { cookie } : undefined);
@@ -21,7 +24,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("sessionCookie", () => {
   it("is HttpOnly, SameSite=Lax, site-wide and expires in a week", () => {
-    const header = sessionCookie(TOKEN, SECRET, NOW);
+    const header = sessionCookie(sess(), SECRET, NOW);
     expect(header).toContain(`${SESSION_COOKIE}=`);
     expect(header).toContain("HttpOnly");
     expect(header).toContain("SameSite=Lax");
@@ -30,14 +33,14 @@ describe("sessionCookie", () => {
   });
 
   it("is Secure in production only", () => {
-    expect(sessionCookie(TOKEN, SECRET, NOW)).not.toContain("Secure");
+    expect(sessionCookie(sess(), SECRET, NOW)).not.toContain("Secure");
     vi.stubEnv("NODE_ENV", "production");
-    expect(sessionCookie(TOKEN, SECRET, NOW)).toContain("Secure");
+    expect(sessionCookie(sess(), SECRET, NOW)).toContain("Secure");
     expect(clearSessionCookie()).toContain("Secure");
   });
 
   it("never carries the token in the clear", () => {
-    expect(sessionCookie(TOKEN, SECRET, NOW)).not.toContain(TOKEN);
+    expect(sessionCookie(sess(), SECRET, NOW)).not.toContain(TOKEN);
   });
 
   it("clears with an immediate expiry", () => {
@@ -47,7 +50,7 @@ describe("sessionCookie", () => {
 
 describe("readSessionToken", () => {
   const cookieFor = (token = TOKEN) =>
-    cookiePair(sessionCookie(token, SECRET, NOW));
+    cookiePair(sessionCookie(sess(token), SECRET, NOW));
   const read = (cookie?: string, now = NOW) =>
     readSessionToken(request(cookie), now, () => SECRET);
 
@@ -79,7 +82,7 @@ describe("readSessionToken", () => {
   });
 
   it("is anonymous when the cookie was sealed with another secret", () => {
-    const other = cookiePair(sessionCookie(TOKEN, "z".repeat(40), NOW));
+    const other = cookiePair(sessionCookie(sess(), "z".repeat(40), NOW));
     expect(read(other)).toBeNull();
   });
 
@@ -97,6 +100,29 @@ describe("readSessionToken", () => {
     expect(token).toBeNull();
     expect(String(info.mock.calls[0]?.[0])).toContain("auth_config_error");
     info.mockRestore();
+  });
+});
+
+describe("readSession", () => {
+  it("returns the token together with the login it belongs to", () => {
+    const cookie = cookiePair(sessionCookie(sess(TOKEN, "Ada"), SECRET, NOW));
+    expect(readSession(request(cookie), NOW, () => SECRET)).toEqual({
+      token: TOKEN,
+      login: "Ada",
+    });
+  });
+
+  it("reads a session written without a login as having no known login", () => {
+    const legacy = `${SESSION_COOKIE}=${seal("session", { token: TOKEN }, SECRET, 60, NOW)}`;
+    expect(readSession(request(legacy), NOW, () => SECRET)).toEqual({
+      token: TOKEN,
+      login: null,
+    });
+  });
+
+  it("drops a stored login that is not a valid GitHub login", () => {
+    const bad = `${SESSION_COOKIE}=${seal("session", { token: TOKEN, login: "a/b" }, SECRET, 60, NOW)}`;
+    expect(readSession(request(bad), NOW, () => SECRET)?.login).toBeNull();
   });
 });
 

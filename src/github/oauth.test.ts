@@ -3,6 +3,7 @@ import {
   DEFAULT_RETURN_TO,
   exchangeCode,
   finishSignIn,
+  revokeToken,
   STATE_COOKIE,
   safeReturnTo,
   startSignIn,
@@ -26,8 +27,13 @@ function begin(returnTo: string | null = "/ada") {
   return { location, setCookie, state, headers: new Headers({ cookie }) };
 }
 
+/** Answers the token endpoint with `body`, and the viewer lookup with login "Ada". */
 const githubReplies = (body: unknown, init?: ResponseInit) =>
-  vi.fn(async () => new Response(JSON.stringify(body), init));
+  vi.fn(async (url: string | URL | Request) =>
+    String(url).endsWith("/user")
+      ? new Response(JSON.stringify({ login: "Ada" }))
+      : new Response(JSON.stringify(body), init),
+  );
 
 describe("safeReturnTo", () => {
   it("keeps same-origin relative paths", () => {
@@ -133,9 +139,37 @@ describe("finishSignIn", () => {
     expect(outcome).toEqual({
       kind: "signed_in",
       token: TOKEN,
+      login: "Ada",
       returnTo: "/ada",
     });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    // The code exchange, then the viewer lookup.
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("creates no session when the token's owner cannot be determined, and revokes it", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const { state, headers } = begin("/ada");
+    const calls: string[] = [];
+    const fetchImpl = vi.fn(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push(`${init?.method ?? "GET"} ${String(url)}`);
+        return String(url).endsWith("/user")
+          ? new Response("{}", { status: 401 })
+          : String(url).includes("/applications/")
+            ? new Response(null, { status: 204 })
+            : new Response(JSON.stringify({ access_token: TOKEN }));
+      },
+    );
+    const outcome = await finishSignIn(
+      { code: "code123", state, error: null },
+      headers,
+      APP,
+      SECRET,
+      { now: NOW, fetchImpl },
+    );
+    expect(outcome).toEqual({ kind: "failed", returnTo: "/ada" });
+    expect(calls.at(-1)).toMatch(/^DELETE .*\/applications\/client-id\/token$/);
+    vi.restoreAllMocks();
   });
 
   it("rejects a state that does not match the browser's, without calling GitHub", async () => {
@@ -245,6 +279,40 @@ describe("finishSignIn", () => {
     );
     expect(outcome).toEqual({ kind: "failed", returnTo: "/ada" });
     vi.restoreAllMocks();
+  });
+});
+
+describe("revokeToken", () => {
+  it("sends the token with the app's basic auth credentials", async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 }));
+    await revokeToken(TOKEN, APP, fetchImpl);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("https://api.github.com/applications/client-id/token");
+    expect(init.method).toBe("DELETE");
+    expect((init.headers as Record<string, string>).authorization).toBe(
+      `Basic ${Buffer.from("client-id:client-secret").toString("base64")}`,
+    );
+    expect(JSON.parse(String(init.body))).toEqual({ access_token: TOKEN });
+  });
+
+  it("never throws or logs the token, whatever GitHub does", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    await revokeToken(
+      TOKEN,
+      APP,
+      async () => new Response("", { status: 500 }),
+    );
+    await revokeToken(TOKEN, APP, async () => {
+      throw new Error(`down ${TOKEN}`);
+    });
+    const logged = info.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(logged).toContain("oauth_revoke_failed");
+    expect(logged).not.toContain(TOKEN);
+    expect(logged).not.toContain(APP.clientSecret);
+    info.mockRestore();
   });
 });
 

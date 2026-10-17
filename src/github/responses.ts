@@ -36,6 +36,12 @@ export const previewRateLimited = () =>
     reason: "ip_limit",
   });
 
+export const authRateLimited = () =>
+  error(429, "rate_limited", "Too many sign-in attempts. Try again soon.", {
+    retryAfterSeconds: 60,
+    reason: "ip_limit",
+  });
+
 export const signInExpired = () =>
   error(400, "invalid_state", "Sign-in expired. Go back and try again.");
 
