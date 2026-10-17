@@ -318,3 +318,39 @@ test("more than one segment is not found for now", async ({ page }) => {
   const response = await page.goto("/ada/grace");
   expect(response?.status()).toBe(404);
 });
+
+test("commits not attributed to a day show as a labelled step with an honest note", async ({
+  page,
+}) => {
+  const year = makeYear(2023, steadyDays(2023, 1), 1000);
+  const missing = (
+    year.totals.commits - year.reconciliation.summed
+  ).toLocaleString("en-US");
+  await mockApi(page, {
+    status: 200,
+    body: {
+      source: "cache",
+      reposTruncated: false,
+      history: makeHistory("ada", [year]),
+    },
+  });
+  await page.goto("/ada");
+  await startButton(page).click();
+  const skip = page.getByRole("button", { name: "Skip" });
+  await expect(skip).toBeEnabled();
+  await skip.click();
+
+  await expect(
+    page.getByText(`+${missing} not attributed to a day`),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("main")
+      .getByText(
+        `${missing} commits in 2023 are not attributed to a day; yearly totals are exact.`,
+      )
+      .first(),
+  ).toBeVisible();
+  // The total is the official one, not the sum of the days.
+  await expect(page.getByText("@ada: 1,000 commits, 2023")).toBeVisible();
+});
