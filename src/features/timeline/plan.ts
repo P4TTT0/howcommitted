@@ -21,8 +21,10 @@ export const TOTAL_SECONDS = DRAW_SECONDS + TAIL_SECONDS;
 export const BPM = 140;
 /** One sixteenth note at the tempo. */
 export const GRID_SECONDS = 60 / BPM / 4;
-/** A payoff every this many commits. */
+/** A payoff every this many commits... */
 export const MILESTONE_STEP = 1000;
+/** ...except the first, which comes early so the payoff lands sooner. */
+export const MILESTONE_FIRST = 500;
 
 /** Block colors in rotation order with the text color that passes contrast. */
 export const BLOCK_SEQUENCE = [
@@ -56,6 +58,7 @@ export function buildPlan(days: DailyCommits[]): Plan {
     duration: DRAW_SECONDS,
     grid: GRID_SECONDS,
     step: MILESTONE_STEP,
+    first: MILESTONE_FIRST,
     minGapToFinal: 1.5,
   });
   const slots = buildTickSlots(aggregateWeekly(days), weekSpan(days), {

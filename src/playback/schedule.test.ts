@@ -103,6 +103,14 @@ describe("findMilestones", () => {
     ]);
   });
 
+  it("can start with an earlier first milestone", () => {
+    const data = days(Array.from({ length: 100 }, () => 35)); // 3,500 total
+    const values = findMilestones(data, { ...options, first: 500 }).map(
+      (m) => m.value,
+    );
+    expect(values).toEqual([500, 1000, 2000, 3000, 3500]);
+  });
+
   it("orders milestones in time and keeps them on the grid", () => {
     const data = days(Array.from({ length: 100 }, () => 35));
     const times = findMilestones(data, options).map((m) => m.time);

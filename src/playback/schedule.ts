@@ -104,17 +104,19 @@ export type MilestoneOptions = {
   grid: number;
   /** A payoff every `step` commits (for example 1,000). */
   step: number;
+  /** Value of the first payoff, if it should come earlier than `step`. */
+  first?: number;
   /** Step milestones this close to the final one (seconds) are dropped. */
   minGapToFinal: number;
 };
 
 /**
- * Finds the moments a payoff plays: each time the running total crosses a
- * multiple of `step`, plus the final total. Times are quantized to the grid.
+ * Finds the moments a payoff plays: each time the running total crosses
+ * `first` and then each multiple of `step`, plus the final total. Times are quantized to the grid.
  */
 export function findMilestones(
   days: readonly DailyCommits[],
-  { duration, grid, step, minGapToFinal }: MilestoneOptions,
+  { duration, grid, step, first = step, minGapToFinal }: MilestoneOptions,
 ): Milestone[] {
   const cumulative = cumulativeByDay(days);
   const total = cumulative[cumulative.length - 1] ?? 0;
@@ -127,7 +129,7 @@ export function findMilestones(
   const finalTime = timeAfterDay(days.findLastIndex((day) => day.count > 0));
   const milestones: Milestone[] = [];
 
-  let nextValue = step;
+  let nextValue = first;
   for (let index = 0; index < dayCount && nextValue < total; index += 1) {
     const running = cumulative[index] ?? 0;
     if (running < nextValue) continue;
