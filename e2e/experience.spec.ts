@@ -84,7 +84,8 @@ test("search shows a preview, then the click opens the experience", async ({
 
   await button.click();
   await expect(page).toHaveURL(/\/ada$/);
-  expect(mocks.historyRequests).toHaveLength(1);
+  // The history request goes out right after the navigation, not with it.
+  await expect.poll(() => mocks.historyRequests.length).toBe(1);
 
   // Audio was unlocked by the landing click, so the scene starts by itself.
   await expect(page.locator('[data-role="block"]')).toBeVisible();

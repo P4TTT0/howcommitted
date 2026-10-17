@@ -31,8 +31,10 @@ test("the landing is the question, with the input inside the sentence", async ({
     name: "How committed is GitHub username",
   });
   await expect(input).toBeVisible();
-  // The wordmark is small; the question is the headline, not a second title.
-  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(0);
+  // The small wordmark is the page title; the question is the headline.
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Committed" }),
+  ).toBeVisible();
 });
 
 test("typing a username finds the user in a clickable row", async ({
@@ -107,7 +109,7 @@ test("reduced motion keeps a static placeholder and a drawn line", async ({
   await expect(input).toHaveAttribute("placeholder", "torvalds");
   await page.waitForTimeout(700);
   await expect(input).toHaveAttribute("placeholder", "torvalds");
-  await expect(page.locator("polyline.signature-line")).toHaveCSS(
+  await expect(page.locator("svg.signature-line")).toHaveCSS(
     "animation-name",
     "none",
   );
@@ -121,4 +123,38 @@ test("the layout holds on a portrait phone", async ({ page }) => {
     () => document.documentElement.scrollWidth - window.innerWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("the disabled Listen stays legible: no opacity, dashed, same size", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const listen = page.getByRole("button", { name: "Listen", exact: true });
+  await expect(listen).toHaveAttribute("aria-disabled", "true");
+  await expect(listen).toHaveCSS("opacity", "1");
+  await expect(listen).toHaveCSS("border-top-style", "dashed");
+  await expect(listen).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(listen).toHaveCSS("color", "rgb(20, 20, 20)");
+  await expect(listen).toHaveCSS("cursor", "not-allowed");
+  const box = await listen.boundingBox();
+
+  await page.getByLabel("GitHub username").fill("ada");
+  await expect(listen).toHaveAttribute("aria-disabled", "false");
+  await expect(listen).toHaveCSS("background-color", "rgb(20, 20, 20)");
+  await expect(listen).toHaveCSS("color", "rgb(243, 241, 236)");
+  const after = await listen.boundingBox();
+  expect([after?.width, after?.height]).toEqual([box?.width, box?.height]);
+});
+
+test("on a phone the question takes three lines and fits", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const how = page.getByText("How", { exact: true });
+  const committed = page.getByText("committed", { exact: true });
+  const [a, b] = await Promise.all([
+    how.boundingBox(),
+    committed.boundingBox(),
+  ]);
+  expect(b?.y ?? 0).toBeGreaterThan((a?.y ?? 0) + (a?.height ?? 0) - 2);
+  expect((b?.x ?? 0) + (b?.width ?? 0)).toBeLessThanOrEqual(390 - 16);
 });
