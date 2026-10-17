@@ -46,3 +46,13 @@ export function indexAfterKey(
       return null;
   }
 }
+
+/** The element a scene's view must contain; throws so a broken scene is dropped. */
+export function findElement<T extends Element>(
+  root: ParentNode,
+  selector: string,
+): T {
+  const element = root.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing scene element: ${selector}`);
+  return element;
+}

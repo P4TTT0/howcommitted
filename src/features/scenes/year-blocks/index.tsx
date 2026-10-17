@@ -1,5 +1,6 @@
 import type { SceneDefinition } from "@/features/sequencer/types";
 import { BPM, planYearBars } from "./bars";
+import { exploreYearBlocks } from "./explore";
 import { mountYearBlocks } from "./mount";
 import { YearBlocksView } from "./YearBlocksView";
 
@@ -19,6 +20,7 @@ export const yearBlocksScene: SceneDefinition = {
       bpm: BPM,
       view: <YearBlocksView bars={bars} />,
       mount: (root, runtime) => mountYearBlocks(root, bars, runtime),
+      explore: (root) => exploreYearBlocks(root, bars),
     };
   },
 };

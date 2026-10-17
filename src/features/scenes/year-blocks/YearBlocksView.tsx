@@ -1,5 +1,6 @@
 import { formatCount } from "@/features/sequencer/model/format";
 import { blockForYearIndex } from "@/features/sequencer/model/plan";
+import { focusRing } from "@/ui/classes";
 import type { YearBar } from "./bars";
 
 /** At most this many year labels fit on the axis of a phone. */
@@ -50,27 +51,47 @@ export function YearBlocksView({ bars }: YearBlocksViewProps) {
 
       <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 pt-4">
         <p className="font-mono text-xs uppercase">Contributions per year</p>
-        <div
-          role="img"
-          aria-label={`Contributions per year: ${summary}`}
-          className="mt-3 flex min-h-0 flex-1 items-end gap-1 border-b-2 border-ink"
-        >
-          {bars.map((bar, index) => {
-            const colors = blockForYearIndex(bar.colorIndex);
-            return (
-              <div
-                key={bar.year}
-                data-bar={index}
-                className="min-w-px flex-1"
-                style={{
-                  height: `${bar.ratio * 100}%`,
-                  minHeight: bar.contributions > 0 ? "2px" : undefined,
-                  backgroundColor: colors.background,
-                  transformOrigin: "50% 100%",
-                }}
-              />
-            );
-          })}
+        <div className="relative mt-3 min-h-0 flex-1">
+          <div
+            role="img"
+            aria-label={`Contributions per year: ${summary}`}
+            className="flex h-full items-end gap-1 border-b-2 border-ink"
+          >
+            {bars.map((bar, index) => {
+              const colors = blockForYearIndex(bar.colorIndex);
+              return (
+                <div
+                  key={bar.year}
+                  data-bar={index}
+                  className="min-w-px flex-1"
+                  style={{
+                    height: `${bar.ratio * 100}%`,
+                    minHeight: bar.contributions > 0 ? "2px" : undefined,
+                    backgroundColor: colors.background,
+                    transformOrigin: "50% 100%",
+                  }}
+                />
+              );
+            })}
+          </div>
+          {/* Explore only: `mount.ts` shows it once the scene has ended. */}
+          <div
+            data-role="scrub"
+            hidden
+            role="slider"
+            tabIndex={-1}
+            aria-label="Contributions by year"
+            aria-orientation="horizontal"
+            aria-valuemin={0}
+            aria-valuemax={Math.max(0, bars.length - 1)}
+            aria-valuenow={Math.max(0, bars.length - 1)}
+            aria-valuetext={
+              last
+                ? `${last.year}: ${formatCount(last.contributions)} contributions`
+                : ""
+            }
+            className={`absolute inset-0 touch-none ${focusRing}`}
+          />
         </div>
         <div
           aria-hidden="true"

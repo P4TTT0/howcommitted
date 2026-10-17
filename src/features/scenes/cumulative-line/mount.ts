@@ -162,6 +162,13 @@ function createRenderer(root: HTMLElement, plan: Plan) {
     at: Number(element.dataset.stepLabel),
     shown: false,
   }));
+  const flags = [...root.querySelectorAll<HTMLElement>("[data-flag]")].map(
+    (element) => ({
+      element,
+      at: Number(element.dataset.at),
+      shown: false,
+    }),
+  );
   let lastTotal = Number.NaN;
 
   return (seconds: number) => {
@@ -182,6 +189,15 @@ function createRenderer(root: HTMLElement, plan: Plan) {
       if (shown !== label.shown) {
         label.shown = shown;
         label.element.dataset.visible = String(shown);
+      }
+    }
+
+    // A repo flag is planted the instant the line reaches its day.
+    for (const flag of flags) {
+      const shown = progress >= flag.at;
+      if (shown !== flag.shown) {
+        flag.shown = shown;
+        flag.element.dataset.visible = String(shown);
       }
     }
 
