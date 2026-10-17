@@ -196,6 +196,7 @@ describe("copy", () => {
 describe("activeSpan", () => {
   it("spans the first and last contribution year", () => {
     expect(activeSpan([2025, 2012, 2018])).toEqual({ first: 2012, last: 2025 });
+    expect(formatActiveSpan(user.contributionYears)).toBe("Active 2011–2025");
     expect(formatActiveSpan([2020])).toBe("Active in 2020");
     expect(formatActiveSpan([])).toBe("No contribution years yet");
   });

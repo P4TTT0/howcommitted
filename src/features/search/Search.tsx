@@ -4,27 +4,27 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import { recordIntent } from "@/features/experience/intent";
 import { preloadAudio, unlockAudio } from "@/playback/unlock";
-import { focusRing } from "@/ui/classes";
+import { actionClass } from "@/ui/classes";
 import { StartButton } from "@/ui/StartButton";
 import {
   canRetry,
   checkInput,
-  formatActiveSpan,
   LOOKUP_DEBOUNCE_MS,
   type LookupState,
   lookupLogin,
   lookupMessage,
 } from "./lookup";
+import { PreviewRow } from "./PreviewRow";
+import { useTypingPlaceholder } from "./useTypingPlaceholder";
 
-/** Names longer than this leave the display face and truncate in mono. */
-const DISPLAY_NAME_MAX_CHARACTERS = 18;
+const NUDGE = "Type a GitHub username first.";
 
 function warmUpAudio() {
   void preloadAudio().catch(() => {});
 }
 
 /**
- * Landing search: debounced exact-username lookup with a preview. Only the
+ * The landing question: "How committed is @[input]?". Debounced exact-username lookup with a preview. debounced exact-username lookup with a preview. Only the
  * preview is fetched here; the history waits for the click (fetch on intent),
  * which also unlocks audio before navigating to the experience.
  */
@@ -34,6 +34,9 @@ export function Search() {
   const [state, setState] = useState<LookupState>({ kind: "idle" });
   const [attempt, setAttempt] = useState(0);
   const [starting, setStarting] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [nudge, setNudge] = useState(false);
+  const placeholder = useTypingPlaceholder(value === "" && !focused);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` re-runs the lookup on retry
   useEffect(() => {
@@ -76,8 +79,7 @@ export function Search() {
     if (found) warmUpAudio();
   }, [found]);
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function start() {
     if (!found || starting) return;
     setStarting(true);
     // Called before any await so the click still counts as the user gesture.
@@ -86,90 +88,101 @@ export function Search() {
     router.push(`/${found.login}`);
   }
 
-  const displayName = found?.name ?? found?.login ?? "";
+  function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    // Not found yet: say so politely instead of doing nothing silently.
+    if (!found && state.kind === "idle") setNudge(true);
+    void start();
+  }
 
+  const statusText =
+    nudge && state.kind === "idle"
+      ? NUDGE
+      : lookupMessage(state as Exclude<LookupState, { kind: "found" }>);
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-4 py-10">
-      <h1 className="font-display text-[clamp(3.5rem,16vw,12rem)] font-black uppercase leading-[0.8]">
-        Committed
-      </h1>
-
-      <form
-        onSubmit={onSubmit}
-        noValidate
-        className="flex w-full max-w-xl flex-col gap-4"
-      >
-        <label htmlFor="login" className="font-mono text-xs uppercase">
-          GitHub username
+    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-7">
+      <div className="font-display text-[clamp(40px,12vw,200px)] font-black uppercase leading-[0.86]">
+        <label id="ask-how" htmlFor="login" className="block whitespace-nowrap">
+          How committed
         </label>
-        <input
-          id="login"
-          name="login"
-          type="text"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onFocus={warmUpAudio}
-          autoComplete="off"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          aria-describedby="lookup-status"
-          className={`min-h-14 w-full border-2 border-ink bg-paper px-4 font-mono text-base ${focusRing}`}
-        />
+        <span id="ask-rest" className="sr-only">
+          is GitHub username
+        </span>
+        <span className="flex max-w-full items-baseline gap-[0.2em]">
+          <span aria-hidden="true">is&nbsp;@</span>
+          <span className="inline-grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] items-baseline">
+            {/* Sizer: the field is as wide as what it shows, like part of the sentence. */}
+            <span
+              aria-hidden="true"
+              className="invisible col-start-1 row-start-1 whitespace-pre pr-[0.05em]"
+            >
+              {value || placeholder || "m"}
+            </span>
+            <input
+              id="login"
+              name="login"
+              type="text"
+              value={value}
+              onChange={(event) => {
+                setValue(event.target.value);
+                setNudge(false);
+              }}
+              onFocus={() => {
+                setFocused(true);
+                warmUpAudio();
+              }}
+              onBlur={() => setFocused(false)}
+              placeholder={placeholder}
+              aria-labelledby="ask-how ask-rest"
+              aria-describedby="lookup-status"
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="col-start-1 row-start-1 w-0 min-w-full rounded-none border-0 border-b-[0.07em] border-ink bg-transparent p-0 font-[inherit] uppercase text-[inherit] caret-block-ultramarine outline-none placeholder:text-ink placeholder:opacity-40 focus:border-block-ultramarine"
+            />
+          </span>
+          <span aria-hidden="true">?</span>
+        </span>
+      </div>
 
-        <div
-          id="lookup-status"
-          role="status"
-          className="min-h-20 font-mono text-xs"
-        >
-          {state.kind === "found" ? (
-            <div className="flex items-center gap-4 border-2 border-ink p-3">
-              {/* biome-ignore lint/performance/noImgElement: a 64px remote avatar needs no optimizer */}
-              <img
-                src={state.user.avatarUrl}
-                alt=""
-                width={64}
-                height={64}
-                className="size-16 shrink-0 border-2 border-ink object-cover"
-              />
-              <div className="min-w-0">
-                <p
-                  className={
-                    displayName.length <= DISPLAY_NAME_MAX_CHARACTERS
-                      ? "truncate font-display text-3xl font-black uppercase leading-none"
-                      : "truncate font-mono text-sm font-bold"
-                  }
-                >
-                  {displayName}
-                </p>
-                <p className="mt-1 truncate">@{state.user.login}</p>
-                <p className="mt-1">
-                  {formatActiveSpan(state.user.contributionYears)}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-3">
-              <p>{lookupMessage(state)}</p>
-              {canRetry(state) && (
-                <button
-                  type="button"
-                  onClick={() => setAttempt((count) => count + 1)}
-                  className={`min-h-11 min-w-11 border-2 border-ink px-3 uppercase ${focusRing}`}
-                >
-                  Try again
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+      <div
+        id="lookup-status"
+        role="status"
+        className="min-h-14 font-mono text-sm"
+      >
+        {state.kind === "found" ? (
+          <PreviewRow user={state.user} disabled={starting} onStart={start} />
+        ) : (
+          <div className="flex min-h-14 flex-wrap items-center gap-3">
+            <p>{statusText}</p>
+            {canRetry(state) && (
+              <button
+                type="button"
+                onClick={() => setAttempt((count) => count + 1)}
+                className={`${actionClass} min-h-11`}
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
         <StartButton
           type="submit"
-          size="form"
+          tone="ink"
+          size="cta"
           aria-disabled={!found || starting}
-        />
-      </form>
-    </main>
+        >
+          Listen
+        </StartButton>
+        <p className="max-w-[48ch] font-mono text-[15px] leading-relaxed">
+          Type a GitHub username. Their contribution history plays as sound and
+          motion, year by year. Headphones on.
+        </p>
+      </div>
+    </form>
   );
 }

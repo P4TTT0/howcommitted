@@ -81,3 +81,27 @@ body {
     transform: scaleX(0.5);
   }
 }
+
+/* Landing signature: the cumulative line draws itself, then loops. */
+@keyframes draw-line {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  70%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.signature-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-line 9s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signature-line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
