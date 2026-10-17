@@ -13,6 +13,7 @@ export default defineConfig({
   webServer: {
     command: process.env.CI ? "pnpm start" : "pnpm build && pnpm start",
     url: "http://localhost:3000",
+    env: { ALLOW_LAB: "1" },
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },

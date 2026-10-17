@@ -1,6 +1,6 @@
 # Architecture
 
-Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented; `playback/`, `features/` and the pages are not yet.
+Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. `playback/` and `features/timeline/` hold the playback spike, reachable at `/lab` outside production; the product pages are not built yet.
 
 ## Stack
 
@@ -26,12 +26,14 @@ src/app/              Thin Next routes only
   [...users]/opengraph-image.tsx
   api/user/[login]/       Exact-login preview, rate limited per IP
   api/history/[login]/    Full profile history (cache, coalescing, quota)
+  lab/page.tsx            Playback lab: previews and local dev only, 404 in production
 src/domain/           Pure TS types and metrics
 src/github/           Server-only GraphQL client, queries, cache
-src/playback/         One clock driving GSAP and Tone.js (sound/ inside)
+src/playback/         One clock driving GSAP and Tone.js (clock.ts), pure scheduling
+                      helpers (aggregate, schedule, pitch), sound/ engine
 src/features/         timeline, stats, versus
 src/ui/               Shared presentational components
-public/sounds/        .ogg with .mp3 fallback
+public/sounds/        Kenney CC0 chip samples as .ogg with .mp3 fallback, CREDITS.md
 e2e/                  Playwright
 .github/              workflows/ci.yml, pull_request_template.md, ISSUE_TEMPLATE (planned)
 .env.example          Required env vars
