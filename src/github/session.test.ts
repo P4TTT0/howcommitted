@@ -13,7 +13,7 @@ const SECRET = "k".repeat(40);
 const NOW = new Date("2026-10-17T12:00:00Z");
 const TOKEN = "gho_16C7e42F292c6912E7710c838347Ae178B4a";
 
-const valueOf = (setCookie: string) => setCookie.split(";")[0] as string;
+const cookiePair = (setCookie: string) => setCookie.split(";")[0] as string;
 const request = (cookie?: string) =>
   new Headers(cookie ? { cookie } : undefined);
 
@@ -47,7 +47,7 @@ describe("sessionCookie", () => {
 
 describe("readSessionToken", () => {
   const cookieFor = (token = TOKEN) =>
-    valueOf(sessionCookie(token, SECRET, NOW));
+    cookiePair(sessionCookie(token, SECRET, NOW));
   const read = (cookie?: string, now = NOW) =>
     readSessionToken(request(cookie), now, () => SECRET);
 
@@ -79,7 +79,7 @@ describe("readSessionToken", () => {
   });
 
   it("is anonymous when the cookie was sealed with another secret", () => {
-    const other = valueOf(sessionCookie(TOKEN, "z".repeat(40), NOW));
+    const other = cookiePair(sessionCookie(TOKEN, "z".repeat(40), NOW));
     expect(read(other)).toBeNull();
   });
 
@@ -104,7 +104,7 @@ describe("isPlausibleToken", () => {
   it("accepts GitHub token shapes and rejects anything else", () => {
     expect(isPlausibleToken(TOKEN)).toBe(true);
     expect(isPlausibleToken("a".repeat(40))).toBe(true);
-    expect(isPlausibleToken("github_pat_" + "A1".repeat(20))).toBe(true);
+    expect(isPlausibleToken(`github_pat_${"A1".repeat(20)}`)).toBe(true);
     expect(isPlausibleToken("")).toBe(false);
     expect(isPlausibleToken(`${TOKEN} `)).toBe(false);
     expect(isPlausibleToken(`${TOKEN}\n`)).toBe(false);

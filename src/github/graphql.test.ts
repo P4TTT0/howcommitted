@@ -135,12 +135,19 @@ describe("githubGraphql", () => {
       error: { kind: "upstream", message: "socket hang up" },
     });
 
-    stubFetch(
-      json({ errors: [{ message: "Bad credentials" }] }, { status: 401 }),
-    );
+    stubFetch(json({ errors: [{ message: "Server error" }] }, { status: 500 }));
     expect(await githubGraphql("t", "q", {})).toMatchObject({
       ok: false,
-      error: { kind: "upstream", message: "Bad credentials" },
+      error: { kind: "upstream", message: "Server error" },
+    });
+  });
+
+  it("maps a 401 to unauthorized so a rejected token can be told apart", async () => {
+    stubFetch(json({ message: "Bad credentials" }, { status: 401 }));
+    expect(await githubGraphql("t", "q", {})).toEqual({
+      ok: false,
+      error: { kind: "unauthorized" },
+      rateLimit: null,
     });
   });
 });
