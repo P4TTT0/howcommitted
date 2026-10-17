@@ -8,7 +8,7 @@ COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value. Canonic
 
 ## Project state
 
-Scaffolded: tooling, design tokens and CI exist; no features yet. Do not scaffold beyond what a task asks for.
+The solo slice exists: landing search, `/{login}` playing the timeline scene with real data, the user and history APIs, and `/lab` for playback work. Versus, the other scenes, share/OG and sign-in are not built. Do not scaffold beyond what a task asks for.
 
 ## Commands
 
