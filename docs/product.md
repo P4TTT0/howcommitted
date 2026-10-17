@@ -59,4 +59,5 @@ COMMITS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 ## Decisions
 
 - Radar chart rejected: mismatched scales, and it reads as a performance review, violating the core principle.
+- Commits not attributed to a day are shown as an explicit step, never spread across days: GitHub can truncate per-day detail while the yearly total stays exact. The line draws only real daily commits; the missing amount appears at the end of its year as one dashed step with the label "+N not attributed to a day" and a soft, distinct sound cue, and a note says so. Counter and year blocks end on the official totals. If the daily detail ever exceeds a yearly total it is not scaled down: the official total wins and the year is flagged. A milestone crossed inside a step fires at the step.
 - Exact-username lookup instead of fuzzy search: GitHub's user search API allows only 30 requests/minute.
