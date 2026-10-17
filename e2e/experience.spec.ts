@@ -33,7 +33,7 @@ const okReply: Reply = {
 };
 
 /** Total as the end card prints it, derived from the fixture. */
-const TOTAL = history.totals.commits.toLocaleString("en-US");
+const TOTAL = history.totalContributions.toLocaleString("en-US");
 
 /** Mocks the two API routes; `ghost` does not exist, everything else is `ada`. */
 async function mockApi(
@@ -196,17 +196,21 @@ test("skipping to the end shows the total and the principle", async ({
   await skip.click();
 
   await expect(
-    page.getByText("Commits are not productivity. This is rhythm, not value."),
+    page.getByText(
+      "Contributions are not productivity. This is rhythm, not value.",
+    ),
   ).toBeVisible();
   await expect(
-    page.getByText(`@ada: ${TOTAL} commits, 2022 to 2024`),
+    page.getByText(`@ada: ${TOTAL} contributions, 2022 to 2024`),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Replay" }).first(),
   ).toBeVisible();
 });
 
-test("a user with no commits gets a calm empty state", async ({ page }) => {
+test("a user with no contributions gets a calm empty state", async ({
+  page,
+}) => {
   await mockApi(page, {
     status: 200,
     body: {
@@ -218,7 +222,14 @@ test("a user with no commits gets a calm empty state", async ({ page }) => {
   await page.goto("/ada");
   await startButton(page).click();
   await expect(
-    page.getByRole("main").getByText(/No public commits found for @ada/),
+    page.getByRole("main").getByText(/No contributions found for @ada/),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("main")
+      .getByText(
+        "Private contributions only appear if @ada shares them on their GitHub profile.",
+      ),
   ).toBeVisible();
 });
 
@@ -319,12 +330,13 @@ test("more than one segment is not found for now", async ({ page }) => {
   expect(response?.status()).toBe(404);
 });
 
-test("commits not attributed to a day show as a labelled step with an honest note", async ({
+test("contributions not attributed to a day show as a labelled step with an honest note", async ({
   page,
 }) => {
   const year = makeYear(2023, steadyDays(2023, 1), 1000);
   const missing = (
-    year.totals.commits - year.reconciliation.summed
+    year.totalContributions -
+    year.dailyContributions.reduce((sum, day) => sum + day.count, 0)
   ).toLocaleString("en-US");
   await mockApi(page, {
     status: 200,
@@ -347,10 +359,47 @@ test("commits not attributed to a day show as a labelled step with an honest not
     page
       .getByRole("main")
       .getByText(
-        `${missing} commits in 2023 are not attributed to a day; yearly totals are exact.`,
+        `${missing} contributions in 2023 are not attributed to a day; yearly totals are exact.`,
       )
       .first(),
   ).toBeVisible();
   // The total is the official one, not the sum of the days.
-  await expect(page.getByText("@ada: 1,000 commits, 2023")).toBeVisible();
+  await expect(page.getByText("@ada: 1,000 contributions, 2023")).toBeVisible();
+});
+
+test("a profile with only private contributions plays the full calendar", async ({
+  page,
+}) => {
+  // mngobbi-like: no public commits, everything comes from the calendar.
+  const days = steadyDays(2026, 8, 1).filter((day) => day.date <= "2026-08-26");
+  const total = days.reduce((sum, day) => sum + day.count, 0);
+  const privateOnly = makeHistory("ada", [
+    makeYear(2026, days, {
+      official: total,
+      commits: 0,
+      privateContributions: total,
+    }),
+  ]);
+  await mockApi(page, {
+    status: 200,
+    body: { source: "cache", reposTruncated: false, history: privateOnly },
+  });
+  await page.goto("/ada");
+  await startButton(page).click();
+  const skip = page.getByRole("button", { name: "Skip" });
+  await expect(skip).toBeEnabled();
+  await skip.click();
+
+  const formatted = total.toLocaleString("en-US");
+  await expect(
+    page.getByText(`@ada: ${formatted} contributions, 2026`),
+  ).toBeVisible();
+  await expect(
+    page.getByText(`Includes ${formatted} private contributions.`),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Contributions are not productivity. This is rhythm, not value.",
+    ),
+  ).toBeVisible();
 });

@@ -14,7 +14,7 @@ const martianMono = Martian_Mono({
 
 export const metadata: Metadata = {
   title: "Committed",
-  description: "Your commit history as an audio-visual experience.",
+  description: "Your contribution history as an audio-visual experience.",
 };
 
 export default function RootLayout({

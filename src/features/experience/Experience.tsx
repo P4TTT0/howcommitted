@@ -72,11 +72,11 @@ function announcement(phase: Phase, login: string): string {
     case "gate":
       return "Press How Committed? to start.";
     case "loading":
-      return "Reading the public commit history.";
+      return "Reading the contribution history.";
     case "failed":
       return failureCopy(phase.failure, login).message;
     case "empty":
-      return `No public commits found for @${phase.login}. Nothing to play yet.`;
+      return `No contributions found for @${phase.login}. Nothing to play yet.`;
     case "scene":
       return `Starting @${phase.login}.`;
   }
@@ -177,7 +177,7 @@ function screen(phase: Phase, login: string, start: () => void) {
         <ScreenMain>
           <LoadingMoment
             login={login}
-            label="Reading the public commit history"
+            label="Reading the contribution history"
           />
         </ScreenMain>
       );
@@ -212,7 +212,11 @@ function screen(phase: Phase, login: string, start: () => void) {
         <ScreenMain>
           <Poster login={phase.login} tone="ink">
             <p className="font-mono text-sm">
-              No public commits found for @{phase.login}. Nothing to play yet.
+              No contributions found for @{phase.login}. Nothing to play yet.
+            </p>
+            <p className="font-mono text-xs">
+              Private contributions only appear if @{phase.login} shares them on
+              their GitHub profile.
             </p>
             <div className="flex flex-wrap gap-2">
               <Link href="/" className={actionClass}>
@@ -228,7 +232,7 @@ function screen(phase: Phase, login: string, start: () => void) {
       return (
         <Timeline
           plan={model.plan}
-          title={`@${phase.login} commit history`}
+          title={`@${phase.login} contribution history`}
           caption="Turn sound on."
           autoStart
           starting={
@@ -247,6 +251,7 @@ function screen(phase: Phase, login: string, start: () => void) {
               lastYear={phase.lastYear}
               yearBlocks={model.yearBlocks}
               note={model.note}
+              privateContributions={model.privateContributions}
               onReplay={replay}
             />
           )}

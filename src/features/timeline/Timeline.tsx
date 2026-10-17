@@ -119,7 +119,7 @@ export function Timeline({
   const firstYear = plan.years[0]?.year ?? 0;
   const lastYear = plan.years.at(-1)?.year ?? firstYear;
   const labelEvery = Math.ceil(plan.years.length / MAX_YEAR_LABELS);
-  const chartLabel = `Cumulative commits from ${firstYear} to ${lastYear}, ${formatCount(plan.total)} in total`;
+  const chartLabel = `Cumulative contributions from ${firstYear} to ${lastYear}, ${formatCount(plan.total)} in total`;
 
   return (
     <ScreenMain ref={rootRef}>
@@ -156,7 +156,9 @@ export function Timeline({
                   >
                     0
                   </p>
-                  <p className="mt-4 font-mono text-xs uppercase">Commits</p>
+                  <p className="mt-4 font-mono text-xs uppercase">
+                    Contributions
+                  </p>
                 </div>
               </div>
             );
@@ -192,7 +194,7 @@ export function Timeline({
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
               />
-              {/* Commits no day carries: dashed, so it reads as not a day. */}
+              {/* Contributions no day carries: dashed, so it reads as not a day. */}
               <path
                 d={dashedPath}
                 clipPath="url(#reveal)"
@@ -279,14 +281,16 @@ export function Timeline({
             >
               {formatCount(milestone.value)}
             </span>
-            <span className="mt-4 font-mono text-sm uppercase">Commits</span>
+            <span className="mt-4 font-mono text-sm uppercase">
+              Contributions
+            </span>
           </div>
         );
       })}
 
       <p className="sr-only" aria-live="polite">
         {status === "ended"
-          ? `Finished. ${formatCount(plan.total)} commits.`
+          ? `Finished. ${formatCount(plan.total)} contributions.`
           : ""}
       </p>
 
