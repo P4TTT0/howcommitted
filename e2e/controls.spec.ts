@@ -14,7 +14,6 @@ const history = makeHistory("ada", [
   makeYear(2024, steadyDays(2024, 2)),
 ]);
 const historyBody = { source: "cache", reposTruncated: false, history };
-const TOTAL = history.totalContributions.toLocaleString("en-US");
 
 /** Mocks the two API routes; everything is `ada`. */
 async function mockApi(page: Page) {
@@ -83,7 +82,7 @@ test("a finished scene holds in explore and never moves on by itself", async ({
   await page.waitForTimeout(1500);
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 1 of 2: Year blocks",
+    "Scene 1 of 2: Timeline",
   );
   // The way forward is there, never a dead end.
   await expect(nextButton(page)).toBeEnabled();
@@ -91,7 +90,7 @@ test("a finished scene holds in explore and never moves on by itself", async ({
   await nextButton(page).click();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 2 of 2: Cumulative line",
+    "Scene 2 of 2: Heatmap",
   );
   await expect(pauseButton(page)).toBeVisible();
 });
@@ -136,7 +135,7 @@ test("previous, next and the scene segments move at any time", async ({
   await expect(replayButton(page)).toBeVisible();
 });
 
-test("year blocks can be read by pointer and keyboard in explore", async ({
+test("the timeline reads each year by pointer and keyboard in explore", async ({
   page,
 }) => {
   await play(page);
@@ -146,13 +145,24 @@ test("year blocks can be read by pointer and keyboard in explore", async ({
   await expect(chart).toBeVisible();
   const [first, second, third] = history.years;
   if (!first || !second || !third) throw new Error("Fixture needs 3 years");
-  const reading = (year: (typeof history.years)[number]) =>
-    `${year.year}: ${year.totalContributions.toLocaleString("en-US")} contributions`;
+  const reading = (
+    year: (typeof history.years)[number],
+    thisYear: number,
+    total: number,
+  ) =>
+    `${year.year}: ${thisYear.toLocaleString("en-US")} contributions this year, ${total.toLocaleString("en-US")} in total`;
+  const afterSecond = first.totalContributions + second.totalContributions;
 
   await chart.focus();
-  await expect(chart).toHaveAttribute("aria-valuetext", reading(third));
+  await expect(chart).toHaveAttribute(
+    "aria-valuetext",
+    reading(third, third.totalContributions, history.totalContributions),
+  );
   await chart.press("ArrowLeft");
-  await expect(chart).toHaveAttribute("aria-valuetext", reading(second));
+  await expect(chart).toHaveAttribute(
+    "aria-valuetext",
+    reading(second, second.totalContributions, afterSecond),
+  );
   // The arrows belong to the chart while it is focused: still the same scene.
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
@@ -162,39 +172,54 @@ test("year blocks can be read by pointer and keyboard in explore", async ({
   const box = await chart.boundingBox();
   if (!box) throw new Error("The chart has no box");
   await page.mouse.move(box.x + box.width * 0.1, box.y + box.height / 2);
-  await expect(chart).toHaveAttribute("aria-valuetext", reading(first));
-  await expect(page.locator('[data-role="year"]')).toHaveText(
+  await expect(chart).toHaveAttribute(
+    "aria-valuetext",
+    reading(first, first.totalContributions, first.totalContributions),
+  );
+  await expect(page.locator("[data-readout-year]")).toHaveText(
     String(first.year),
   );
-  await expect(page.locator('[data-role="value"]')).toHaveText(
-    first.totalContributions.toLocaleString("en-US"),
+  await expect(page.locator("[data-readout-detail]")).toHaveText(
+    `${first.totalContributions.toLocaleString("en-US")} this year · ${first.totalContributions.toLocaleString("en-US")} total`,
   );
 });
 
-test("the cumulative line reads the date and total under the pointer", async ({
+test("the heatmap reads a week by keyboard and shows the month strip", async ({
   page,
 }) => {
   await play(page);
   await openInExplore(page, 2);
 
-  const chart = page.getByRole("slider", {
-    name: "Cumulative contributions by date",
-  });
-  const box = await chart.boundingBox();
-  if (!box) throw new Error("The chart has no box");
-  await page.mouse.move(box.x + box.width - 1, box.y + box.height / 2);
-  await expect(chart).toHaveAttribute(
+  const grid = page.getByRole("slider", { name: "Contributions by week" });
+  await expect(grid).toBeVisible();
+  await grid.focus();
+  await expect(grid).toHaveAttribute(
     "aria-valuetext",
-    new RegExp(`^Dec \\d+, 2024: ${TOTAL} contributions so far`),
+    /^2024 · week d+: d+ contributions? that week$/,
   );
-  await expect(page.getByText(`${TOTAL} contributions so far`)).toBeVisible();
+  await grid.press("Home");
+  await expect(grid).toHaveAttribute(
+    "aria-valuetext",
+    /^2022 · week 1: d+ contributions? that week$/,
+  );
+  await grid.press("ArrowDown");
+  await expect(grid).toHaveAttribute(
+    "aria-valuetext",
+    /^2023 · week 1: d+ contributions? that week$/,
+  );
+  // The arrows belong to the grid while it is focused: still the same scene.
+  await expect(progress(page)).toHaveAttribute(
+    "aria-valuetext",
+    /^Scene 2 of 2/,
+  );
+  await expect(page.locator("[data-role=readout-title]")).toHaveText(
+    "2023 · week 1",
+  );
 
-  await chart.focus();
-  await chart.press("Home");
-  await expect(chart).toHaveAttribute(
-    "aria-valuetext",
-    /^Jan 1, 2022: \d+ contributions so far/,
-  );
+  // The fixture lives through every calendar month, so the strip is shown.
+  await expect(
+    page.getByRole("img", { name: /^Average contributions per month/ }),
+  ).toBeVisible();
 });
 
 test("speed is chosen once and carries across scenes", async ({ page }) => {

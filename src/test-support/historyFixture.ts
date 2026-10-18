@@ -1,5 +1,6 @@
+import { buildHeatmap } from "@/domain/heatmap";
 import type { History, HistoryYear } from "@/domain/history";
-import type { DailyContributions } from "@/domain/types";
+import type { CalendarDay, DailyContributions } from "@/domain/types";
 
 /**
  * Small deterministic histories for tests (unit and e2e). They only need to
@@ -20,6 +21,22 @@ export function steadyDays(
     }
   }
   return days;
+}
+
+/** Every day of the year as the GitHub calendar lists it, quiet days as zeros. */
+function calendarOf(year: number, days: DailyContributions[]): CalendarDay[] {
+  const counts = new Map(days.map((day) => [day.date, day.count]));
+  const calendar: CalendarDay[] = [];
+  const end = Date.UTC(year, 11, 31);
+  for (let ms = Date.UTC(year, 0, 1); ms <= end; ms += 86_400_000) {
+    const date = new Date(ms).toISOString().slice(0, 10);
+    calendar.push({
+      date,
+      count: counts.get(date) ?? 0,
+      weekday: new Date(ms).getUTCDay(),
+    });
+  }
+  return calendar;
 }
 
 export type YearOptions = {
@@ -60,7 +77,7 @@ export function makeYear(
     },
     dailyContributions,
     totalContributions: total,
-    heatmap: [],
+    heatmap: buildHeatmap(calendarOf(year, dailyContributions)),
   };
 }
 
