@@ -62,18 +62,17 @@ async function mockApi(
 }
 
 const pauseButton = (page: Page) => page.getByRole("button", { name: "Pause" });
-const nextButton = (page: Page) =>
-  page.getByRole("button", { name: "Next", exact: true });
+const nextButton = (page: Page) => page.getByRole("button", { name: /^Next/ });
 const prevButton = (page: Page) =>
   page.getByRole("button", { name: "Previous scene" });
 const progress = (page: Page) =>
   page.getByRole("progressbar", { name: "Playback progress" });
 
-/** Goes through every scene with Next (one more than the ticks); the end card follows. */
+/** Goes through every scene with Next (one per tick); the end card follows. */
 async function skipAllScenes(page: Page) {
   // The bar only exists once the history has loaded.
   await expect(nextButton(page)).toBeEnabled();
-  const scenes = (await page.locator("[data-scene-tick]").count()) + 1;
+  const scenes = await page.locator("[data-scene-tick]").count();
   for (let scene = 0; scene < scenes; scene += 1) {
     await expect(nextButton(page)).toBeEnabled();
     await nextButton(page).click();
@@ -128,7 +127,7 @@ test("search shows a preview, then the click opens the experience", async ({
   // Audio was unlocked by the landing click, so the scene starts by itself.
   await expect(pauseButton(page)).toBeEnabled();
   await expect(page.getByRole("button", { name: "Pause" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Mute" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Sound/ })).toBeVisible();
 });
 
 test("pressing Enter on a found user starts the experience", async ({
@@ -268,16 +267,15 @@ test("pausing holds the position and resuming continues", async ({ page }) => {
   await pauseButton(page).click();
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
-  const fill = page.getByRole("progressbar").locator("div").first();
-  const held = await fill.evaluate((element) => element.style.width);
+  // The bar carries the clock position (0..1) in `data-progress`.
+  const tick = page.getByRole("progressbar");
+  const held = await tick.getAttribute("data-progress");
   await page.waitForTimeout(800);
-  expect(await fill.evaluate((element) => element.style.width)).toBe(held);
+  expect(await tick.getAttribute("data-progress")).toBe(held);
 
   await page.getByRole("button", { name: "Resume" }).click();
   await expect(pauseButton(page)).toBeVisible();
-  await expect
-    .poll(() => fill.evaluate((element) => element.style.width))
-    .not.toBe(held);
+  await expect.poll(() => tick.getAttribute("data-progress")).not.toBe(held);
 });
 
 test("moving to another scene plays it, and mute carries over", async ({
@@ -287,7 +285,7 @@ test("moving to another scene plays it, and mute carries over", async ({
   await page.goto("/ada");
   await startButton(page).click();
   await expect(pauseButton(page)).toBeEnabled();
-  await page.getByRole("button", { name: "Mute" }).click();
+  await page.getByRole("button", { name: /^Sound/ }).click();
   await nextButton(page).click();
 
   await expect(progress(page)).toHaveAttribute(
@@ -295,10 +293,7 @@ test("moving to another scene plays it, and mute carries over", async ({
     /^Scene 2 of /,
   );
   await expect(pauseButton(page)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Mute" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("button", { name: "Sound off" })).toBeVisible();
 });
 
 test("going past the last scene shows the total and the principle", async ({

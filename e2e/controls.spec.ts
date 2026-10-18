@@ -41,8 +41,7 @@ const playButton = (page: Page) =>
 const pauseButton = (page: Page) => page.getByRole("button", { name: "Pause" });
 const replayButton = (page: Page) =>
   page.getByRole("button", { name: "Replay" });
-const nextButton = (page: Page) =>
-  page.getByRole("button", { name: "Next", exact: true });
+const nextButton = (page: Page) => page.getByRole("button", { name: /^Next/ });
 const prevButton = (page: Page) =>
   page.getByRole("button", { name: "Previous scene" });
 const cancelButton = (page: Page) =>
@@ -201,9 +200,10 @@ test("the cumulative line reads the date and total under the pointer", async ({
 test("speed is chosen once and carries across scenes", async ({ page }) => {
   await play(page);
 
-  const slow = page.getByRole("button", { name: "0.5×" });
-  await slow.click();
-  await expect(slow).toHaveAttribute("aria-pressed", "true");
+  const speed = page.getByRole("button", { name: /^Playback speed/ });
+  // The button cycles 1× → 1.5× → 2× → 0.5×.
+  for (let press = 0; press < 3; press += 1) await speed.click();
+  await expect(speed).toHaveText("0.5×");
   // At half speed the 4 second scene is still running well past 4 seconds.
   await page.waitForTimeout(5000);
   await expect(pauseButton(page)).toBeVisible();
@@ -213,7 +213,7 @@ test("speed is chosen once and carries across scenes", async ({ page }) => {
     "aria-valuetext",
     /^Scene 2 of 2/,
   );
-  await expect(slow).toHaveAttribute("aria-pressed", "true");
+  await expect(speed).toHaveText("0.5×");
   expect(
     await page.evaluate(() => sessionStorage.getItem("committed:speed")),
   ).toBe("0.5");
@@ -228,10 +228,7 @@ test("keyboard shortcuts steer the experience", async ({ page }) => {
   await expect(pauseButton(page)).toBeVisible();
 
   await page.keyboard.press("m");
-  await expect(page.getByRole("button", { name: "Mute" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("button", { name: "Sound off" })).toBeVisible();
 
   await page.keyboard.press("ArrowRight");
   await expect(progress(page)).toHaveAttribute(

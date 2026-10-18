@@ -7,7 +7,7 @@ test("lab renders the start button without producing sound", async ({
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Mute" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Sound/ })).toBeVisible();
 });
 
 test("lab previews one scene on its own with ?scene=", async ({ page }) => {
@@ -25,21 +25,11 @@ test("lab shows the whole controls bar, idle before Play and live after", async 
   page,
 }) => {
   await page.goto("/lab?scene=year-blocks");
-  const speeds = page.getByRole("group", { name: "Playback speed" });
-  await expect(speeds.getByRole("button")).toHaveText([
-    "0.5×",
-    "1×",
-    "1.5×",
-    "2×",
-  ]);
-  await expect(speeds.getByRole("button", { name: "1×" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(page.getByRole("button", { name: "Pause" })).toBeDisabled();
   await expect(
-    page.getByRole("button", { name: "Next", exact: true }),
-  ).toBeDisabled();
+    page.getByRole("button", { name: /^Playback speed 1×/ }),
+  ).toHaveText("1×");
+  await expect(page.getByRole("button", { name: "Pause" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^Next/ })).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "Cancel and go back" }),
   ).toBeEnabled();
@@ -49,7 +39,7 @@ test("lab shows the whole controls bar, idle before Play and live after", async 
   await expect(
     page.getByRole("button", { name: "Previous scene" }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: /^Next/ }).click();
   await expect(
     page.getByText("Contributions are not productivity."),
   ).toBeVisible();
