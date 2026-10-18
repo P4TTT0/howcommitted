@@ -712,25 +712,72 @@ describe("getProfile for a signed-in visitor", () => {
     );
   });
 
-  it("populates the shared cache for everyone", async () => {
+  it("never writes their results to the shared cache", async () => {
     const calls = stubGithub(happyPath);
     const { deps } = setup({ chargeColdGeneration: async () => null });
-    await getProfile("ada", visitor, deps, {
+    const spies = {
+      setUser: vi.spyOn(deps.cache, "setUser"),
+      setYear: vi.spyOn(deps.cache, "setYear"),
+      setRepos: vi.spyOn(deps.cache, "setRepos"),
+    };
+    const result = await getProfile("ada", visitor, deps, {
       userToken: USER_TOKEN,
       viewerLogin: "viewer",
     });
-    const before = { ...calls };
+    expect(result).toMatchObject({ status: "ok", source: "fresh" });
+    expect(spies.setUser).not.toHaveBeenCalled();
+    expect(spies.setYear).not.toHaveBeenCalled();
+    expect(spies.setRepos).not.toHaveBeenCalled();
+    expect(await deps.cache.getUser("ada")).toBeNull();
+    expect(await deps.cache.getRepos("ada")).toBeNull();
 
-    const anonymous = await getProfile("ada", visitor, deps);
-    expect(anonymous).toMatchObject({ status: "ok", source: "cache" });
+    // An anonymous visitor finds nothing cached and does not fetch without quota.
+    const before = { ...calls };
+    expect(await getProfile("ada", visitor, deps)).toEqual({
+      status: "login_required",
+      reason: "quota_exhausted",
+    });
     expect(calls).toEqual(before);
   });
 
-  it("still uses the coalescing lock", async () => {
+  it("serves the shared cache to a signed-in visitor without fetching", async () => {
     const calls = stubGithub(happyPath);
     const { deps } = setup();
+    await getProfile("ada", visitor, deps);
+    const before = { ...calls };
+    const result = await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(result).toMatchObject({ status: "ok", source: "cache" });
+    expect(calls).toEqual(before);
+  });
+
+  it("caches their own profile, fetched with the server token", async () => {
+    const bearers = stubWithAuth(happy);
+    const { deps } = setup();
+    const setYear = vi.spyOn(deps.cache, "setYear");
+    const setRepos = vi.spyOn(deps.cache, "setRepos");
+    const setUser = vi.spyOn(deps.cache, "setUser");
+    await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "ada",
+    });
+    expect(new Set(bearers)).toEqual(new Set(["bearer token"]));
+    expect(setUser).toHaveBeenCalled();
+    expect(setYear).toHaveBeenCalledTimes(3);
+    expect(setRepos).toHaveBeenCalled();
+    expect(await getProfile("ada", visitor, deps)).toMatchObject({
+      source: "cache",
+    });
+  });
+
+  it("skips the coalescing lock, so an anonymous request is not blocked behind it", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps } = setup({ chargeColdGeneration: async () => null });
+    const acquire = vi.spyOn(deps.lock, "acquire");
     const results = await Promise.all(
-      Array.from({ length: 4 }, () =>
+      Array.from({ length: 2 }, () =>
         getProfile("ada", visitor, deps, {
           userToken: USER_TOKEN,
           viewerLogin: "viewer",
@@ -738,25 +785,77 @@ describe("getProfile for a signed-in visitor", () => {
       ),
     );
     expect(results.every((r) => r.status === "ok")).toBe(true);
-    expect(calls).toEqual({ Preview: 1, Year: 3, Repos: 1 });
+    // Nothing is shared, so each generated for itself, without the lock.
+    expect(calls).toEqual({ Preview: 2, Year: 6, Repos: 2 });
+    expect(acquire).not.toHaveBeenCalled();
 
-    const busy = setup();
-    await busy.deps.lock.acquire("grace");
-    let clock = NOW.getTime();
+    // A held lock does not stop a user-token request either.
+    const held = setup();
+    await held.deps.lock.acquire("grace");
     expect(
-      await getProfile(
-        "grace",
-        visitor,
-        {
-          ...busy.deps,
-          now: () => new Date(clock),
-          sleep: async () => {
-            clock += GENERATION_DEADLINE_MS;
-          },
-        },
-        { userToken: USER_TOKEN, viewerLogin: "viewer" },
-      ),
-    ).toEqual({ status: "degraded", reason: "busy" });
+      await getProfile("grace", visitor, held.deps, {
+        userToken: USER_TOKEN,
+        viewerLogin: "viewer",
+      }),
+    ).toMatchObject({ status: "ok", source: "fresh" });
+  });
+
+  it("leaves the lock free while a user-token generation is in flight", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        await gate;
+        const { query } = JSON.parse(String(init.body)) as { query: string };
+        const kind = (["Preview", "Year", "Repos"] as const).find((k) =>
+          query.includes(`query ${k}(`),
+        ) as Kind;
+        return happy(kind);
+      }),
+    );
+    const { deps } = setup();
+    const pending = getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    await Promise.resolve();
+    expect(await deps.lock.acquire("ada")).toBeTruthy();
+    release();
+    expect(await pending).toMatchObject({ status: "ok" });
+  });
+
+  it("does not mark a login missing for everyone when their token cannot find it", async () => {
+    stubGithub(() => ({ data: { rateLimit, user: null } }));
+    const { deps } = setup();
+    const markMissing = vi.spyOn(deps.cache, "markMissing");
+    expect(
+      await getProfile("ghost", visitor, deps, {
+        userToken: USER_TOKEN,
+        viewerLogin: "viewer",
+      }),
+    ).toEqual({ status: "not_found" });
+    expect(markMissing).not.toHaveBeenCalled();
+    expect(await deps.cache.isMissing("ghost")).toBe(false);
+  });
+
+  it("writes nothing to the shared cache when refetching a stale year with their token", async () => {
+    stubGithub((kind) =>
+      kind === "Preview" ? userBody([2026, 2025, 2024]) : happyPath(kind),
+    );
+    const { deps } = setup({ now: () => new Date("2026-12-31T23:00:00Z") });
+    await getProfile("ada", visitor, deps);
+
+    const newYear = { ...deps, now: () => new Date("2027-01-01T01:00:00Z") };
+    const setYear = vi.spyOn(newYear.cache, "setYear");
+    const result = await getProfile("ada", visitor, newYear, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(result).toMatchObject({ status: "ok", source: "fresh" });
+    expect(setYear).not.toHaveBeenCalled();
   });
 
   it("is not stopped by an open circuit breaker, which only guards the server token", async () => {
