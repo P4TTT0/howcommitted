@@ -4,6 +4,7 @@ import { heatmapScene } from "@/features/scenes/heatmap";
 import { languageMosaicScene } from "@/features/scenes/language-mosaic";
 import { mainRepoScene } from "@/features/scenes/main-repo";
 import { recordsScene } from "@/features/scenes/records";
+import { thenNowScene } from "@/features/scenes/then-now";
 import { timelineScene } from "@/features/scenes/timeline";
 import { versusFinale } from "@/features/scenes/versus-finale";
 import { versusRaceScene } from "@/features/scenes/versus-race";
@@ -24,6 +25,7 @@ export const SCENES: readonly SceneDefinition[] = [
   mainRepoScene,
   weekShapeScene,
   recordsScene,
+  thenNowScene,
   languageMosaicScene,
   bigNumbersScene,
 ];
