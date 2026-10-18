@@ -228,10 +228,7 @@ test("keyboard shortcuts steer the experience", async ({ page }) => {
   await expect(pauseButton(page)).toBeVisible();
 
   await page.keyboard.press("m");
-  await expect(page.getByRole("button", { name: /^Sound/ })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("button", { name: "Sound off" })).toBeVisible();
 
   await page.keyboard.press("ArrowRight");
   await expect(progress(page)).toHaveAttribute(

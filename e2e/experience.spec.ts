@@ -294,10 +294,7 @@ test("moving to another scene plays it, and mute carries over", async ({
     /^Scene 2 of /,
   );
   await expect(pauseButton(page)).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Sound/ })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("button", { name: "Sound off" })).toBeVisible();
 });
 
 test("going past the last scene shows the total and the principle", async ({

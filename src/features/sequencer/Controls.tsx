@@ -180,7 +180,6 @@ export function Controls({
         <button
           type="button"
           className={`${button} px-3 md:px-4`}
-          aria-pressed={muted}
           aria-keyshortcuts={SHORTCUT_KEYS.mute}
           title="Mute (M)"
           onClick={onMute}
