@@ -496,10 +496,12 @@ test("contributions not attributed to a day show as a labelled step with an hone
       )
       .first(),
   ).toBeVisible();
-  // The total is the official one, not the sum of the days. The heatmap is
-  // the scene between the timeline and the final poster.
-  await nextButton(page).click();
-  await nextButton(page).click();
+  // The total is the official one, not the sum of the days. From the first
+  // scene, one Next per scene tick reaches the final poster.
+  const scenes = await page.locator("[data-scene-tick]").count();
+  for (let scene = 0; scene < scenes; scene += 1) {
+    await nextButton(page).click();
+  }
   await expect(page.getByText("@ada: 1,000 contributions, 2023")).toBeVisible();
 });
 
