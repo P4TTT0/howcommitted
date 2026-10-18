@@ -1,6 +1,6 @@
 # Architecture
 
-Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. The solo vertical slice works end to end: landing search (`features/search`), `/{login}` (`features/experience`) and a scene sequencer (`features/sequencer`) playing the timeline (year blocks under the running total line) driven by real history, then the heatmap, then the end card (`features/scenes`). `/lab` keeps the generated profile for playback work outside production. GitHub sign-in works (see Auth). Versus plays through the same sequencer outside production (see Scenes and the sequencer); share is not built yet.
+Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. The solo vertical slice works end to end: landing search (`features/search`), `/{login}` (`features/experience`) and a scene sequencer (`features/sequencer`) playing the timeline (year blocks under the running total line) driven by real history, then the heatmap, then the end card (`features/scenes`). `/lab` keeps the generated profile for playback work outside production. GitHub sign-in works (see Auth). Versus plays through the same sequencer outside production (see Scenes and the sequencer); the final poster offers three 9:16 share cards (poster, rhythm, eras) saved as PNGs, drawn in the browser from the history already loaded (`features/scenes/finale/cards.ts` builds them, `cardCanvas.ts` draws them), so nothing is uploaded or cached.
 
 ## Stack
 
