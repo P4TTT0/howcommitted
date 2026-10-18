@@ -2,6 +2,7 @@ import { bigNumbersScene } from "@/features/scenes/big-numbers";
 import { endCardFinale } from "@/features/scenes/finale";
 import { heatmapScene } from "@/features/scenes/heatmap";
 import { languageMosaicScene } from "@/features/scenes/language-mosaic";
+import { mainRepoScene } from "@/features/scenes/main-repo";
 import { recordsScene } from "@/features/scenes/records";
 import { timelineScene } from "@/features/scenes/timeline";
 import { versusFinale } from "@/features/scenes/versus-finale";
@@ -20,6 +21,7 @@ import type {
 export const SCENES: readonly SceneDefinition[] = [
   timelineScene,
   heatmapScene,
+  mainRepoScene,
   weekShapeScene,
   recordsScene,
   languageMosaicScene,
