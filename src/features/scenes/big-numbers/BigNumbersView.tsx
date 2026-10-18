@@ -1,9 +1,20 @@
+import type { CSSProperties } from "react";
 import { formatCount } from "@/features/sequencer/model/format";
 import { blockForYearIndex } from "@/features/sequencer/model/plan";
 import { focusRing } from "@/ui/classes";
 import { SceneFrame } from "@/ui/SceneFrame";
-import { type MixPlan, mixReading } from "./mix";
+import { type MixPlan, mixReading, visibleSegments } from "./mix";
 import { type BigNumbersPlan, scopeNote, totalReading } from "./numbers";
+
+/** Digits a tile's number shows at full size; longer ones shrink to stay inside it. */
+const FULL_SIZE_CHARACTERS = 7;
+
+/** The `--fit` factor (0..1) that keeps a long number inside its tile. */
+function fitFor(text: string): CSSProperties {
+  return {
+    "--fit": Math.min(1, FULL_SIZE_CHARACTERS / text.length),
+  } as CSSProperties;
+}
 
 type BigNumbersViewProps = { plan: BigNumbersPlan };
 
@@ -47,7 +58,8 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
                   <div aria-hidden="true">
                     <p
                       data-role="count"
-                      className="font-display text-[min(10vw,9dvh)] font-black leading-[0.85] tabular-nums landscape:text-[min(8vw,16dvh)]"
+                      className="font-display text-[length:calc(min(10vw,9dvh)*var(--fit))] font-black leading-[0.85] tabular-nums landscape:text-[length:calc(min(8vw,16dvh)*var(--fit))]"
+                      style={fitFor(formatCount(number.total))}
                     >
                       {formatCount(number.total)}
                     </p>
@@ -94,18 +106,16 @@ function MixStrip({ mix }: { mix: MixPlan }) {
               data-mix-row={row.year}
               className="flex h-5 min-w-0 flex-1 gap-0.5 md:h-[22px]"
             >
-              {row.segments
-                .filter((segment) => segment.share > 0)
-                .map((segment) => (
-                  <span
-                    key={segment.role}
-                    className="min-w-0.5"
-                    style={{
-                      flex: `${segment.share} 1 0`,
-                      backgroundColor: segment.color,
-                    }}
-                  />
-                ))}
+              {visibleSegments(row).map((segment) => (
+                <span
+                  key={segment.role}
+                  className="min-w-0.5"
+                  style={{
+                    flex: `${segment.share} 1 0`,
+                    backgroundColor: segment.color,
+                  }}
+                />
+              ))}
             </div>
           </div>
         ))}

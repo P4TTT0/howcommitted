@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import type { YearBlock } from "@/domain/year-summary";
 import { formatCount } from "@/features/sequencer/model/format";
 import { blockForYearIndex } from "@/features/sequencer/model/plan";
@@ -19,6 +19,9 @@ import {
 } from "./poster";
 import { ShareCards } from "./ShareCards";
 
+/** Digits of the big total shown at full size; longer ones shrink to fit. */
+const FULL_SIZE_CHARACTERS = 6;
+
 /** Kept for callers that import the fixed line from here. */
 export const PRINCIPLE = FIXED_LINE;
 
@@ -29,7 +32,7 @@ type PosterProps = {
   lastYear: number;
   yearBlocks: readonly YearBlock[];
   note: string | null;
-  /** The share cards that can be built from this profile; empty in the lab. */
+  /** The share cards this profile has data for; none hides the section. */
   cards: readonly ShareCard[];
   /** Private contributions included in `total`; the line is hidden at 0. */
   privateContributions: number;
@@ -54,7 +57,7 @@ function YearBars({
     .join(", ");
 
   return (
-    <div className="flex min-h-16 flex-1 flex-col">
+    <div className="flex min-h-24 flex-1 flex-col">
       <div
         role="img"
         aria-label={`Contributions per year: ${label}`}
@@ -124,13 +127,21 @@ export function EndCard({
   const privateText = privateNote(privateContributions);
   return (
     <div className="flex h-full min-h-0 flex-col gap-8 overflow-y-auto p-4 md:p-8 lg:flex-row lg:gap-12 lg:overflow-hidden">
-      <div className="flex min-h-[26rem] min-w-0 flex-1 flex-col gap-3 lg:min-h-0">
+      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
         <p className="font-mono text-xs uppercase">
           {summaryLine(login, total, firstYear, lastYear)}
         </p>
         <p
           aria-hidden="true"
-          className="font-display text-[min(32vw,22dvh)] font-extrabold leading-[0.85]"
+          className="font-display text-[length:calc(min(32vw,22dvh)*var(--fit))] font-extrabold leading-[0.85]"
+          style={
+            {
+              "--fit": Math.min(
+                1,
+                FULL_SIZE_CHARACTERS / formatCount(total).length,
+              ),
+            } as CSSProperties
+          }
         >
           {formatCount(total)}
         </p>
