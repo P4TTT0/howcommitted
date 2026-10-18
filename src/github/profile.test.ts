@@ -712,25 +712,71 @@ describe("getProfile for a signed-in visitor", () => {
     );
   });
 
-  it("populates the shared cache for everyone", async () => {
+  it("never writes their results to the shared cache", async () => {
     const calls = stubGithub(happyPath);
     const { deps } = setup({ chargeColdGeneration: async () => null });
-    await getProfile("ada", visitor, deps, {
+    const spies = {
+      setUser: vi.spyOn(deps.cache, "setUser"),
+      setYear: vi.spyOn(deps.cache, "setYear"),
+      setRepos: vi.spyOn(deps.cache, "setRepos"),
+    };
+    const result = await getProfile("ada", visitor, deps, {
       userToken: USER_TOKEN,
       viewerLogin: "viewer",
     });
-    const before = { ...calls };
+    expect(result).toMatchObject({ status: "ok", source: "fresh" });
+    expect(spies.setUser).not.toHaveBeenCalled();
+    expect(spies.setYear).not.toHaveBeenCalled();
+    expect(spies.setRepos).not.toHaveBeenCalled();
+    expect(await deps.cache.getUser("ada")).toBeNull();
+    expect(await deps.cache.getRepos("ada")).toBeNull();
 
-    const anonymous = await getProfile("ada", visitor, deps);
-    expect(anonymous).toMatchObject({ status: "ok", source: "cache" });
+    // An anonymous visitor finds nothing cached and does not fetch without quota.
+    const before = { ...calls };
+    expect(await getProfile("ada", visitor, deps)).toEqual({
+      status: "login_required",
+      reason: "quota_exhausted",
+    });
     expect(calls).toEqual(before);
   });
 
-  it("still uses the coalescing lock", async () => {
+  it("serves the shared cache to a signed-in visitor without fetching", async () => {
     const calls = stubGithub(happyPath);
     const { deps } = setup();
+    await getProfile("ada", visitor, deps);
+    const before = { ...calls };
+    const result = await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(result).toMatchObject({ status: "ok", source: "cache" });
+    expect(calls).toEqual(before);
+  });
+
+  it("caches their own profile, fetched with the server token", async () => {
+    const bearers = stubWithAuth(happy);
+    const { deps } = setup();
+    const setYear = vi.spyOn(deps.cache, "setYear");
+    const setRepos = vi.spyOn(deps.cache, "setRepos");
+    const setUser = vi.spyOn(deps.cache, "setUser");
+    await getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "ada",
+    });
+    expect(new Set(bearers)).toEqual(new Set(["bearer token"]));
+    expect(setUser).toHaveBeenCalled();
+    expect(setYear).toHaveBeenCalledTimes(3);
+    expect(setRepos).toHaveBeenCalled();
+    expect(await getProfile("ada", visitor, deps)).toMatchObject({
+      source: "cache",
+    });
+  });
+
+  it("still uses the coalescing lock, and waiters fetch for themselves when nothing was cached", async () => {
+    const calls = stubGithub(happyPath);
+    const { deps } = setup({ chargeColdGeneration: async () => null });
     const results = await Promise.all(
-      Array.from({ length: 4 }, () =>
+      Array.from({ length: 3 }, () =>
         getProfile("ada", visitor, deps, {
           userToken: USER_TOKEN,
           viewerLogin: "viewer",
@@ -738,7 +784,8 @@ describe("getProfile for a signed-in visitor", () => {
       ),
     );
     expect(results.every((r) => r.status === "ok")).toBe(true);
-    expect(calls).toEqual({ Preview: 1, Year: 3, Repos: 1 });
+    // Nothing was written, so each waiter regenerates once it gets the lock.
+    expect(calls).toEqual({ Preview: 3, Year: 9, Repos: 3 });
 
     const busy = setup();
     await busy.deps.lock.acquire("grace");

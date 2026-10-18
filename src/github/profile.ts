@@ -245,7 +245,9 @@ async function fetchUser(
     fetchUserPreview(tokenFor(ctx), login, ctx.signal),
   );
   if (!result.ok) return failureFrom(login, result.error, ctx);
-  await orElse("setUser", () => cache.setUser(result.data), undefined);
+  if (!ctx.userToken) {
+    await orElse("setUser", () => cache.setUser(result.data), undefined);
+  }
   return { status: "ok", user: result.data };
 }
 
@@ -331,8 +333,9 @@ export type ProfileOptions = {
   /**
    * The signed-in visitor's own GitHub token. A cold generation then spends
    * their GitHub budget instead of the anonymous quota and the server token,
-   * and stays out of the circuit breaker. The lock and the shared cache still
-   * apply, and what they fetch lands in the shared cache.
+   * and stays out of the circuit breaker. The lock and shared cache reads still
+   * apply, but what they fetch is never written to the shared cache: their token
+   * may see data an anonymous visitor cannot.
    */
   userToken?: string | null;
   /**
@@ -609,11 +612,14 @@ async function fetchMissingYears(
       if (result.ok) {
         done.add(year);
         snapshot.years.set(year, result.data);
-        await orElse(
-          "setYear",
-          () => ctx.deps.cache.setYear(login, result.data, ctx.now()),
-          undefined,
-        );
+        // A visitor's token may see data an anonymous visitor cannot: never shared.
+        if (!ctx.userToken) {
+          await orElse(
+            "setYear",
+            () => ctx.deps.cache.setYear(login, result.data, ctx.now()),
+            undefined,
+          );
+        }
         return;
       }
       // Keep the first failure: the siblings we abort report a timeout of their own.
@@ -651,11 +657,13 @@ async function fetchMissingRepos(
     return { failure: await failureFrom(login, result.error, ctx) };
   }
   const { repos, truncated } = result.data;
-  await orElse(
-    "setRepos",
-    () => ctx.deps.cache.setRepos(login, repos, truncated),
-    undefined,
-  );
+  if (!ctx.userToken) {
+    await orElse(
+      "setRepos",
+      () => ctx.deps.cache.setRepos(login, repos, truncated),
+      undefined,
+    );
+  }
   return { repos: result.data };
 }
 
