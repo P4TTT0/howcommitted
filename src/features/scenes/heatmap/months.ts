@@ -32,7 +32,7 @@ export type MonthBar = {
 
 export type MonthStrip = {
   bars: MonthBar[];
-  /** "Spring builder. March is your month." */
+  /** "March is your month." */
   headline: string;
   /** "Average per month across every year. August and December run quiet." */
   detail: string;
@@ -40,19 +40,6 @@ export type MonthStrip = {
 
 export function monthName(month: number): string {
   return MONTH_NAMES[month - 1] ?? "";
-}
-
-/**
- * The calendar season of a month, northern-hemisphere convention:
- * December to February winter, March to May spring, June to August summer,
- * September to November autumn. The data has no location, so the season is
- * only a way to name a stretch of the calendar, never a claim about weather.
- */
-export function seasonOf(month: number): string {
-  if (month === 12 || month <= 2) return "Winter";
-  if (month <= 5) return "Spring";
-  if (month <= 8) return "Summer";
-  return "Autumn";
 }
 
 /** "August", "August and December", "April, August and December". */
@@ -99,7 +86,7 @@ export function planMonthStrip(
       : "";
   return {
     bars,
-    headline: `${seasonOf(topMonth)} builder. ${monthName(topMonth)} is your month.`,
+    headline: `${monthName(topMonth)} is your month.`,
     detail: `Average per month across every year.${quiet}`,
   };
 }

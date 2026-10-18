@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DailyContributions } from "@/domain/types";
-import { monthName, planMonthStrip, seasonOf } from "./months";
+import { monthName, planMonthStrip } from "./months";
 
 /** One active day on the 15th of every month of the years, with a count by month. */
 function year(
@@ -13,24 +13,6 @@ function year(
   }));
 }
 
-describe("seasonOf", () => {
-  it("names the calendar season, northern-hemisphere convention", () => {
-    expect(
-      [12, 1, 2, 3, 5, 6, 8, 9, 11].map((month) => seasonOf(month)),
-    ).toEqual([
-      "Winter",
-      "Winter",
-      "Winter",
-      "Spring",
-      "Spring",
-      "Summer",
-      "Summer",
-      "Autumn",
-      "Autumn",
-    ]);
-  });
-});
-
 describe("planMonthStrip", () => {
   const days = [
     ...year(2023, (m) => (m === 3 ? 50 : m === 8 || m === 12 ? 2 : 20)),
@@ -38,8 +20,8 @@ describe("planMonthStrip", () => {
   ];
   const strip = planMonthStrip(days);
 
-  it("names the season and the month of the top average", () => {
-    expect(strip?.headline).toBe("Spring builder. March is your month.");
+  it("names the month of the top average", () => {
+    expect(strip?.headline).toBe("March is your month.");
   });
 
   it("draws twelve bars, the top one at full height and flagged", () => {

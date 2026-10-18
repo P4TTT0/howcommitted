@@ -31,7 +31,7 @@ CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 |---|-------|---------|
 | 1 | Timeline | Yearly blocks (height = calendar contributions of the year; color = year identity; the year in progress is dashed) under the running total line, with repo-creation flags and the big counter |
 | 2 | Versus race (versus only) | A race of horizontal bars in fixed lanes (order added, never re-sorted, no leader or rank) on one shared timeline, with a year label |
-| 3 | Heatmap | Every year as a row of 53 week squares tinted in the year color, yearly totals on the right, plus a month strip (average per calendar month; "<Season> builder. <Month> is your month." only when the history covers every calendar month; seasons are northern-hemisphere calendar seasons). Same calendar data as the line; label it "contributions", never commits |
+| 3 | Heatmap | Every year as a row of 53 week squares tinted in the year color, yearly totals on the right, plus a month strip (average per calendar month; "<Month> is your month." only when the history covers every calendar month). Same calendar data as the line; label it "contributions", never commits |
 | 4 | Language mosaic | Proportional blocks, top 5 plus "other". Label: languages of owned repos, not per-commit |
 | 5 | Big numbers | Four giant numbers: commits, PRs, reviews, issues |
 | - | Final poster | Summary, fixed line "Contributions are not productivity. This is rhythm, not value.", actions |
