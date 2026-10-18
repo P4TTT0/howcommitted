@@ -23,7 +23,10 @@ export function VersusEndCard({ summaries, onReplay }: Props) {
   useEffect(() => replayRef.current?.focus(), []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4">
+    <section
+      aria-label="Versus summary"
+      className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4"
+    >
       <h2 className="font-display text-[clamp(40px,9vw,96px)] font-black uppercase leading-[0.9]">
         Versus
       </h2>
@@ -66,6 +69,6 @@ export function VersusEndCard({ summaries, onReplay }: Props) {
           Search again
         </Link>
       </div>
-    </div>
+    </section>
   );
 }

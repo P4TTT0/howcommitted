@@ -73,10 +73,12 @@ test("Play loads each history in order, then plays the race and the finale witho
       "Contributions are not productivity. This is rhythm, not value.",
     ),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Replay" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Search again" })).toBeVisible();
-  const finale = page.getByRole("heading", { name: "Versus", level: 2 });
+  const finale = page.getByRole("region", { name: "Versus summary" });
   await expect(finale).toBeVisible();
+  await expect(finale.getByRole("button", { name: "Replay" })).toBeVisible();
+  await expect(
+    finale.getByRole("link", { name: "Search again" }),
+  ).toBeVisible();
   await expect(
     page.getByText("contributions, 2023 to 2024").first(),
   ).toBeVisible();
