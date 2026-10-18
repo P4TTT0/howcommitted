@@ -282,7 +282,7 @@ test("cancelling while the history loads aborts the request", async ({
   const aborted = page.waitForEvent("requestfailed", (request) =>
     request.url().includes("/api/history/"),
   );
-  await page.getByRole("button", { name: "Cancel and go back" }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await aborted;
   await expect(page).toHaveURL(/\/$/);
 });

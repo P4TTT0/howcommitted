@@ -68,7 +68,13 @@ export function Sequencer({
     [sequence],
   );
 
+  const durations = useMemo(
+    () => sequence.map((scene) => scene.instance.duration),
+    [sequence],
+  );
+
   const stageRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
   const clockRef = useRef<PlaybackClock | null>(null);
@@ -149,6 +155,14 @@ export function Sequencer({
       setStatus(next);
       // The scene ran out: hold on it (explore). Moving on is the user's call.
       if (next === "ended") controller.finishScene();
+    });
+    // Mirror the clock position on the bar as `data-progress` (0..1); written
+    // straight to the DOM so a frame never re-renders React.
+    clock.onFrame((seconds) => {
+      const duration = durations[controller.state.index] ?? 0;
+      const fraction = duration > 0 ? Math.min(1, seconds / duration) : 0;
+      const track = trackRef.current;
+      if (track) track.dataset.progress = fraction.toFixed(2);
     });
     clockRef.current = clock;
     engineRef.current = engine;
@@ -347,6 +361,7 @@ export function Sequencer({
         index={seq.index}
         canPrev={phase === "running" && (finished ? count > 0 : seq.index > 0)}
         canNext={phase === "running" && !finished}
+        trackRef={trackRef}
         progressText={finished ? "Finished" : progressText}
         progressPercent={finished ? 100 : progressPercent}
         toggleRef={toggleRef}

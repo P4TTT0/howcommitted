@@ -25,6 +25,8 @@ export type ControlsProps = {
   index: number;
   canPrev: boolean;
   canNext: boolean;
+  /** The bar; the sequencer mirrors the clock position on it as `data-progress`. */
+  trackRef: Ref<HTMLDivElement>;
   /** Spoken value of the bar, for example "Scene 2 of 5: Cumulative line". */
   progressText: string;
   /** Coarse progress (start of the current scene), for assistive tech. */
@@ -63,6 +65,7 @@ export function Controls({
   index,
   canPrev,
   canNext,
+  trackRef,
   progressText,
   progressPercent,
   toggleRef,
@@ -132,7 +135,9 @@ export function Controls({
 
       <div className="relative order-first h-8 min-w-0 md:order-none md:h-11 md:flex-1">
         <div
+          ref={trackRef}
           role="progressbar"
+          data-progress="0"
           aria-label="Playback progress"
           aria-valuemin={0}
           aria-valuemax={100}

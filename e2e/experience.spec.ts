@@ -267,16 +267,15 @@ test("pausing holds the position and resuming continues", async ({ page }) => {
   await pauseButton(page).click();
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
-  const fill = page.getByRole("progressbar").locator("div").first();
-  const held = await fill.evaluate((element) => element.style.width);
+  // The bar carries the clock position (0..1) in `data-progress`.
+  const tick = page.getByRole("progressbar");
+  const held = await tick.getAttribute("data-progress");
   await page.waitForTimeout(800);
-  expect(await fill.evaluate((element) => element.style.width)).toBe(held);
+  expect(await tick.getAttribute("data-progress")).toBe(held);
 
   await page.getByRole("button", { name: "Resume" }).click();
   await expect(pauseButton(page)).toBeVisible();
-  await expect
-    .poll(() => fill.evaluate((element) => element.style.width))
-    .not.toBe(held);
+  await expect.poll(() => tick.getAttribute("data-progress")).not.toBe(held);
 });
 
 test("moving to another scene plays it, and mute carries over", async ({
