@@ -22,6 +22,7 @@ describe("buildYearSummary and yearBlocks", () => {
       commitContributionsByRepo: [
         [{ occurredAt: "2023-03-01T00:00:00Z", commitCount: 7 }],
       ],
+      publicRepoContributions: [],
       calendar: [],
       totalContributions: 25,
     });
@@ -38,6 +39,7 @@ describe("buildYearSummary and yearBlocks", () => {
         year,
         totals: totals(commits),
         commitContributionsByRepo: [],
+        publicRepoContributions: [],
         calendar: [],
         totalContributions: commits * 10,
       });

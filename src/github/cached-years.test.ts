@@ -24,6 +24,7 @@ const summary = (year: number): YearSummary => ({
     privateContributions: 0,
   },
   dailyCommits: [],
+  repoCommits: [],
   reconciliation: { summed: 0, official: 0, difference: 0, matches: true },
   calendar: [],
   totalContributions: year,

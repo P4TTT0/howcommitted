@@ -29,9 +29,10 @@ export const TTL = {
 const VERSION = "v3";
 /**
  * Per-kind overrides. Repos are v4: v3 entries came from a query without the
- * public-only filter and could hold private repository names.
+ * public-only filter and could hold private repository names. Years are v4:
+ * v3 entries lack the per-repository public commits.
  */
-const KIND_VERSION: Record<string, string> = { repos: "v4" };
+const KIND_VERSION: Record<string, string> = { repos: "v4", year: "v4" };
 
 /** A cached year plus when it was fetched, so the current year can go stale. */
 export type CachedYear = { summary: YearSummary; fetchedAt: string };

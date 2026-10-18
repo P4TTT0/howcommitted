@@ -7,6 +7,7 @@ import type {
   DailyCommits,
   DailyContributions,
   ProfileData,
+  RepoCommits,
   UserProfile,
   YearTotals,
 } from "./types";
@@ -17,6 +18,8 @@ export type HistoryYear = {
   totals: YearTotals;
   /** True commits per day. May be incomplete when `reconciliation.matches` is false. */
   dailyCommits: DailyCommits[];
+  /** Commits to public repositories, per repository. Private repositories are never listed. */
+  repoCommits: RepoCommits[];
   reconciliation: CommitReconciliation;
   /** Calendar contributions per day (all types, public and shared private). Days with none are omitted. */
   dailyContributions: DailyContributions[];
@@ -75,6 +78,7 @@ export function buildHistory({ user, years, repos }: ProfileData): History {
       year: year.year,
       totals: year.totals,
       dailyCommits: year.dailyCommits,
+      repoCommits: year.repoCommits,
       reconciliation: year.reconciliation,
       dailyContributions: year.calendar
         .filter((day) => day.count > 0)

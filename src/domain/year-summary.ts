@@ -6,6 +6,7 @@ import {
 import type {
   CalendarDay,
   CommitContribution,
+  RepoCommits,
   YearSummary,
   YearTotals,
 } from "./types";
@@ -14,9 +15,39 @@ export type RawYear = {
   year: number;
   totals: YearTotals;
   commitContributionsByRepo: CommitContribution[][];
+  /**
+   * Commit contributions of public repositories only (`repo` is `owner/name`).
+   * The same repo may appear once per quarter window; they are merged.
+   */
+  publicRepoContributions: { repo: string; nodes: CommitContribution[] }[];
   calendar: CalendarDay[];
   totalContributions: number;
 };
+
+/** Merges per-window entries of the same repo into per-day counts, sorted by repo then date. */
+export function mergeRepoCommits(
+  entries: { repo: string; nodes: CommitContribution[] }[],
+): RepoCommits[] {
+  const byRepo = new Map<string, Map<string, number>>();
+  for (const { repo, nodes } of entries) {
+    const days = byRepo.get(repo) ?? new Map<string, number>();
+    for (const { occurredAt, commitCount } of nodes) {
+      if (commitCount <= 0) continue;
+      const date = occurredAt.slice(0, 10);
+      days.set(date, (days.get(date) ?? 0) + commitCount);
+    }
+    byRepo.set(repo, days);
+  }
+  return [...byRepo]
+    .filter(([, days]) => days.size > 0)
+    .map(([repo, days]) => ({
+      repo,
+      days: [...days]
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    }))
+    .sort((a, b) => a.repo.localeCompare(b.repo));
+}
 
 export function buildYearSummary(raw: RawYear): YearSummary {
   const dailyCommits = sumDailyCommits(raw.commitContributionsByRepo);
@@ -24,6 +55,7 @@ export function buildYearSummary(raw: RawYear): YearSummary {
     year: raw.year,
     totals: raw.totals,
     dailyCommits,
+    repoCommits: mergeRepoCommits(raw.publicRepoContributions),
     reconciliation: reconcileCommits(
       totalCommits(dailyCommits),
       raw.totals.commits,
