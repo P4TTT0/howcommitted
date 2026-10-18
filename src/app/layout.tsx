@@ -11,6 +11,7 @@ const bigShoulders = Big_Shoulders({
 const martianMono = Martian_Mono({
   subsets: ["latin"],
   variable: "--font-martian-mono",
+  axes: ["wdth"],
 });
 
 const description = "Your contribution history as an audio-visual experience.";
