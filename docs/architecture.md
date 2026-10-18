@@ -1,6 +1,6 @@
 # Architecture
 
-Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. The solo vertical slice works end to end: landing search (`features/search`), `/{login}` (`features/experience`) and a scene sequencer (`features/sequencer`) playing year blocks, then the cumulative line driven by real history, then the end card (`features/scenes`). `/lab` keeps the generated profile for playback work outside production. GitHub sign-in works (see Auth). Versus, the other scenes and share are not built yet.
+Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `domain/`, `github/` and the API routes are implemented. The solo vertical slice works end to end: landing search (`features/search`), `/{login}` (`features/experience`) and a scene sequencer (`features/sequencer`) playing year blocks, then the cumulative line driven by real history, then the end card (`features/scenes`). `/lab` keeps the generated profile for playback work outside production. GitHub sign-in works (see Auth). Versus plays through the same sequencer outside production (see Scenes and the sequencer); share is not built yet.
 
 ## Stack
 
@@ -64,6 +64,8 @@ To add a scene (3 to 5):
 3. Preview it alone at `/lab?scene=<id>`.
 
 The final poster owns the single `FINALE` line in the registry (`render(data, { replay })`) and the `features/scenes/finale/` folder. Today it is the end card. Shared plan code (`Plan`, `planFromHistory`, formatting, the lab's fake profile) lives in `features/sequencer/model/`, so the contract imports nothing from a specific scene.
+
+Versus (2 to 5 developers, outside production) reuses the sequencer unchanged apart from one seam: `SceneData.versus?`, the developers in the order they were added (`login` plus `HistoryPlan`), with the solo fields describing the first one. `registry.ts` exports `VERSUS_SCENES` (`versus-race`: cumulative contributions as bars in fixed lanes on one shared timeline, never re-sorted, no leader or rank) and `VERSUS_FINALE` (`versus-finale`: a side-by-side summary and the fixed line). `features/versus/VersusExperience` loads the histories on intent, builds that `SceneData` and mounts the `Sequencer`; the solo scenes are untouched and the versus scenes return `null` without `versus`.
 
 ### Scene checklist
 

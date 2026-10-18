@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { History } from "@/domain/history";
 import {
@@ -10,6 +11,10 @@ import {
 import { consumeIntent } from "@/features/experience/intent";
 import { LoadingMoment, Poster } from "@/features/experience/Poster";
 import { SignInLink } from "@/features/experience/SignInLink";
+import { VERSUS_FINALE, VERSUS_SCENES } from "@/features/scenes/registry";
+import { planFromHistory } from "@/features/sequencer/model/historyPlan";
+import { Sequencer } from "@/features/sequencer/Sequencer";
+import type { SceneData } from "@/features/sequencer/types";
 import { isAudioUnlocked, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
 import { ScreenMain } from "@/ui/ScreenMain";
@@ -22,15 +27,16 @@ type Phase =
   | { name: "gate" }
   | { name: "loading"; login: string; position: number }
   | { name: "failed"; login: string; failure: HistoryFailure }
-  | { name: "summary"; histories: History[] };
+  | { name: "scene"; data: SceneData };
 
 /**
- * TEMPORARY. Versus playback is not built yet, so this loads every history
- * on intent (the Play gate, or the landing click), one after another, and
- * lists each developer with their calendar total. It only exists outside
- * production (see isVersusEnabled) and is replaced by the versus scenes.
+ * Versus: loads every history on intent (the Play gate, or the landing
+ * click), one after another, then plays them through the same sequencer as
+ * solo, with the versus scenes and finale. It only exists outside production
+ * (see isVersusEnabled).
  */
 export function VersusExperience({ logins }: { logins: string[] }) {
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ name: "init" });
   const mountedRef = useRef(true);
   const decidedRef = useRef(false);
@@ -60,7 +66,7 @@ export function VersusExperience({ logins }: { logins: string[] }) {
       }
       setPhase(
         result.kind === "ok"
-          ? { name: "summary", histories: result.histories }
+          ? sceneFor(result.histories)
           : { name: "failed", login: result.login, failure: result.failure },
       );
     } finally {
@@ -147,43 +153,45 @@ export function VersusExperience({ logins }: { logins: string[] }) {
       );
     }
 
-    case "summary":
+    case "scene":
       return (
-        <ScreenMain className="overflow-auto">
-          <Lineup logins={logins} />
-          <ul className="flex flex-col gap-3 p-4 pt-0">
-            {phase.histories.map((history, index) => (
-              <li
-                key={history.user.login}
-                className="flex items-center gap-3 border-2 border-ink p-3"
-              >
-                <span
-                  aria-hidden="true"
-                  className={`size-6 shrink-0 ${swatchClass(index)}`}
-                />
-                <span className="min-w-0 flex-1 truncate font-mono text-sm font-bold">
-                  @{history.user.login}
-                </span>
-                <span className="text-right font-mono text-xs">
-                  <span className="block font-display text-4xl font-black leading-none">
-                    {history.totalContributions.toLocaleString("en-US")}
-                  </span>
-                  calendar contributions
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="flex flex-wrap items-center gap-3 p-4 pt-0">
-            <p className="font-mono text-xs">
-              Temporary summary. The versus scenes are not built yet.
-            </p>
-            <Link href="/" className={actionClass}>
-              Search again
-            </Link>
-          </div>
-        </ScreenMain>
+        <Sequencer
+          data={phase.data}
+          scenes={VERSUS_SCENES}
+          finale={VERSUS_FINALE}
+          title={`${logins.map((login) => `@${login}`).join(" vs ")} contribution history`}
+          caption="Turn sound on."
+          onCancel={() => router.push("/")}
+          autoStart
+          starting={
+            <LoadingMoment
+              login={logins[0] as string}
+              label="Loading sound"
+              heading={false}
+            />
+          }
+        />
       );
   }
+}
+
+/** The first developer fills the solo fields; `versus` carries all of them in order. */
+function sceneFor(histories: readonly History[]): Phase {
+  const entries = histories.map((history) => ({
+    login: history.user.login,
+    model: planFromHistory(history),
+  }));
+  const [first] = entries;
+  if (!first) return { name: "failed", login: "", failure: { kind: "server" } };
+  return {
+    name: "scene",
+    data: {
+      login: first.login,
+      model: first.model,
+      history: histories[0] ?? null,
+      versus: entries,
+    },
+  };
 }
 
 /** The lineup as the title, each developer in their versus color. */
