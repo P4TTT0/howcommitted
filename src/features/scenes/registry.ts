@@ -2,9 +2,11 @@ import { bigNumbersScene } from "@/features/scenes/big-numbers";
 import { endCardFinale } from "@/features/scenes/finale";
 import { heatmapScene } from "@/features/scenes/heatmap";
 import { languageMosaicScene } from "@/features/scenes/language-mosaic";
+import { recordsScene } from "@/features/scenes/records";
 import { timelineScene } from "@/features/scenes/timeline";
 import { versusFinale } from "@/features/scenes/versus-finale";
 import { versusRaceScene } from "@/features/scenes/versus-race";
+import { weekShapeScene } from "@/features/scenes/week-shape";
 import type {
   FinaleDefinition,
   SceneDefinition,
@@ -18,6 +20,8 @@ import type {
 export const SCENES: readonly SceneDefinition[] = [
   timelineScene,
   heatmapScene,
+  weekShapeScene,
+  recordsScene,
   languageMosaicScene,
   bigNumbersScene,
 ];

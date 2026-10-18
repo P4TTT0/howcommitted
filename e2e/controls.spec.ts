@@ -83,7 +83,7 @@ test("a finished scene holds in explore and never moves on by itself", async ({
   await page.waitForTimeout(1500);
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 1 of 2: Timeline",
+    "Scene 1 of 4: Timeline",
   );
   // The way forward is there, never a dead end.
   await expect(nextButton(page)).toBeEnabled();
@@ -91,7 +91,7 @@ test("a finished scene holds in explore and never moves on by itself", async ({
   await nextButton(page).click();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 2 of 2: Heatmap",
+    "Scene 2 of 4: Heatmap",
   );
   await expect(pauseButton(page)).toBeVisible();
 });
@@ -106,7 +106,7 @@ test("previous, next and the scene segments move at any time", async ({
   await page.getByRole("button", { name: /^Go to scene 2/ }).click();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    /^Scene 2 of 2/,
+    /^Scene 2 of 4/,
   );
   await expect(pauseButton(page)).toBeVisible();
 
@@ -114,7 +114,7 @@ test("previous, next and the scene segments move at any time", async ({
   await prevButton(page).click();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    /^Scene 1 of 2/,
+    /^Scene 1 of 4/,
   );
   await expect(replayButton(page)).toBeVisible();
 
@@ -123,7 +123,10 @@ test("previous, next and the scene segments move at any time", async ({
   await expect(replayButton(page)).toBeVisible();
 
   // The finale is reachable with Next and leads back with Previous.
-  await nextButton(page).click();
+  const scenes = await page.locator("[data-scene-tick]").count();
+  for (let scene = 2; scene <= scenes; scene++) {
+    await nextButton(page).click();
+  }
   await expect(
     page.getByText("Contributions are not productivity."),
   ).toBeVisible();
@@ -131,7 +134,7 @@ test("previous, next and the scene segments move at any time", async ({
   await prevButton(page).click();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    /^Scene 2 of 2/,
+    new RegExp(`^Scene ${scenes} of ${scenes}`),
   );
   await expect(replayButton(page)).toBeVisible();
 });
@@ -167,7 +170,7 @@ test("the timeline reads each year by pointer and keyboard in explore", async ({
   // The arrows belong to the chart while it is focused: still the same scene.
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    /^Scene 1 of 2/,
+    /^Scene 1 of 4/,
   );
 
   const box = await chart.boundingBox();
@@ -211,7 +214,7 @@ test("the heatmap reads a week by keyboard and shows the month strip", async ({
   // The arrows belong to the grid while it is focused: still the same scene.
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    /^Scene 2 of 2/,
+    /^Scene 2 of 4/,
   );
   await expect(page.locator("[data-role=readout-title]")).toHaveText(
     "2023 · week 1",
@@ -237,7 +240,7 @@ test("speed is chosen once and carries across scenes", async ({ page }) => {
   await nextButton(page).click();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    /^Scene 2 of 2/,
+    /^Scene 2 of 4/,
   );
   await expect(speed).toHaveText("0.5×");
   expect(
@@ -259,12 +262,12 @@ test("keyboard shortcuts steer the experience", async ({ page }) => {
   await page.keyboard.press("ArrowRight");
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    /^Scene 2 of 2/,
+    /^Scene 2 of 4/,
   );
   await page.keyboard.press("ArrowLeft");
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    /^Scene 1 of 2/,
+    /^Scene 1 of 4/,
   );
   await expect(replayButton(page)).toBeVisible();
 
