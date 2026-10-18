@@ -3,6 +3,8 @@ import { cumulativeLineScene } from "@/features/scenes/cumulative-line";
 import { endCardFinale } from "@/features/scenes/finale";
 import { heatmapScene } from "@/features/scenes/heatmap";
 import { languageMosaicScene } from "@/features/scenes/language-mosaic";
+import { versusFinale } from "@/features/scenes/versus-finale";
+import { versusRaceScene } from "@/features/scenes/versus-race";
 import { yearBlocksScene } from "@/features/scenes/year-blocks";
 import type {
   FinaleDefinition,
@@ -27,3 +29,7 @@ export const SCENES: readonly SceneDefinition[] = [
  * the value of this one line (and the `finale/` folder it points to).
  */
 export const FINALE: FinaleDefinition = endCardFinale;
+
+/** The versus run: its own list and finale, played by the same sequencer. */
+export const VERSUS_SCENES: readonly SceneDefinition[] = [versusRaceScene];
+export const VERSUS_FINALE: FinaleDefinition = versusFinale;

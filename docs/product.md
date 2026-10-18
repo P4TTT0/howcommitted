@@ -30,7 +30,7 @@ CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 | # | Scene | Content |
 |---|-------|---------|
 | 1 | Year blocks | Block height = calendar contributions of the year; block color = year identity |
-| 2 | Cumulative line | Cumulative contributions with repo-creation flags. In versus: bar chart race |
+| 2 | Cumulative line | Cumulative contributions with repo-creation flags. In versus: a race of horizontal bars in fixed lanes (order added, never re-sorted, no leader or rank) on one shared timeline, with a year label |
 | 3 | Heatmap | Weekday by week. Same calendar data as the line; label it "contributions", never commits |
 | 4 | Language mosaic | Proportional blocks, top 5 plus "other". Label: languages of owned repos, not per-commit |
 | 5 | Big numbers | Four giant numbers: commits, PRs, reviews, issues |
@@ -41,6 +41,7 @@ CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 - Pause, previous and next scene, speed (0.5×, 1×, 1.5×, 2×, kept for the whole run), mute, and cancel (back to the landing).
 - Scenes never advance on their own. A finished scene stays on screen to explore: its chart is interactive (pointer and keyboard show exact values) and a clear "Next" moves on. Going back or jumping to a scene already played lands in explore; it can be replayed.
 - Progress bar with clickable scene ticks.
+- Versus uses the same controls and explore phase. Its scene is the contribution race; its final poster shows each developer side by side (total, years) with the fixed line, Replay and Search again.
 - Keyboard: Space pause/resume, ← → previous/next scene, M mute, Esc cancel. Never while typing.
 - Shared links never autoplay.
 

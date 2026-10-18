@@ -300,7 +300,9 @@ export function Sequencer({
   const progressText = scene
     ? `Scene ${seq.index + 1} of ${count}: ${scene.label}`
     : "";
-  const finishedText = `Finished. ${formatCount(data.model.plan.total)} contributions.`;
+  const finishedText = data.versus
+    ? "Finished. Every developer's contributions are summarized."
+    : `Finished. ${formatCount(data.model.plan.total)} contributions.`;
   const exploreText = `${progressText}. Scene finished. Explore the chart, or press Next.`;
 
   return (

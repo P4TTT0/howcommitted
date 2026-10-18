@@ -47,20 +47,45 @@ test("a versus path waits for Play and fetches nothing before it", async ({
   expect(requests).toEqual([]);
 });
 
-test("Play loads each history in order, then lists every developer without ranking", async ({
+test("Play loads each history in order, then plays the race and the finale without ranking", async ({
   page,
 }) => {
   const requests = await mockHistory(page);
   await page.goto("/ada/grace/linus");
   await play(page).click();
-  await expect(page.getByText("Temporary summary")).toBeVisible();
-  expect(requests).toEqual(["ada", "grace", "linus"]);
 
-  const rows = page.getByRole("listitem").filter({ hasText: "calendar" });
-  await expect(rows).toHaveCount(3);
-  await expect(rows.nth(0)).toContainText("@ada");
-  await expect(rows.nth(2)).toContainText("@linus");
-  await expect(page.getByText(/winner|best|most productive/i)).toHaveCount(0);
+  // The race: one fixed lane per developer, in the order they were added.
+  const race = page.getByRole("region", {
+    name: /^Cumulative contributions from 2023 to 2024/,
+  });
+  await expect(race).toBeVisible();
+  expect(requests).toEqual(["ada", "grace", "linus"]);
+  const lanes = race.getByRole("listitem");
+  await expect(lanes).toHaveCount(3);
+  await expect(lanes.nth(0)).toContainText("@ada");
+  await expect(lanes.nth(2)).toContainText("@linus");
+  await expect(page.getByRole("button", { name: "Pause" })).toBeEnabled();
+
+  // The same controls as solo: Next moves on to the finale.
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(
+    page.getByText(
+      "Contributions are not productivity. This is rhythm, not value.",
+    ),
+  ).toBeVisible();
+  const finale = page.getByRole("region", { name: "Versus summary" });
+  await expect(finale).toBeVisible();
+  await expect(finale.getByRole("button", { name: "Replay" })).toBeVisible();
+  await expect(
+    finale.getByRole("link", { name: "Search again" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("contributions, 2023 to 2024").first(),
+  ).toBeVisible();
+
+  await expect(
+    page.getByText(/winner|best|most productive|leader/i),
+  ).toHaveCount(0);
 });
 
 test("it stops at the first login_required and requests nothing more", async ({

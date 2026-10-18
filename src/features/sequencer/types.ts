@@ -26,6 +26,9 @@ import type { SoundEngine } from "@/playback/sound/engine";
  * Replay is always a fresh `mount` in the playing phase.
  */
 
+/** One developer in a versus run. */
+export type VersusEntry = { login: string; model: HistoryPlan };
+
 /** Everything a scene may read. Scenes never fetch. */
 export type SceneData = {
   login: string;
@@ -33,6 +36,12 @@ export type SceneData = {
   model: HistoryPlan;
   /** The full payload for scenes that need more than the plan; null in the lab. */
   history: History | null;
+  /**
+   * Versus only: every developer in the order they were added (2 to 5). The
+   * fields above then describe the first one. Solo scenes ignore this; the
+   * versus scenes and finale read it and are skipped without it.
+   */
+  versus?: readonly VersusEntry[];
 };
 
 /** What the sequencer hands a scene when it mounts. */
