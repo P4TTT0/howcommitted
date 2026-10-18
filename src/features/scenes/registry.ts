@@ -1,11 +1,10 @@
 import { bigNumbersScene } from "@/features/scenes/big-numbers";
-import { cumulativeLineScene } from "@/features/scenes/cumulative-line";
 import { endCardFinale } from "@/features/scenes/finale";
 import { heatmapScene } from "@/features/scenes/heatmap";
 import { languageMosaicScene } from "@/features/scenes/language-mosaic";
+import { timelineScene } from "@/features/scenes/timeline";
 import { versusFinale } from "@/features/scenes/versus-finale";
 import { versusRaceScene } from "@/features/scenes/versus-race";
-import { yearBlocksScene } from "@/features/scenes/year-blocks";
 import type {
   FinaleDefinition,
   SceneDefinition,
@@ -17,8 +16,7 @@ import type {
  * Contract: `features/sequencer/types.ts` and docs/architecture.md.
  */
 export const SCENES: readonly SceneDefinition[] = [
-  yearBlocksScene,
-  cumulativeLineScene,
+  timelineScene,
   heatmapScene,
   languageMosaicScene,
   bigNumbersScene,

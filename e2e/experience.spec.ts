@@ -235,7 +235,7 @@ test("scenes play in order, with a progress bar that names the scene", async ({
   await expect(pauseButton(page)).toBeEnabled();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 1 of 2: Year blocks",
+    "Scene 1 of 2: Timeline",
   );
   // One block per year: height is the calendar total of the year.
   const perYear = history.years
@@ -251,10 +251,10 @@ test("scenes play in order, with a progress bar that names the scene", async ({
   await nextButton(page).click();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 2 of 2: Cumulative line",
+    "Scene 2 of 2: Heatmap",
   );
   await expect(
-    page.getByRole("img", { name: /^Cumulative contributions/ }),
+    page.getByRole("img", { name: /^Contributions per week/ }),
   ).toBeVisible();
 });
 
@@ -482,7 +482,8 @@ test("contributions not attributed to a day show as a labelled step with an hone
   await startButton(page).click();
   await expect(pauseButton(page)).toBeEnabled();
   // The scene just has to have been left once: it then reopens finished.
-  await openInExplore(page, 2);
+  // The step lives on the timeline, the first scene.
+  await openInExplore(page, 1);
 
   await expect(
     page.getByText(`+${missing} not attributed to a day`),
@@ -495,7 +496,9 @@ test("contributions not attributed to a day show as a labelled step with an hone
       )
       .first(),
   ).toBeVisible();
-  // The total is the official one, not the sum of the days.
+  // The total is the official one, not the sum of the days. The heatmap is
+  // the scene between the timeline and the final poster.
+  await nextButton(page).click();
   await nextButton(page).click();
   await expect(page.getByText("@ada: 1,000 contributions, 2023")).toBeVisible();
 });

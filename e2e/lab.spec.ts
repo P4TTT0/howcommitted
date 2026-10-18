@@ -11,11 +11,11 @@ test("lab renders the start button without producing sound", async ({
 });
 
 test("lab previews one scene on its own with ?scene=", async ({ page }) => {
-  await page.goto("/lab?scene=year-blocks");
+  await page.goto("/lab?scene=timeline");
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(
     page.getByRole("progressbar", { name: "Playback progress" }),
-  ).toHaveAttribute("aria-valuetext", "Scene 1 of 1: Year blocks");
+  ).toHaveAttribute("aria-valuetext", "Scene 1 of 1: Timeline");
   await expect(
     page.getByRole("img", { name: /^Contributions per year: 2018 / }),
   ).toBeVisible();
@@ -24,7 +24,7 @@ test("lab previews one scene on its own with ?scene=", async ({ page }) => {
 test("lab shows the whole controls bar, idle before Play and live after", async ({
   page,
 }) => {
-  await page.goto("/lab?scene=year-blocks");
+  await page.goto("/lab?scene=timeline");
   await expect(
     page.getByRole("button", { name: /^Playback speed 1×/ }),
   ).toHaveText("1×");

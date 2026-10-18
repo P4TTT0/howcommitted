@@ -1,9 +1,5 @@
 import type { RepoFlag } from "@/domain/repo-flags";
 import { formatCount } from "@/features/sequencer/model/format";
-import {
-  stepLabel,
-  type UnattributedStep,
-} from "@/features/sequencer/model/plan";
 
 /** A repo-creation flag placed on the line. */
 export type FlagMark = {
@@ -53,20 +49,6 @@ export function flagMarks(
   });
 }
 
-/** Days either side of the cursor within which a flag counts as "here". */
-export function flagWindow(dayCount: number): number {
-  return Math.max(3, Math.round(dayCount * 0.006));
-}
-
-/** The flags close enough to the day under the cursor to be labelled. */
-export function nearFlags(
-  marks: readonly FlagMark[],
-  dayIndex: number,
-  window: number,
-): FlagMark[] {
-  return marks.filter((mark) => Math.abs(mark.dayIndex - dayIndex) <= window);
-}
-
 /** "Repository created: name, 240 stars, Mar 4, 2021". */
 export function flagLabel(mark: FlagMark): string {
   const stars =
@@ -74,25 +56,4 @@ export function flagLabel(mark: FlagMark): string {
       ? `, ${formatCount(mark.stars)} ${mark.stars === 1 ? "star" : "stars"}`
       : "";
   return `Repository created: ${mark.name}${stars}, ${formatDay(mark.date)}`;
-}
-
-/** What is spoken and shown for the day under the cursor. */
-export function dayReading({
-  date,
-  total,
-  step,
-  flags,
-}: {
-  date: string;
-  total: number;
-  /** The unattributed step released on this day, if any. */
-  step?: UnattributedStep;
-  flags: readonly FlagMark[];
-}): string {
-  const parts = [
-    `${formatDay(date)}: ${formatCount(total)} contributions so far`,
-  ];
-  if (step) parts.push(stepLabel(step));
-  for (const mark of flags) parts.push(flagLabel(mark));
-  return parts.join(". ");
 }
