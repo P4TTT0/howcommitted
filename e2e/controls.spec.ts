@@ -75,10 +75,11 @@ async function openInExplore(page: Page, sceneNumber: number) {
 test("a finished scene holds in explore and never moves on by itself", async ({
   page,
 }) => {
+  // The timeline draws for about half a minute; its end turns Pause into Replay.
+  test.setTimeout(90_000);
   await play(page);
 
-  // The first scene is a few seconds long; its end turns Pause into Replay.
-  await expect(replayButton(page)).toBeVisible({ timeout: 20_000 });
+  await expect(replayButton(page)).toBeVisible({ timeout: 45_000 });
   await page.waitForTimeout(1500);
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
@@ -195,17 +196,17 @@ test("the heatmap reads a week by keyboard and shows the month strip", async ({
   await grid.focus();
   await expect(grid).toHaveAttribute(
     "aria-valuetext",
-    /^2024 · week d+: d+ contributions? that week$/,
+    /^2024 · week \d+: \d+ contributions? that week$/,
   );
   await grid.press("Home");
   await expect(grid).toHaveAttribute(
     "aria-valuetext",
-    /^2022 · week 1: d+ contributions? that week$/,
+    /^2022 · week 1: \d+ contributions? that week$/,
   );
   await grid.press("ArrowDown");
   await expect(grid).toHaveAttribute(
     "aria-valuetext",
-    /^2023 · week 1: d+ contributions? that week$/,
+    /^2023 · week 1: \d+ contributions? that week$/,
   );
   // The arrows belong to the grid while it is focused: still the same scene.
   await expect(progress(page)).toHaveAttribute(

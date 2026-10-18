@@ -482,7 +482,8 @@ test("contributions not attributed to a day show as a labelled step with an hone
   await startButton(page).click();
   await expect(pauseButton(page)).toBeEnabled();
   // The scene just has to have been left once: it then reopens finished.
-  await openInExplore(page, 2);
+  // The step lives on the timeline, the first scene.
+  await openInExplore(page, 1);
 
   await expect(
     page.getByText(`+${missing} not attributed to a day`),
@@ -495,7 +496,9 @@ test("contributions not attributed to a day show as a labelled step with an hone
       )
       .first(),
   ).toBeVisible();
-  // The total is the official one, not the sum of the days.
+  // The total is the official one, not the sum of the days. The heatmap is
+  // the scene between the timeline and the final poster.
+  await nextButton(page).click();
   await nextButton(page).click();
   await expect(page.getByText("@ada: 1,000 contributions, 2023")).toBeVisible();
 });
