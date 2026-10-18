@@ -125,6 +125,7 @@ describe("history response contract", () => {
               commitContributionsByRepo: [
                 [{ occurredAt: "2024-02-29T10:00:00Z", commitCount: 3 }],
               ],
+              publicRepoContributions: [],
               calendar: [{ date: "2024-02-29", count: 5, weekday: 4 }],
               totalContributions: 5,
             }),
@@ -167,6 +168,7 @@ describe("history response contract", () => {
       "dailyContributions",
       "heatmap",
       "reconciliation",
+      "repoCommits",
       "totalContributions",
       "totals",
       "year",

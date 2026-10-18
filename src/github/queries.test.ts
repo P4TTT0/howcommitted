@@ -89,7 +89,15 @@ describe("fetchYear", () => {
       ],
     },
   });
-  const repo = (nodes: { occurredAt: string; commitCount: number }[]) => ({
+  const repo = (
+    nodes: { occurredAt: string; commitCount: number }[],
+    repository: unknown = {
+      nameWithOwner: "a/engine",
+      isPrivate: false,
+      visibility: "PUBLIC",
+    },
+  ) => ({
+    repository,
     contributions: { nodes },
   });
   const yearBody = {
@@ -223,6 +231,86 @@ describe("fetchYear", () => {
     });
   });
 
+  it("drops private repositories and merges a public repo across quarters", async () => {
+    stubFetchSequence({
+      data: {
+        rateLimit,
+        user: {
+          year: totals(9),
+          q1: {
+            commitContributionsByRepository: [
+              repo([{ occurredAt: "2023-01-05T00:00:00Z", commitCount: 2 }]),
+              repo([{ occurredAt: "2023-01-05T00:00:00Z", commitCount: 4 }], {
+                nameWithOwner: "a/secret",
+                isPrivate: true,
+                visibility: "PRIVATE",
+              }),
+            ],
+          },
+          q2: {
+            commitContributionsByRepository: [
+              repo([{ occurredAt: "2023-04-02T00:00:00Z", commitCount: 3 }]),
+            ],
+          },
+          q3: empty,
+          q4: empty,
+        },
+      },
+    });
+    const result = await fetchYear("t", "a", 2023, undefined, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.repoCommits).toEqual([
+      { repo: "a/engine", commits: 5, days: 2 },
+    ]);
+    expect(JSON.stringify(result.data)).not.toContain("secret");
+    // Private commits still count toward the aggregate daily total.
+    expect(result.data.dailyCommits[0]).toEqual({
+      date: "2023-01-05",
+      commits: 6,
+    });
+  });
+
+  it("fails closed: drops repos with missing, null or non-public visibility", async () => {
+    const hidden = [
+      { nameWithOwner: "a/no-flag", visibility: "PUBLIC" },
+      { nameWithOwner: "a/internal", isPrivate: false, visibility: "INTERNAL" },
+      { nameWithOwner: "a/no-visibility", isPrivate: false },
+      null,
+    ];
+    stubFetchSequence({
+      data: {
+        rateLimit,
+        user: {
+          year: totals(5),
+          q1: {
+            commitContributionsByRepository: [
+              repo([{ occurredAt: "2023-01-05T00:00:00Z", commitCount: 1 }]),
+              ...hidden.map((repository) =>
+                repo(
+                  [{ occurredAt: "2023-01-05T00:00:00Z", commitCount: 1 }],
+                  repository,
+                ),
+              ),
+            ],
+          },
+          q2: empty,
+          q3: empty,
+          q4: empty,
+        },
+      },
+    });
+    const result = await fetchYear("t", "a", 2023, undefined, NOW);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.repoCommits).toEqual([
+      { repo: "a/engine", commits: 1, days: 1 },
+    ]);
+    const json = JSON.stringify(result.data);
+    for (const name of ["no-flag", "internal", "no-visibility"])
+      expect(json).not.toContain(name);
+  });
+
   it("skips quarters that have not started yet in the current year", async () => {
     const fetchMock = stubFetchSequence({
       data: {
@@ -256,7 +344,14 @@ describe("fetchYear", () => {
           q2: null,
           q3: {
             commitContributionsByRepository: [
-              { contributions: { nodes: null } },
+              {
+                repository: {
+                  nameWithOwner: "a/engine",
+                  isPrivate: false,
+                  visibility: "PUBLIC",
+                },
+                contributions: { nodes: null },
+              },
             ],
           },
           q4: empty,

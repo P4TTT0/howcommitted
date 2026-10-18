@@ -51,6 +51,7 @@ export function makeYear(
       privateContributions: options.privateContributions ?? 0,
     },
     dailyCommits: [],
+    repoCommits: [],
     reconciliation: {
       summed: 0,
       official: commits,

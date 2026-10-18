@@ -16,6 +16,12 @@ const year = (y: number, commits: number, priv: number) =>
     commitContributionsByRepo: [
       [{ occurredAt: `${y}-12-31T00:00:00Z`, commitCount: commits }],
     ],
+    publicRepoContributions: [
+      {
+        repo: "ada/engine",
+        nodes: [{ occurredAt: `${y}-12-31T00:00:00Z`, commitCount: commits }],
+      },
+    ],
     calendar: [{ date: `${y}-12-31`, count: commits, weekday: 1 }],
     totalContributions: commits + priv,
   });
@@ -80,6 +86,7 @@ describe("buildHistory", () => {
             privateContributions: 1912,
           },
           commitContributionsByRepo: [],
+          publicRepoContributions: [],
           calendar: [
             { date: "2026-03-02", count: 900, weekday: 1 },
             { date: "2026-03-03", count: 1012, weekday: 2 },
@@ -132,6 +139,7 @@ describe("buildHistory", () => {
           privateContributions: 0,
         },
         commitContributionsByRepo: [],
+        publicRepoContributions: [],
         calendar: days.map(([date, count, weekday]) => ({
           date,
           count,

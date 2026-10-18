@@ -42,6 +42,7 @@ export function quarterWindows(year: number): QuarterWindow[] {
 
 const QUARTER_FIELDS = `{
     commitContributionsByRepository(maxRepositories: 100) {
+      repository { nameWithOwner isPrivate visibility }
       contributions(first: 100) { nodes { occurredAt commitCount } }
     }
   }`;
@@ -113,6 +114,11 @@ type PreviewData = {
 
 type QuarterData = {
   commitContributionsByRepository: {
+    repository: {
+      nameWithOwner: string;
+      isPrivate: boolean;
+      visibility: string;
+    } | null;
     contributions: {
       nodes: { occurredAt: string; commitCount: number }[] | null;
     };
@@ -230,6 +236,23 @@ export async function fetchYear(
       (repo) => repo.contributions.nodes ?? [],
     ),
   );
+  // Fail closed: a repo is kept only when GitHub says it is PUBLIC and not
+  // private. Anything else (null, missing fields, INTERNAL) is dropped here,
+  // before anything is cached.
+  const publicRepoContributions = quarters.flatMap((_, i) =>
+    (user[`q${i + 1}`]?.commitContributionsByRepository ?? []).flatMap(
+      (repo) =>
+        repo.repository?.visibility === "PUBLIC" &&
+        repo.repository.isPrivate === false
+          ? [
+              {
+                repo: repo.repository.nameWithOwner,
+                nodes: repo.contributions.nodes ?? [],
+              },
+            ]
+          : [],
+    ),
+  );
   return {
     ok: true,
     rateLimit: result.rateLimit,
@@ -243,6 +266,7 @@ export async function fetchYear(
         privateContributions: collection.restrictedContributionsCount,
       },
       commitContributionsByRepo,
+      publicRepoContributions,
       totalContributions: collection.contributionCalendar.totalContributions,
       // Defensive: weeks at the edges can pad with days of the neighbouring
       // years. Only days of the requested year belong to this year.

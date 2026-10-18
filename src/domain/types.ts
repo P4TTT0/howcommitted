@@ -19,6 +19,18 @@ export type DailyCommits = {
   commits: number;
 };
 
+/**
+ * Commits to one public repository in one year. `repo` is `owner/name`.
+ * Private repositories never appear here: their names must not reach the
+ * cache or the browser, so private work stays an aggregate count only.
+ */
+export type RepoCommits = {
+  repo: string;
+  commits: number;
+  /** Distinct days of the year with at least one commit to it. */
+  days: number;
+};
+
 /** Contributions of one day from the GitHub calendar (all types, public and shared private). */
 export type DailyContributions = {
   date: string;
@@ -59,6 +71,8 @@ export type YearSummary = {
    * `reconciliation` flags that case.
    */
   dailyCommits: DailyCommits[];
+  /** Commits to public repositories, per repository. Sorted by repo name. */
+  repoCommits: RepoCommits[];
   reconciliation: CommitReconciliation;
   calendar: CalendarDay[];
   /** The calendar's own total for the year (all contribution types, public and shared private). */
