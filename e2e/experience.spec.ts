@@ -65,6 +65,8 @@ const pauseButton = (page: Page) => page.getByRole("button", { name: "Pause" });
 const nextButton = (page: Page) => page.getByRole("button", { name: /^Next/ });
 const prevButton = (page: Page) =>
   page.getByRole("button", { name: "Previous scene" });
+/** How many scenes this fixture plays: one tick per scene on the bar. */
+const sceneCount = (page: Page) => page.locator("[data-scene-tick]").count();
 const progress = (page: Page) =>
   page.getByRole("progressbar", { name: "Playback progress" });
 
@@ -235,7 +237,7 @@ test("scenes play in order, with a progress bar that names the scene", async ({
   await expect(pauseButton(page)).toBeEnabled();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 1 of 4: Timeline",
+    `Scene 1 of ${await sceneCount(page)}: Timeline`,
   );
   // One block per year: height is the calendar total of the year.
   const perYear = history.years
@@ -251,7 +253,7 @@ test("scenes play in order, with a progress bar that names the scene", async ({
   await nextButton(page).click();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 2 of 4: Heatmap",
+    `Scene 2 of ${await sceneCount(page)}: Heatmap`,
   );
   await expect(
     page.getByRole("img", { name: /^Contributions per week/ }),
