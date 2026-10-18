@@ -772,11 +772,12 @@ describe("getProfile for a signed-in visitor", () => {
     });
   });
 
-  it("still uses the coalescing lock, and waiters fetch for themselves when nothing was cached", async () => {
+  it("skips the coalescing lock, so an anonymous request is not blocked behind it", async () => {
     const calls = stubGithub(happyPath);
     const { deps } = setup({ chargeColdGeneration: async () => null });
+    const acquire = vi.spyOn(deps.lock, "acquire");
     const results = await Promise.all(
-      Array.from({ length: 3 }, () =>
+      Array.from({ length: 2 }, () =>
         getProfile("ada", visitor, deps, {
           userToken: USER_TOKEN,
           viewerLogin: "viewer",
@@ -784,26 +785,77 @@ describe("getProfile for a signed-in visitor", () => {
       ),
     );
     expect(results.every((r) => r.status === "ok")).toBe(true);
-    // Nothing was written, so each waiter regenerates once it gets the lock.
-    expect(calls).toEqual({ Preview: 3, Year: 9, Repos: 3 });
+    // Nothing is shared, so each generated for itself, without the lock.
+    expect(calls).toEqual({ Preview: 2, Year: 6, Repos: 2 });
+    expect(acquire).not.toHaveBeenCalled();
 
-    const busy = setup();
-    await busy.deps.lock.acquire("grace");
-    let clock = NOW.getTime();
+    // A held lock does not stop a user-token request either.
+    const held = setup();
+    await held.deps.lock.acquire("grace");
     expect(
-      await getProfile(
-        "grace",
-        visitor,
-        {
-          ...busy.deps,
-          now: () => new Date(clock),
-          sleep: async () => {
-            clock += GENERATION_DEADLINE_MS;
-          },
-        },
-        { userToken: USER_TOKEN, viewerLogin: "viewer" },
-      ),
-    ).toEqual({ status: "degraded", reason: "busy" });
+      await getProfile("grace", visitor, held.deps, {
+        userToken: USER_TOKEN,
+        viewerLogin: "viewer",
+      }),
+    ).toMatchObject({ status: "ok", source: "fresh" });
+  });
+
+  it("leaves the lock free while a user-token generation is in flight", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        await gate;
+        const { query } = JSON.parse(String(init.body)) as { query: string };
+        const kind = (["Preview", "Year", "Repos"] as const).find((k) =>
+          query.includes(`query ${k}(`),
+        ) as Kind;
+        return happy(kind);
+      }),
+    );
+    const { deps } = setup();
+    const pending = getProfile("ada", visitor, deps, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    await Promise.resolve();
+    expect(await deps.lock.acquire("ada")).toBeTruthy();
+    release();
+    expect(await pending).toMatchObject({ status: "ok" });
+  });
+
+  it("does not mark a login missing for everyone when their token cannot find it", async () => {
+    stubGithub(() => ({ data: { rateLimit, user: null } }));
+    const { deps } = setup();
+    const markMissing = vi.spyOn(deps.cache, "markMissing");
+    expect(
+      await getProfile("ghost", visitor, deps, {
+        userToken: USER_TOKEN,
+        viewerLogin: "viewer",
+      }),
+    ).toEqual({ status: "not_found" });
+    expect(markMissing).not.toHaveBeenCalled();
+    expect(await deps.cache.isMissing("ghost")).toBe(false);
+  });
+
+  it("writes nothing to the shared cache when refetching a stale year with their token", async () => {
+    stubGithub((kind) =>
+      kind === "Preview" ? userBody([2026, 2025, 2024]) : happyPath(kind),
+    );
+    const { deps } = setup({ now: () => new Date("2026-12-31T23:00:00Z") });
+    await getProfile("ada", visitor, deps);
+
+    const newYear = { ...deps, now: () => new Date("2027-01-01T01:00:00Z") };
+    const setYear = vi.spyOn(newYear.cache, "setYear");
+    const result = await getProfile("ada", visitor, newYear, {
+      userToken: USER_TOKEN,
+      viewerLogin: "viewer",
+    });
+    expect(result).toMatchObject({ status: "ok", source: "fresh" });
+    expect(setYear).not.toHaveBeenCalled();
   });
 
   it("is not stopped by an open circuit breaker, which only guards the server token", async () => {

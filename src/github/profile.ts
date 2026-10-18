@@ -199,7 +199,8 @@ async function failureFrom(
   error: GithubError,
   ctx: Context,
 ): Promise<Failure> {
-  if (error.kind === "not_found") {
+  // A user-token not_found is theirs alone (it may lack access): never shared.
+  if (error.kind === "not_found" && !ctx.userToken) {
     await orElse(
       "markMissing",
       () => ctx.deps.cache.markMissing(login),
@@ -333,8 +334,8 @@ export type ProfileOptions = {
   /**
    * The signed-in visitor's own GitHub token. A cold generation then spends
    * their GitHub budget instead of the anonymous quota and the server token,
-   * and stays out of the circuit breaker. The lock and shared cache reads still
-   * apply, but what they fetch is never written to the shared cache: their token
+   * and stays out of the circuit breaker. Shared cache reads still apply, the
+   * coalescing lock is skipped, and what they fetch is never written to the shared cache: their token
    * may see data an anonymous visitor cannot.
    */
   userToken?: string | null;
@@ -397,6 +398,18 @@ async function resolveProfile(
 
   const cached = await lookup(login, ctx);
   if (cached.result) return cached.result;
+
+  // A visitor's token never shares its result, so holding the coalescing lock
+  // would only make anonymous waiters queue behind it. Generate directly.
+  if (ctx.userToken) {
+    if (
+      ctx.deadline - ctx.now().getTime() <
+      (deps.minBudgetMs ?? MIN_GENERATION_BUDGET_MS)
+    ) {
+      return { status: "degraded", reason: "busy" };
+    }
+    return generate(login, visitor, ctx);
+  }
 
   for (let attempt = 0; ; attempt++) {
     let release: Awaited<ReturnType<Lock["acquire"]>>;
