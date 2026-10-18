@@ -312,7 +312,10 @@ export function Sequencer({
           {title}
         </h1>
       )}
-      <div className={`absolute inset-x-0 top-0 ${STAGE_BOTTOM_CLASS}`}>
+      <div
+        data-scene-frame=""
+        className={`absolute inset-x-0 top-0 ${STAGE_BOTTOM_CLASS}`}
+      >
         {scene && !finished && (
           <div
             key={`${seq.run}-${seq.visit}-${scene.id}`}
