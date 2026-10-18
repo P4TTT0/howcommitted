@@ -235,7 +235,7 @@ test("scenes play in order, with a progress bar that names the scene", async ({
   await expect(pauseButton(page)).toBeEnabled();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 1 of 2: Timeline",
+    "Scene 1 of 4: Timeline",
   );
   // One block per year: height is the calendar total of the year.
   const perYear = history.years
@@ -251,7 +251,7 @@ test("scenes play in order, with a progress bar that names the scene", async ({
   await nextButton(page).click();
   await expect(progress(page)).toHaveAttribute(
     "aria-valuetext",
-    "Scene 2 of 2: Heatmap",
+    "Scene 2 of 4: Heatmap",
   );
   await expect(
     page.getByRole("img", { name: /^Contributions per week/ }),
