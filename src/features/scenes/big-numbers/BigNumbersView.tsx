@@ -21,10 +21,12 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
         title="Big numbers."
         note={scopeNote(plan.privateContributions)}
       >
-        <div className="flex h-full min-h-0 flex-col gap-3 md:gap-4">
+        {/* Never clips: the tiles keep the height their numbers need, and the
+            scene scrolls vertically when a short screen cannot hold them. */}
+        <div className="absolute inset-0 flex flex-col gap-3 overflow-y-auto md:gap-4">
           <ul
             aria-label="Totals"
-            className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3 md:gap-4"
+            className="grid flex-1 grid-cols-2 [grid-template-rows:repeat(2,minmax(min-content,1fr))] gap-3 md:gap-4"
           >
             {plan.numbers.map((number, index) => {
               const colors = blockForYearIndex(number.colorIndex);
@@ -33,7 +35,7 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
                   key={number.key}
                   data-tile={index}
                   aria-label={totalReading(number)}
-                  className={`flex min-h-0 min-w-0 flex-col justify-between overflow-hidden p-3 landscape:p-5 ${focusRing}`}
+                  className={`flex min-w-0 flex-col justify-between p-3 landscape:p-5 ${focusRing}`}
                   style={{
                     backgroundColor: colors.background,
                     color: colors.foreground,
@@ -75,9 +77,9 @@ function MixStrip({ mix }: { mix: MixPlan }) {
   return (
     <section
       aria-label="How the mix changed"
-      className="flex shrink-0 flex-col gap-2 border-t-2 border-ink pt-3 md:flex-row md:items-center md:gap-6"
+      className="flex shrink-0 flex-col gap-2 border-t-2 border-ink pt-3 lg:flex-row lg:items-center lg:gap-6"
     >
-      <h3 className="font-display text-2xl font-extrabold uppercase leading-none md:text-[30px]">
+      <h3 className="font-display text-2xl font-extrabold uppercase leading-none lg:shrink-0 lg:text-[30px]">
         How the mix changed
       </h3>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -122,7 +124,7 @@ function MixStrip({ mix }: { mix: MixPlan }) {
           ))}
         </ul>
       </div>
-      <p className="font-mono text-xs leading-[1.6] [font-stretch:87.5%] md:w-[320px] md:shrink-0">
+      <p className="font-mono text-xs leading-[1.6] [font-stretch:87.5%] lg:w-[320px] lg:shrink-0">
         {mix.summary}
       </p>
     </section>
