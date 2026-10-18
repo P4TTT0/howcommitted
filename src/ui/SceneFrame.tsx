@@ -1,8 +1,12 @@
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import { labelClass } from "./classes";
 
+/** Where the scene sits in the run; the sequencer provides it around the view. */
+export type ScenePosition = { index: number; count: number };
+export const ScenePositionContext = createContext<ScenePosition | null>(null);
+
 type SceneFrameProps = {
-  /** Right side of the header, for example "Week shape". */
+  /** Right side of the header, after "Scene N of M · " when known. */
   sceneLabel: string;
   /** The big headline. */
   title?: ReactNode;
@@ -24,6 +28,10 @@ export function SceneFrame({
   children,
   className = "",
 }: SceneFrameProps) {
+  const position = useContext(ScenePositionContext);
+  const headerLabel = position
+    ? `Scene ${position.index + 1} of ${position.count} · ${sceneLabel}`
+    : sceneLabel;
   return (
     <div
       className={`flex h-full min-w-0 flex-col gap-[18px] px-4 pt-6 pb-4 md:px-16 md:pt-12 ${className}`}
@@ -32,7 +40,7 @@ export function SceneFrame({
         <p className="font-display text-[28px] font-black uppercase tracking-[0.02em]">
           Committed
         </p>
-        <p className={`text-right ${labelClass}`}>{sceneLabel}</p>
+        <p className={`text-right ${labelClass}`}>{headerLabel}</p>
       </header>
       {(title || note) && (
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">

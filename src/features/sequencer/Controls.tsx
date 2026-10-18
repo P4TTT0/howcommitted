@@ -181,12 +181,11 @@ export function Controls({
           type="button"
           className={`${button} px-3 md:px-4`}
           aria-pressed={muted}
-          aria-label="Mute"
           aria-keyshortcuts={SHORTCUT_KEYS.mute}
           title="Mute (M)"
           onClick={onMute}
         >
-          <span aria-hidden="true">{muted ? "Sound off" : "Sound on"}</span>
+          {muted ? "Sound off" : "Sound on"}
         </button>
         <button
           ref={nextRef}

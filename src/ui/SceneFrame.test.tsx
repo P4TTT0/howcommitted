@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ReadoutBox, SceneFrame } from "./SceneFrame";
+import { ReadoutBox, SceneFrame, ScenePositionContext } from "./SceneFrame";
 
 describe("SceneFrame", () => {
   it("renders the header, the title and the content", () => {
@@ -21,6 +21,17 @@ describe("SceneFrame", () => {
       </SceneFrame>,
     );
     expect(html).not.toContain("<h2");
+  });
+});
+
+describe("SceneFrame position", () => {
+  it("prefixes the header with the scene position when provided", () => {
+    const html = renderToStaticMarkup(
+      <ScenePositionContext value={{ index: 4, count: 9 }}>
+        <SceneFrame sceneLabel="Big numbers">x</SceneFrame>
+      </ScenePositionContext>,
+    );
+    expect(html).toContain("Scene 5 of 9 · Big numbers");
   });
 });
 

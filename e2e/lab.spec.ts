@@ -7,7 +7,7 @@ test("lab renders the start button without producing sound", async ({
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Mute" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Sound/ })).toBeVisible();
 });
 
 test("lab previews one scene on its own with ?scene=", async ({ page }) => {

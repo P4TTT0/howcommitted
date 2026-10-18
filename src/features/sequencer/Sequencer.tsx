@@ -10,6 +10,7 @@ import {
 } from "react";
 import { type ClockStatus, PlaybackClock } from "@/playback/clock";
 import { SoundEngine } from "@/playback/sound/engine";
+import { ScenePositionContext } from "@/ui/SceneFrame";
 import { ScreenMain } from "@/ui/ScreenMain";
 import { Controls, type ControlsView, STAGE_BOTTOM_CLASS } from "./Controls";
 import {
@@ -302,7 +303,9 @@ export function Sequencer({
             ref={stageRef}
             className="absolute inset-0"
           >
-            {scene.instance.view}
+            <ScenePositionContext value={{ index: seq.index, count }}>
+              {scene.instance.view}
+            </ScenePositionContext>
           </div>
         )}
         {finished && (

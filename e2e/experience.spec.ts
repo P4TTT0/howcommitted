@@ -127,7 +127,7 @@ test("search shows a preview, then the click opens the experience", async ({
   // Audio was unlocked by the landing click, so the scene starts by itself.
   await expect(pauseButton(page)).toBeEnabled();
   await expect(page.getByRole("button", { name: "Pause" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Mute" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Sound/ })).toBeVisible();
 });
 
 test("pressing Enter on a found user starts the experience", async ({
@@ -286,7 +286,7 @@ test("moving to another scene plays it, and mute carries over", async ({
   await page.goto("/ada");
   await startButton(page).click();
   await expect(pauseButton(page)).toBeEnabled();
-  await page.getByRole("button", { name: "Mute" }).click();
+  await page.getByRole("button", { name: /^Sound/ }).click();
   await nextButton(page).click();
 
   await expect(progress(page)).toHaveAttribute(
@@ -294,7 +294,7 @@ test("moving to another scene plays it, and mute carries over", async ({
     /^Scene 2 of /,
   );
   await expect(pauseButton(page)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Mute" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: /^Sound/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
