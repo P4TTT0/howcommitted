@@ -66,8 +66,9 @@ test("Play loads each history in order, then plays the race and the finale witho
   await expect(lanes.nth(2)).toContainText("@linus");
   await expect(page.getByRole("button", { name: "Pause" })).toBeEnabled();
 
-  // The same controls as solo: Next moves on to the finale.
-  await page.getByRole("button", { name: /^Next/ }).click();
+  // The same controls as solo: Next moves on, scene by scene, to the finale.
+  const nextScene = page.getByRole("button", { name: /^Next/ });
+  while (await nextScene.isEnabled()) await nextScene.click();
   await expect(
     page.getByText(
       "Contributions are not productivity. This is rhythm, not value.",

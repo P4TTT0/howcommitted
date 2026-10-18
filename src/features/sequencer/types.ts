@@ -27,7 +27,12 @@ import type { SoundEngine } from "@/playback/sound/engine";
  */
 
 /** One developer in a versus run. */
-export type VersusEntry = { login: string; model: HistoryPlan };
+export type VersusEntry = {
+  login: string;
+  model: HistoryPlan;
+  /** The full payload (languages, reviews...); absent when only the plan is known. */
+  history?: History | null;
+};
 
 /** Everything a scene may read. Scenes never fetch. */
 export type SceneData = {
