@@ -17,7 +17,10 @@ function yScale(peak: number) {
     .range([CHART_HEIGHT - PADDING, PADDING]);
 }
 
-const xScale = scaleLinear().domain([0, 1]).range([0, CHART_WIDTH]);
+/** Maps a progress through the days to a 0..1 horizontal position. */
+export type XOf = (progress: number) => number;
+
+const toX = (x: number) => x * CHART_WIDTH;
 
 /** Splits the points where a step breaks the line. */
 function segments(points: readonly LinePoint[]): LinePoint[][] {
@@ -31,10 +34,10 @@ function segments(points: readonly LinePoint[]): LinePoint[][] {
 }
 
 /** SVG path of the real cumulative line: solid, broken wherever a step sits. */
-export function linePath(plan: Plan): string {
+export function linePath(plan: Plan, xOf: XOf): string {
   const y = yScale(plan.peak);
   const draw = line<LinePoint>()
-    .x((point) => xScale(point.progress))
+    .x((point) => toX(xOf(point.progress)))
     .y((point) => y(point.total));
   return segments(plan.linePoints)
     .map((segment) => draw(segment) ?? "")
@@ -42,11 +45,11 @@ export function linePath(plan: Plan): string {
 }
 
 /** SVG path of the unattributed steps: drawn dashed, apart from the real line. */
-export function stepPath(plan: Plan): string {
+export function stepPath(plan: Plan, xOf: XOf): string {
   const y = yScale(plan.peak);
   return plan.steps
     .map((step) => {
-      const x = xScale(step.progress);
+      const x = toX(xOf(step.progress));
       return `M${x},${y(step.from)} L${x},${y(step.to)}`;
     })
     .join(" ");
@@ -58,9 +61,13 @@ export function topPercent(plan: Plan, runningTotal: number): number {
 }
 
 /** Where a step's label sits: beside the middle of its segment. */
-export function stepLabelPosition(plan: Plan, step: UnattributedStep) {
+export function stepLabelPosition(
+  plan: Plan,
+  step: UnattributedStep,
+  xOf: XOf,
+) {
   return {
-    leftPercent: step.progress * 100,
+    leftPercent: xOf(step.progress) * 100,
     topPercent: topPercent(plan, (step.from + step.to) / 2),
   };
 }

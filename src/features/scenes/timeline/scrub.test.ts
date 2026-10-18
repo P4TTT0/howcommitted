@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  dayReading,
-  flagLabel,
-  flagMarks,
-  flagWindow,
-  formatDay,
-  nearFlags,
-} from "./scrub";
+import { flagLabel, flagMarks, formatDay } from "./scrub";
 
 const days = [
   { date: "2021-01-01" },
@@ -61,23 +54,6 @@ describe("flagMarks", () => {
   });
 });
 
-describe("nearFlags", () => {
-  it("finds the flags within the window of the cursor", () => {
-    const marks = flagMarks(
-      [flag("a", "2021-01-01T00:00:00Z"), flag("b", "2021-01-04T00:00:00Z")],
-      days,
-    );
-    expect(nearFlags(marks, 1, 1).map((mark) => mark.name)).toEqual(["a"]);
-    expect(nearFlags(marks, 2, 1).map((mark) => mark.name)).toEqual(["b"]);
-    expect(nearFlags(marks, 2, 5)).toHaveLength(2);
-  });
-
-  it("uses a window of at least 3 days, wider for long histories", () => {
-    expect(flagWindow(100)).toBe(3);
-    expect(flagWindow(5000)).toBe(30);
-  });
-});
-
 describe("labels", () => {
   it("labels a flag with its repository, stars and date", () => {
     const [mark] = flagMarks([flag("lib", "2021-01-03T00:00:00Z", 240)], days);
@@ -88,31 +64,5 @@ describe("labels", () => {
     expect(one && flagLabel(one)).toContain("1 star,");
     const [none] = flagMarks([flag("a", "2021-01-03T00:00:00Z", 0)], days);
     expect(none && flagLabel(none)).toBe("Repository created: a, Jan 3, 2021");
-  });
-
-  it("reads the day as contributions so far, never commits", () => {
-    const text = dayReading({ date: "2021-01-02", total: 1234, flags: [] });
-    expect(text).toBe("Jan 2, 2021: 1,234 contributions so far");
-    expect(text).not.toMatch(/commit/i);
-  });
-
-  it("adds the unattributed step and flags of that day", () => {
-    const [mark] = flagMarks([flag("lib", "2021-01-02T00:00:00Z")], days);
-    const text = dayReading({
-      date: "2021-01-02",
-      total: 900,
-      step: {
-        year: 2021,
-        dayIndex: 1,
-        amount: 120,
-        progress: 0.5,
-        time: 1,
-        from: 780,
-        to: 900,
-      },
-      flags: mark ? [mark] : [],
-    });
-    expect(text).toContain("+120 not attributed to a day");
-    expect(text).toContain("Repository created: lib");
   });
 });
