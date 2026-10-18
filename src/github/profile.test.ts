@@ -59,7 +59,11 @@ const yearBody = (commits: number) => ({
       q1: {
         commitContributionsByRepository: [
           {
-            repository: { nameWithOwner: "ada/engine", isPrivate: false },
+            repository: {
+              nameWithOwner: "ada/engine",
+              isPrivate: false,
+              visibility: "PUBLIC",
+            },
             contributions: {
               nodes: [
                 { occurredAt: "2025-02-01T00:00:00Z", commitCount: commits },

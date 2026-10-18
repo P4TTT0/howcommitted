@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { YearTotals } from "./types";
 import {
   buildYearSummary,
+  mergeRepoCommits,
   yearBlocks,
   yearBlocksInRange,
 } from "./year-summary";
@@ -71,5 +72,33 @@ describe("yearBlocksInRange", () => {
 
   it("is empty for an inverted range", () => {
     expect(yearBlocksInRange([], 2024, 2022)).toEqual([]);
+  });
+});
+
+describe("mergeRepoCommits", () => {
+  it("adds commits and days of a repo across quarter windows", () => {
+    expect(
+      mergeRepoCommits([
+        {
+          repo: "b/two",
+          nodes: [
+            { occurredAt: "2023-01-05T00:00:00Z", commitCount: 2 },
+            { occurredAt: "2023-01-06T00:00:00Z", commitCount: 0 },
+          ],
+        },
+        {
+          repo: "a/one",
+          nodes: [{ occurredAt: "2023-02-01T00:00:00Z", commitCount: 1 }],
+        },
+        {
+          repo: "b/two",
+          nodes: [{ occurredAt: "2023-04-02T00:00:00Z", commitCount: 3 }],
+        },
+        { repo: "c/none", nodes: [] },
+      ]),
+    ).toEqual([
+      { repo: "a/one", commits: 1, days: 1 },
+      { repo: "b/two", commits: 5, days: 2 },
+    ]);
   });
 });

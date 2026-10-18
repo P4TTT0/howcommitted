@@ -24,28 +24,25 @@ export type RawYear = {
   totalContributions: number;
 };
 
-/** Merges per-window entries of the same repo into per-day counts, sorted by repo then date. */
+/**
+ * Merges per-window entries of the same repo into yearly totals, sorted by
+ * repo. Quarter windows never share a date, so day counts add up exactly.
+ */
 export function mergeRepoCommits(
   entries: { repo: string; nodes: CommitContribution[] }[],
 ): RepoCommits[] {
-  const byRepo = new Map<string, Map<string, number>>();
+  const byRepo = new Map<string, RepoCommits>();
   for (const { repo, nodes } of entries) {
-    const days = byRepo.get(repo) ?? new Map<string, number>();
-    for (const { occurredAt, commitCount } of nodes) {
+    const total = byRepo.get(repo) ?? { repo, commits: 0, days: 0 };
+    for (const { commitCount } of nodes) {
       if (commitCount <= 0) continue;
-      const date = occurredAt.slice(0, 10);
-      days.set(date, (days.get(date) ?? 0) + commitCount);
+      total.commits += commitCount;
+      total.days += 1;
     }
-    byRepo.set(repo, days);
+    byRepo.set(repo, total);
   }
-  return [...byRepo]
-    .filter(([, days]) => days.size > 0)
-    .map(([repo, days]) => ({
-      repo,
-      days: [...days]
-        .map(([date, count]) => ({ date, count }))
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    }))
+  return [...byRepo.values()]
+    .filter((r) => r.commits > 0)
     .sort((a, b) => a.repo.localeCompare(b.repo));
 }
 

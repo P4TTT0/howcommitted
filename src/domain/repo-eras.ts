@@ -22,10 +22,6 @@ type YearRepos = { year: number; repoCommits: RepoCommits[] };
 
 const TOP_REPOS = 5;
 
-function sumCommits(repo: RepoCommits): number {
-  return repo.days.reduce((sum, d) => sum + d.count, 0);
-}
-
 /** More commits first, then more days, then name, so ties are deterministic. */
 function rankCompare(
   a: { repo: string; commits: number; days: number },
@@ -38,33 +34,22 @@ function rankCompare(
 
 /** Commits to public repositories across all years, most commits first. */
 function rankRepos(years: YearRepos[]): MainRepo[] {
-  const byRepo = new Map<
-    string,
-    { commits: number; dates: Set<string>; years: number[] }
-  >();
+  const byRepo = new Map<string, MainRepo>();
   for (const { year, repoCommits } of years) {
-    for (const repo of repoCommits) {
-      const entry = byRepo.get(repo.repo) ?? {
-        commits: 0,
-        dates: new Set<string>(),
-        years: [],
-      };
-      entry.commits += sumCommits(repo);
-      for (const d of repo.days) entry.dates.add(d.date);
-      entry.years.push(year);
-      byRepo.set(repo.repo, entry);
+    for (const { repo, commits, days } of repoCommits) {
+      if (commits <= 0) continue;
+      const entry = byRepo.get(repo);
+      // Days are distinct within a year and years never overlap, so they add up.
+      byRepo.set(repo, {
+        repo,
+        commits: (entry?.commits ?? 0) + commits,
+        days: (entry?.days ?? 0) + days,
+        firstYear: Math.min(entry?.firstYear ?? year, year),
+        lastYear: Math.max(entry?.lastYear ?? year, year),
+      });
     }
   }
-  return [...byRepo]
-    .map(([repo, e]) => ({
-      repo,
-      commits: e.commits,
-      days: e.dates.size,
-      firstYear: Math.min(...e.years),
-      lastYear: Math.max(...e.years),
-    }))
-    .filter((r) => r.commits > 0)
-    .sort(rankCompare);
+  return [...byRepo.values()].sort(rankCompare);
 }
 
 /** The public repository with the most commits, or null without any. */
@@ -99,12 +84,7 @@ export function eras(
   return [...years]
     .sort((a, b) => a.year - b.year)
     .flatMap(({ year, repoCommits }) => {
-      const [top] = repoCommits
-        .map((r) => ({
-          repo: r.repo,
-          commits: sumCommits(r),
-          days: r.days.length,
-        }))
+      const [top] = [...repoCommits]
         .filter((r) => r.commits > 0)
         .sort(rankCompare);
       if (!top) return [];

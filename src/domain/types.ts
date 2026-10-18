@@ -20,14 +20,15 @@ export type DailyCommits = {
 };
 
 /**
- * Commits to one public repository, per day. `repo` is `owner/name`. Private
- * repositories never appear here: their names must not reach the cache or the
- * browser, so private work stays an aggregate count only.
+ * Commits to one public repository in one year. `repo` is `owner/name`.
+ * Private repositories never appear here: their names must not reach the
+ * cache or the browser, so private work stays an aggregate count only.
  */
 export type RepoCommits = {
   repo: string;
-  /** Days with at least one commit, sorted by date (UTC). */
-  days: { date: string; count: number }[];
+  commits: number;
+  /** Distinct days of the year with at least one commit to it. */
+  days: number;
 };
 
 /** Contributions of one day from the GitHub calendar (all types, public and shared private). */

@@ -2,31 +2,20 @@ import { describe, expect, it } from "vitest";
 import { eras, mainRepo, topRepos } from "./repo-eras";
 import type { Repo, RepoCommits } from "./types";
 
-const repo = (name: string, days: [string, number][]): RepoCommits => ({
+const repo = (name: string, commits: number, days: number): RepoCommits => ({
   repo: name,
-  days: days.map(([date, count]) => ({ date, count })),
+  commits,
+  days,
 });
 
 const years = [
   {
     year: 2022,
-    repoCommits: [
-      repo("ada/engine", [
-        ["2022-03-01", 5],
-        ["2022-03-02", 1],
-      ]),
-      repo("org/lib", [["2022-04-01", 2]]),
-    ],
+    repoCommits: [repo("ada/engine", 6, 2), repo("org/lib", 2, 1)],
   },
   {
     year: 2023,
-    repoCommits: [
-      repo("ada/engine", [["2023-05-01", 3]]),
-      repo("org/lib", [
-        ["2023-06-01", 3],
-        ["2023-06-02", 3],
-      ]),
-    ],
+    repoCommits: [repo("ada/engine", 3, 1), repo("org/lib", 6, 2)],
   },
   { year: 2024, repoCommits: [] },
 ];
@@ -66,9 +55,7 @@ describe("mainRepo and topRepos", () => {
 
   it("handles a single day", () => {
     expect(
-      mainRepo([
-        { year: 2024, repoCommits: [repo("a/b", [["2024-02-29", 1]])] },
-      ]),
+      mainRepo([{ year: 2024, repoCommits: [repo("a/b", 1, 1)] }]),
     ).toEqual({
       repo: "a/b",
       commits: 1,
@@ -83,15 +70,9 @@ describe("mainRepo and topRepos", () => {
       {
         year: 2024,
         repoCommits: [
-          repo("z/one-day", [["2024-01-01", 4]]),
-          repo("y/two-days", [
-            ["2024-01-01", 2],
-            ["2024-01-02", 2],
-          ]),
-          repo("x/two-days", [
-            ["2024-01-03", 2],
-            ["2024-01-04", 2],
-          ]),
+          repo("z/one-day", 4, 1),
+          repo("y/two-days", 4, 2),
+          repo("x/two-days", 4, 2),
         ],
       },
     ];
@@ -107,7 +88,7 @@ describe("mainRepo and topRepos", () => {
       {
         year: 2024,
         repoCommits: Array.from({ length: 7 }, (_, i) =>
-          repo(`a/r${i}`, [["2024-01-01", i + 1]]),
+          repo(`a/r${i}`, i + 1, 1),
         ),
       },
     ];
@@ -144,10 +125,7 @@ describe("eras", () => {
       [
         {
           year: 2024,
-          repoCommits: [
-            repo("b/x", [["2024-01-01", 2]]),
-            repo("a/x", [["2024-01-01", 2]]),
-          ],
+          repoCommits: [repo("b/x", 2, 1), repo("a/x", 2, 1)],
         },
       ],
       [],
