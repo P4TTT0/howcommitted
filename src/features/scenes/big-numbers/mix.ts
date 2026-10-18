@@ -46,14 +46,23 @@ function rowOf(mix: RoleMix): MixRow {
   };
 }
 
-/** "2016: 92% commits, 4% pull requests. 2026: 57% commits, 22% reviews." */
-function describe(row: MixRow): string {
-  const parts = row.segments
-    .filter((segment) => segment.percent > 0)
-    .sort((a, b) => b.share - a.share)
-    .slice(0, 2)
-    .map((segment) => `${segment.percent}% ${segment.label.toLowerCase()}`);
-  return `${row.year}: ${parts.join(", ")}.`;
+/** The segments worth stating or drawing: those that round to at least 1%. */
+export function visibleSegments(row: MixRow): MixSegment[] {
+  return row.segments.filter((segment) => segment.percent > 0);
+}
+
+/**
+ * "2016: 92% commits, 4% pull requests". With `limit`, only the largest
+ * shares; the same text feeds the spoken reading and the summary sentence.
+ */
+export function mixReading(row: MixRow, limit?: number): string {
+  const shown = visibleSegments(row);
+  const parts = (
+    limit === undefined
+      ? shown
+      : [...shown].sort((a, b) => b.share - a.share).slice(0, limit)
+  ).map((segment) => `${segment.percent}% ${segment.label.toLowerCase()}`);
+  return `${row.year}: ${parts.join(", ")}`;
 }
 
 /**
@@ -70,13 +79,8 @@ export function planMix(history: History): MixPlan | null {
   if (!first || !last || first.year === last.year) return null;
 
   const rows: [MixRow, MixRow] = [rowOf(first), rowOf(last)];
-  return { rows, summary: `${describe(rows[0])} ${describe(rows[1])}` };
-}
-
-/** Spoken reading of one row of the strip. */
-export function mixReading(row: MixRow): string {
-  const parts = row.segments
-    .filter((segment) => segment.percent > 0)
-    .map((segment) => `${segment.percent}% ${segment.label.toLowerCase()}`);
-  return `${row.year}: ${parts.join(", ")}`;
+  return {
+    rows,
+    summary: `${mixReading(rows[0], 2)}. ${mixReading(rows[1], 2)}.`,
+  };
 }
