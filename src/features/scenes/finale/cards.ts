@@ -1,4 +1,5 @@
-import { records } from "@/domain/records";
+import type { History } from "@/domain/history";
+import { type Records, records } from "@/domain/records";
 import { planMainRepo } from "@/features/scenes/main-repo/plan";
 import { planWeekShape } from "@/features/scenes/week-shape/plan";
 import { formatCount } from "@/features/sequencer/model/format";
@@ -65,6 +66,12 @@ const plural = (count: number, one: string, many: string) =>
 /** Bar colors for the poster card; they all read on the Ultramarine ground. */
 const POSTER_BARS = [neutrals.paper, blocks.signal, blocks.pink, blocks.safety];
 
+/** The honest private share as a card note list: empty when there is none. */
+function privateExtra(privateContributions: number): string[] {
+  const note = privateNote(privateContributions);
+  return note ? [note] : [];
+}
+
 function base(
   data: SceneData,
   id: CardBase["id"],
@@ -85,7 +92,15 @@ function base(
   };
 }
 
-function posterCard(data: SceneData): PosterCard | null {
+/** "Longest streak: 12 days", or null when there is none to state. */
+function streakFact(history: History): CardFact | null {
+  const length = history.longestStreak.length;
+  return length > 0
+    ? { label: "Longest streak", value: plural(length, "day", "days") }
+    : null;
+}
+
+function posterCard(data: SceneData, found: Records | null): PosterCard | null {
   const { model, history } = data;
   const { firstYear, lastYear } = model;
   if (firstYear === null || lastYear === null) return null;
@@ -101,18 +116,13 @@ function posterCard(data: SceneData): PosterCard | null {
 
   const facts: CardFact[] = [];
   if (history) {
-    const streak = history.longestStreak.length;
-    if (streak > 0) {
+    const streak = streakFact(history);
+    if (streak) facts.push(streak);
+    if (found?.busiestDay) {
       facts.push({
-        label: "Longest streak",
-        value: plural(streak, "day", "days"),
+        label: "Busiest day",
+        value: formatCount(found.busiestDay.count),
       });
-    }
-    const busiest = records(
-      history.years.flatMap((year) => year.dailyContributions),
-    ).busiestDay;
-    if (busiest) {
-      facts.push({ label: "Busiest day", value: formatCount(busiest.count) });
     }
     const language = history.languages.find((entry) => !entry.isOther);
     if (language) facts.push({ label: "Built with", value: language.name });
@@ -121,7 +131,6 @@ function posterCard(data: SceneData): PosterCard | null {
   const range =
     firstYear === lastYear ? `${firstYear}` : `${firstYear} — ${lastYear}`;
   const total = formatCount(model.plan.total);
-  const extra = privateNote(model.privateContributions);
   return {
     ...base(
       data,
@@ -133,7 +142,7 @@ function posterCard(data: SceneData): PosterCard | null {
         accent: blocks.signal,
       },
       `Poster card for @${data.login}: ${total} contributions, ${range}.`,
-      extra ? [extra] : [],
+      privateExtra(model.privateContributions),
     ),
     kind: "poster",
     range,
@@ -144,22 +153,14 @@ function posterCard(data: SceneData): PosterCard | null {
   };
 }
 
-function rhythmCard(data: SceneData): RhythmCard | null {
-  if (!data.history) return null;
+function rhythmCard(data: SceneData, found: Records | null): RhythmCard | null {
+  if (!data.history || !found) return null;
   const week = planWeekShape(data.history);
   if (!week) return null;
 
   const facts: CardFact[] = [];
-  const found = records(
-    data.history.years.flatMap((year) => year.dailyContributions),
-  );
-  const streak = data.history.longestStreak.length;
-  if (streak > 0) {
-    facts.push({
-      label: "Longest streak",
-      value: plural(streak, "day", "days"),
-    });
-  }
+  const streak = streakFact(data.history);
+  if (streak) facts.push(streak);
   if (found.longestQuiet) {
     facts.push({
       label: "Came back after",
@@ -177,6 +178,9 @@ function rhythmCard(data: SceneData): RhythmCard | null {
         accent: blocks.signal,
       },
       `Rhythm card for @${data.login}: ${week.archetype}.`,
+      // The streak, weekdays and quiet stretch come from the calendar, which
+      // includes shared private contributions: say so, as the poster does.
+      privateExtra(data.model.privateContributions),
     ),
     kind: "rhythm",
     kicker: "My rhythm",
@@ -229,7 +233,27 @@ function erasCard(data: SceneData): ErasCard | null {
  * browser: nothing here is fetched, stored or cached.
  */
 export function buildShareCards(data: SceneData): ShareCard[] {
-  return [posterCard(data), rhythmCard(data), erasCard(data)].filter(
-    (card): card is ShareCard => card !== null,
-  );
+  const found = data.history
+    ? records(data.history.years.flatMap((year) => year.dailyContributions))
+    : null;
+  return [
+    posterCard(data, found),
+    rhythmCard(data, found),
+    erasCard(data),
+  ].filter((card): card is ShareCard => card !== null);
+}
+
+const built = new WeakMap<object, ShareCard[]>();
+
+/**
+ * `buildShareCards`, once per plan: the finale renders again for unrelated
+ * reasons, and the picker must keep receiving the same array to avoid
+ * redrawing its canvases.
+ */
+export function shareCardsFor(data: SceneData): ShareCard[] {
+  const known = built.get(data.model);
+  if (known) return known;
+  const cards = buildShareCards(data);
+  built.set(data.model, cards);
+  return cards;
 }

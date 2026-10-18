@@ -58,16 +58,26 @@ describe("buildShareCards", () => {
     expect(poster.bars).toHaveLength(3);
   });
 
-  it("never calls the calendar commits", () => {
-    const text = JSON.stringify(
-      buildShareCards(dataFor()).flatMap((card) =>
-        card.kind === "eras"
-          ? [card.alt, card.kicker, card.heading, card.notes]
-          : [card.alt, card.notes],
-      ),
-    );
-    expect(text).not.toMatch(/\bcommits\b/i);
-    expect(text).not.toMatch(/best|winner|most productive|percentile/i);
+  it("never calls the calendar commits or judges, in any string of any card", () => {
+    const strings = (value: unknown): string[] =>
+      typeof value === "string"
+        ? [value]
+        : Array.isArray(value)
+          ? value.flatMap(strings)
+          : value && typeof value === "object"
+            ? Object.values(value).flatMap(strings)
+            : [];
+    for (const card of buildShareCards(dataFor())) {
+      // Only the eras detail counts real commits, to public repositories.
+      const own = card.kind === "eras" ? { ...card, detail: "" } : card;
+      const text = strings(own).join(" | ");
+      expect(text, card.id).not.toMatch(/\bcommits?\b/i);
+      expect(text, card.id).not.toMatch(
+        /best|winner|most productive|percentile/i,
+      );
+    }
+    const eras = buildShareCards(dataFor()).find((c) => c.id === "eras");
+    expect(eras?.kind === "eras" && eras.detail).toMatch(/public commits/);
   });
 
   it("states the private share on the poster only when there is one", () => {
@@ -103,5 +113,73 @@ describe("buildShareCards", () => {
     expect(buildShareCards(labSceneData()).map((card) => card.id)).toEqual([
       "poster",
     ]);
+  });
+
+  it("states the private share on the rhythm card too", () => {
+    const years = [
+      makeYear(2023, steadyDays(2023, 2, 2), { privateContributions: 40 }),
+      makeYear(2024, steadyDays(2024, 2, 2)),
+    ];
+    const history = makeHistory("ada", years);
+    const rhythm = buildShareCards({
+      login: "ada",
+      model: planFromHistory(history),
+      history,
+    }).find((card) => card.id === "rhythm");
+    expect(rhythm?.notes).toContain("Includes 40 private contributions.");
+  });
+
+  it("uses the singular for a single contribution", () => {
+    const history = makeHistory("ada", [
+      makeYear(2024, [{ date: "2024-03-01", count: 1 }]),
+    ]);
+    const [poster] = buildShareCards({
+      login: "ada",
+      model: planFromHistory(history),
+      history,
+    });
+    expect(poster?.kind === "poster" && poster.headline).toBe("Contribution.");
+  });
+
+  it("writes a single year as one year, not a range", () => {
+    const data = dataFor();
+    const history = makeHistory("ada", [
+      makeYear(2024, steadyDays(2024, 2, 2)),
+    ]);
+    const [poster] = buildShareCards({
+      ...data,
+      model: planFromHistory(history),
+      history,
+    });
+    expect(poster?.kind === "poster" && poster.range).toBe("2024");
+  });
+
+  it("leaves out the streak when there is none", () => {
+    const [poster] = buildShareCards(
+      dataFor({ longestStreak: { length: 0, start: null, end: null } }),
+    );
+    const facts = poster?.kind === "poster" ? poster.facts : [];
+    expect(facts.map((fact) => fact.label)).not.toContain("Longest streak");
+  });
+
+  it("does not claim a language when only Other is known", () => {
+    const [poster] = buildShareCards(
+      dataFor({
+        languages: [{ name: "Other", size: 10, share: 1, isOther: true }],
+      }),
+    );
+    const facts = poster?.kind === "poster" ? poster.facts : [];
+    expect(facts.map((fact) => fact.label)).not.toContain("Built with");
+  });
+
+  it("keeps a 39-character login whole in the filename and address", () => {
+    const login = "a".repeat(39);
+    const data = dataFor();
+    const cards = buildShareCards({ ...data, login });
+    expect(cards.length).toBeGreaterThan(0);
+    for (const card of cards) {
+      expect(card.filename).toBe(`committed-${login}-${card.id}`);
+      expect(card.address).toBe(`howcommitted.com/${login}`);
+    }
   });
 });

@@ -26,7 +26,7 @@ const MIN_SECONDS = 4;
 export const MAX_ERAS = 8;
 /** Names up to this long fit the giant type at full size. */
 const FULL_SIZE_NAME = 9;
-const MIN_NAME_SCALE = 0.35;
+export const MIN_NAME_SCALE = 0.35;
 /** Highest scale degree the ticks reach (see playback/pitch). */
 const MAX_DEGREE = 10;
 

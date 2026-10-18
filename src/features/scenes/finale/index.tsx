@@ -1,5 +1,5 @@
 import type { FinaleDefinition } from "@/features/sequencer/types";
-import { buildShareCards } from "./cards";
+import { shareCardsFor } from "./cards";
 import { EndCard } from "./EndCard";
 
 /**
@@ -21,7 +21,7 @@ export const endCardFinale: FinaleDefinition = {
         lastYear={lastYear}
         yearBlocks={model.yearBlocks}
         note={model.note}
-        cards={buildShareCards(data)}
+        cards={shareCardsFor(data)}
         privateContributions={model.privateContributions}
         versusEnabled={versusEnabled}
         onReplay={replay}

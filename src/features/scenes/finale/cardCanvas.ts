@@ -1,4 +1,15 @@
+import { MIN_NAME_SCALE } from "@/features/scenes/main-repo/plan";
 import { neutrals } from "@/ui/tokens";
+import {
+  type CardFonts,
+  type Ctx,
+  drawText,
+  ellipsize,
+  fitText,
+  setFont,
+  type TextStyle,
+  wrap,
+} from "./cardPrimitives";
 import {
   CARD_SIZE,
   type ErasCard,
@@ -7,193 +18,136 @@ import {
   type ShareCard,
 } from "./cards";
 
-/** The two chosen fonts, as CSS family lists (next/font hashes the names). */
-export type CardFonts = { display: string; mono: string };
-
 /**
- * Cards are laid out on a 540 x 960 grid and scaled, so a thumbnail and the
- * saved image are the same drawing.
+ * The three card layouts. Cards are laid out on a grid half the saved size and
+ * scaled, so a thumbnail and the saved image are the same drawing. Every
+ * vertical offset below comes from the named constants, and each block's
+ * height is computed from the same numbers it is drawn with.
  */
-const W = 540;
-const H = 960;
+const GRID = 2;
+const W = CARD_SIZE.width / GRID;
+const H = CARD_SIZE.height / GRID;
 const PAD_X = 36;
 const PAD_Y = 40;
 const INNER = W - PAD_X * 2;
 
-type Ctx = CanvasRenderingContext2D;
-type Ink = Pick<ShareCard, "foreground" | "accent">;
+/** Nothing but the header sits above this line. */
+const HEADER_BOTTOM = 96;
+const HEADER_BASELINE = PAD_Y + 24;
+/** Gap kept between stacked blocks. */
+const BLOCK_GAP = 24;
+/** Baseline of a Big Shoulders line sits this share of its size below its top. */
+const CAP_HEIGHT = 0.8;
+/** Advance between stacked lines of the giant type, as a share of its size. */
+const LINE_ADVANCE = 0.86;
+/** The tallest a card's bar chart gets, and the least it may shrink to. */
+const CHART_HEIGHT = 190;
+const MIN_CHART_HEIGHT = 48;
+/** Distance from a mono label's top to its baseline. */
+const LABEL_ASCENT = 14;
+/** Space between a label and the giant type under it. */
+const LABEL_TO_TYPE = 24;
 
-/** The families the page already loaded, read from the CSS variables. */
-export function readCardFonts(): CardFonts {
-  const style = getComputedStyle(document.documentElement);
-  const read = (name: string, fallback: string) =>
-    style.getPropertyValue(name).trim() || fallback;
-  return {
-    display: read("--font-big-shoulders", "sans-serif"),
-    mono: read("--font-martian-mono", "monospace"),
-  };
-}
+const FOOTER_LINE = 16;
+const ROW_HEIGHT = 40;
+const ROW_GAP = 6;
 
-/** Resolves once both fonts can draw at the weights the cards use. */
-export async function loadCardFonts(fonts: CardFonts): Promise<void> {
-  await Promise.all([
-    document.fonts.load(`900 40px ${fonts.display}`),
-    document.fonts.load(`800 40px ${fonts.display}`),
-    document.fonts.load(`500 12px ${fonts.mono}`),
-    document.fonts.load(`700 12px ${fonts.mono}`),
-  ]);
-}
-
-type TextStyle = {
-  family: string;
-  size: number;
-  weight?: number;
-  color: string;
-  align?: CanvasTextAlign;
-  /** Mono labels: 87.5% width and a little tracking, as everywhere else. */
-  mono?: boolean;
-  upper?: boolean;
-};
-
-function setFont(ctx: Ctx, style: TextStyle) {
-  ctx.font = `${style.weight ?? 400} ${style.size}px ${style.family}`;
-  ctx.fillStyle = style.color;
-  ctx.textAlign = style.align ?? "left";
-  ctx.textBaseline = "alphabetic";
-  // Both are best effort: a browser without them draws the normal width.
-  ctx.fontStretch = style.mono ? "semi-condensed" : "normal";
-  ctx.letterSpacing = style.mono && style.upper ? "0.6px" : "0px";
-}
-
-function text(
-  ctx: Ctx,
-  value: string,
-  x: number,
-  y: number,
-  style: TextStyle,
-): number {
-  setFont(ctx, style);
-  ctx.fillText(style.upper ? value.toUpperCase() : value, x, y);
-  return ctx.measureText(style.upper ? value.toUpperCase() : value).width;
-}
-
-/** The largest size, down from `size`, at which `value` fits `maxWidth`. */
-function fitSize(
-  ctx: Ctx,
-  value: string,
-  maxWidth: number,
+const display = (
+  fonts: CardFonts,
   size: number,
-  style: TextStyle,
-): number {
-  setFont(ctx, { ...style, size });
-  const width = ctx.measureText(value).width;
-  return width <= maxWidth ? size : Math.floor((size * maxWidth) / width);
-}
+  color: string,
+  weight = 900,
+): TextStyle => ({ family: fonts.display, size, weight, color });
 
-function ellipsize(ctx: Ctx, value: string, maxWidth: number): string {
-  if (ctx.measureText(value).width <= maxWidth) return value;
-  let end = value.length;
-  while (end > 1 && ctx.measureText(`${value.slice(0, end)}…`).width > maxWidth)
-    end -= 1;
-  return `${value.slice(0, end)}…`;
-}
+const mono = (
+  fonts: CardFonts,
+  size: number,
+  color: string,
+  weight = 500,
+): TextStyle => ({ family: fonts.mono, size, weight, color, mono: true });
 
-/** Greedy word wrap for the mono notes. */
-function wrap(ctx: Ctx, value: string, maxWidth: number): string[] {
-  const lines: string[] = [];
-  let line = "";
-  for (const word of value.split(" ")) {
-    const next = line ? `${line} ${word}` : word;
-    if (line && ctx.measureText(next).width > maxWidth) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = next;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
+const label = (fonts: CardFonts, color: string, size = 13): TextStyle => ({
+  ...mono(fonts, size, color),
+  upper: true,
+});
 
 function header(ctx: Ctx, card: ShareCard, fonts: CardFonts) {
-  text(ctx, "Committed", PAD_X, PAD_Y + 24, {
-    family: fonts.display,
-    size: 30,
-    weight: 900,
-    color: card.foreground,
-    upper: true,
-  });
-  text(ctx, `@${card.login}`, W - PAD_X, PAD_Y + 24, {
-    family: fonts.mono,
-    size: 12,
-    weight: 500,
-    color: card.foreground,
-    align: "right",
-    mono: true,
-  });
+  const name = { ...display(fonts, 30, card.foreground), upper: true };
+  drawText(ctx, "Committed", PAD_X, HEADER_BASELINE, name);
+  const login = {
+    ...mono(fonts, 12, card.foreground),
+    align: "right" as const,
+  };
+  // The wordmark keeps its room; a long login is cut, never overlapped.
+  setFont(ctx, name);
+  const room = INNER - ctx.measureText("COMMITTED").width - BLOCK_GAP;
+  drawText(
+    ctx,
+    ellipsize(ctx, `@${card.login}`, room, login),
+    W - PAD_X,
+    HEADER_BASELINE,
+    login,
+  );
 }
 
 /** Notes then the address, ending at the bottom padding. Returns its top. */
 function footer(ctx: Ctx, card: ShareCard, fonts: CardFonts): number {
-  const note: TextStyle = {
-    family: fonts.mono,
-    size: 11,
-    weight: 500,
-    color: card.foreground,
-    mono: true,
-  };
-  setFont(ctx, note);
-  const lines = card.notes.flatMap((value) => wrap(ctx, value, INNER));
-  const lineHeight = 16;
-  const top = H - PAD_Y - lineHeight * (lines.length + 1) - 8;
+  const note = mono(fonts, 11, card.foreground);
+  const lines = card.notes.flatMap((value) => wrap(ctx, value, INNER, note));
+  const top = H - PAD_Y - FOOTER_LINE * (lines.length + 1) - 8;
   lines.forEach((line, index) => {
-    text(ctx, line, PAD_X, top + 12 + index * lineHeight, note);
+    drawText(ctx, line, PAD_X, top + 12 + index * FOOTER_LINE, note);
   });
-  text(ctx, card.address, PAD_X, top + 12 + lines.length * lineHeight + 8, {
-    ...note,
-    weight: 700,
-  });
+  const address = { ...note, weight: 700 };
+  drawText(
+    ctx,
+    ellipsize(ctx, card.address, INNER, address),
+    PAD_X,
+    top + 12 + lines.length * FOOTER_LINE + 8,
+    address,
+  );
   return top;
-}
-
-function label(
-  ctx: Ctx,
-  value: string,
-  x: number,
-  y: number,
-  fonts: CardFonts,
-  color: string,
-  size = 13,
-) {
-  text(ctx, value, x, y, {
-    family: fonts.mono,
-    size,
-    weight: 500,
-    color,
-    mono: true,
-    upper: true,
-  });
 }
 
 /** Top of a block of `height` centered between the header and `limit`. */
 function centeredTop(limit: number, height: number): number {
-  const headerBottom = 96;
-  return headerBottom + Math.max(0, (limit - headerBottom - height) / 2);
+  return HEADER_BOTTOM + Math.max(0, (limit - HEADER_BOTTOM - height) / 2);
+}
+
+/** Largest giant-type size, from `size`, whose block still fits `room`. */
+function sizeForRoom(
+  size: number,
+  room: number,
+  fixed: number,
+  lines: number,
+): number {
+  const perSize = CAP_HEIGHT + (lines - 1) * LINE_ADVANCE;
+  return Math.min(size, Math.max(1, Math.floor((room - fixed) / perSize)));
 }
 
 function drawPoster(ctx: Ctx, card: PosterCard, fonts: CardFonts) {
-  const bottom = footer(ctx, card, fonts) - 24;
+  const bottom = footer(ctx, card, fonts) - BLOCK_GAP;
   // Facts: label left, value right, a hairline under all but the last.
   const rowHeight = 56;
   const factsTop = bottom - card.facts.length * rowHeight;
   card.facts.forEach((fact, index) => {
     const baseline = factsTop + index * rowHeight + 38;
-    label(ctx, fact.label, PAD_X, baseline - 6, fonts, card.foreground, 12);
-    text(ctx, fact.value, W - PAD_X, baseline, {
-      family: fonts.display,
-      size: 36,
-      weight: 900,
-      color: card.foreground,
+    drawText(
+      ctx,
+      fact.label,
+      PAD_X,
+      baseline - 6,
+      label(fonts, card.foreground, 12),
+    );
+    const value = fitText(
+      ctx,
+      fact.value,
+      INNER / 2,
+      display(fonts, 36, card.foreground),
+      MIN_NAME_SCALE,
+    );
+    drawText(ctx, value.value, W - PAD_X, baseline, {
+      ...display(fonts, value.size, card.foreground),
       align: "right",
     });
     if (index < card.facts.length - 1) {
@@ -202,37 +156,51 @@ function drawPoster(ctx: Ctx, card: PosterCard, fonts: CardFonts) {
     }
   });
 
-  // One bar per year, tallest at full height, on a ruled baseline.
-  const barsBottom = factsTop - 28;
-  const barsTop = barsBottom - 190;
-  const totalStyle = {
-    family: fonts.display,
-    size: 180,
-    weight: 900,
-    color: card.foreground,
-  };
-  const size = fitSize(ctx, card.total, INNER, 180, totalStyle);
-  const heroHeight = 14 + 20 + size * 0.8 + 80;
+  // The hero: range label, the total, the headline under it.
+  const barsBottom = factsTop - BLOCK_GAP;
+  const headlineSize = 56;
+  const headlineDrop = headlineSize + BLOCK_GAP;
+  const total = fitText(
+    ctx,
+    card.total,
+    INNER,
+    display(fonts, 180, card.foreground),
+    MIN_NAME_SCALE,
+  );
+  const numberTop = LABEL_ASCENT + LABEL_TO_TYPE;
+  const heroHeight = numberTop + total.size * CAP_HEIGHT + headlineDrop;
+  const chartHeight = Math.max(
+    MIN_CHART_HEIGHT,
+    Math.min(CHART_HEIGHT, barsBottom - HEADER_BOTTOM - heroHeight - BLOCK_GAP),
+  );
+  const barsTop = barsBottom - chartHeight;
   const heroTop = centeredTop(barsTop, heroHeight);
-  label(ctx, card.range, PAD_X, heroTop + 14, fonts, card.foreground);
-  text(ctx, card.total, PAD_X, heroTop + 34 + size * 0.8, {
-    ...totalStyle,
-    size,
-  });
-  text(ctx, card.headline, PAD_X, heroTop + 34 + size * 0.8 + 80, {
-    family: fonts.display,
-    size: 56,
-    weight: 800,
-    color: card.accent,
+  drawText(
+    ctx,
+    card.range,
+    PAD_X,
+    heroTop + LABEL_ASCENT,
+    label(fonts, card.foreground),
+  );
+  const totalBaseline = heroTop + numberTop + total.size * CAP_HEIGHT;
+  drawText(
+    ctx,
+    total.value,
+    PAD_X,
+    totalBaseline,
+    display(fonts, total.size, card.foreground),
+  );
+  drawText(ctx, card.headline, PAD_X, totalBaseline + headlineDrop, {
+    ...display(fonts, headlineSize, card.accent, 800),
     upper: true,
   });
 
-  const height = barsBottom - barsTop;
+  // One bar per year, tallest at full height, on a ruled baseline.
   const gap = 4;
   const count = Math.max(1, card.bars.length);
   const width = (INNER - gap * (count - 1)) / count;
   card.bars.forEach((bar, index) => {
-    const barHeight = Math.max(4, Math.round(bar.ratio * height));
+    const barHeight = Math.max(4, Math.round(bar.ratio * chartHeight));
     ctx.fillStyle = bar.color;
     ctx.fillRect(
       PAD_X + index * (width + gap),
@@ -246,60 +214,84 @@ function drawPoster(ctx: Ctx, card: PosterCard, fonts: CardFonts) {
 }
 
 function drawRhythm(ctx: Ctx, card: RhythmCard, fonts: CardFonts) {
-  const bottom = footer(ctx, card, fonts) - 24;
+  const bottom = footer(ctx, card, fonts) - BLOCK_GAP;
 
   // Facts as two boxes: paper, then the accent.
   const boxHeight = 84;
   const boxTop = bottom - boxHeight;
-  const gap = 16;
-  const boxWidth = (INNER - gap) / 2;
+  const boxGap = 16;
+  const boxWidth = (INNER - boxGap) / 2;
   card.facts.slice(0, 2).forEach((fact, index) => {
-    const x = PAD_X + index * (boxWidth + gap);
+    const x = PAD_X + index * (boxWidth + boxGap);
     ctx.fillStyle = index === 0 ? neutrals.paper : card.accent;
     ctx.fillRect(x, boxTop, boxWidth, boxHeight);
-    label(ctx, fact.label, x + 16, boxTop + 28, fonts, neutrals.ink, 11);
-    const size = fitSize(ctx, fact.value, boxWidth - 32, 48, {
-      family: fonts.display,
-      size: 48,
-      weight: 900,
-      color: neutrals.ink,
+    drawText(ctx, fact.label, x + 16, boxTop + 28, {
+      ...label(fonts, neutrals.ink, 11),
     });
-    text(ctx, fact.value, x + 16, boxTop + 28 + 8 + size * 0.8, {
-      family: fonts.display,
-      size,
-      weight: 900,
-      color: neutrals.ink,
-    });
+    const value = fitText(
+      ctx,
+      fact.value,
+      boxWidth - 32,
+      display(fonts, 48, neutrals.ink),
+      MIN_NAME_SCALE,
+    );
+    drawText(
+      ctx,
+      value.value,
+      x + 16,
+      boxTop + 28 + 8 + value.size * CAP_HEIGHT,
+      display(fonts, value.size, neutrals.ink),
+    );
   });
 
   // Seven weekday bars on a ruled baseline, weekend days in the accent.
-  const labelsY = Math.floor(boxTop - 28);
+  const labelsY = Math.floor(boxTop - BLOCK_GAP - 4);
   const baseline = labelsY - 20;
-  const chartHeight = 190;
+  const chartTop = baseline - CHART_HEIGHT;
 
   // The archetype, one word per line so a long name stays big.
   const words = card.archetype.split(" ");
-  const style = {
-    family: fonts.display,
-    size: 104,
-    weight: 900,
-    color: card.foreground,
-    upper: true,
-  };
-  const fitted = Math.min(
-    ...words.map((word) => fitSize(ctx, word.toUpperCase(), INNER, 104, style)),
+  const heroFixed = LABEL_ASCENT + LABEL_TO_TYPE + BLOCK_GAP;
+  const wordStyle = { ...display(fonts, 104, card.foreground), upper: true };
+  const wordSize = Math.min(
+    sizeForRoom(
+      wordStyle.size,
+      chartTop - HEADER_BOTTOM - BLOCK_GAP,
+      heroFixed,
+      words.length,
+    ),
+    ...words.map(
+      (word) => fitText(ctx, word, INNER, wordStyle, MIN_NAME_SCALE).size,
+    ),
   );
   const heroHeight =
-    14 + 24 + fitted * 0.8 + (words.length - 1) * fitted * 0.86 + 8;
-  const heroTop = centeredTop(baseline - chartHeight, heroHeight);
-  label(ctx, card.kicker, PAD_X, heroTop + 14, fonts, card.foreground);
+    heroFixed + wordSize * (CAP_HEIGHT + (words.length - 1) * LINE_ADVANCE);
+  const heroTop = centeredTop(chartTop - BLOCK_GAP, heroHeight);
+  drawText(
+    ctx,
+    card.kicker,
+    PAD_X,
+    heroTop + LABEL_ASCENT,
+    label(fonts, card.foreground),
+  );
   words.forEach((word, index) => {
-    text(
+    const fitted = fitText(
       ctx,
       word,
+      INNER,
+      { ...wordStyle, size: wordSize },
+      MIN_NAME_SCALE,
+    );
+    drawText(
+      ctx,
+      fitted.value,
       PAD_X,
-      heroTop + 38 + fitted * 0.8 + index * fitted * 0.86,
-      { ...style, size: fitted },
+      heroTop +
+        LABEL_ASCENT +
+        LABEL_TO_TYPE +
+        wordSize * CAP_HEIGHT +
+        index * wordSize * LINE_ADVANCE,
+      { ...wordStyle, size: wordSize },
     );
   });
 
@@ -307,17 +299,12 @@ function drawRhythm(ctx: Ctx, card: RhythmCard, fonts: CardFonts) {
   const column = (INNER - columnGap * 6) / 7;
   card.days.forEach((day, index) => {
     const x = PAD_X + index * (column + columnGap);
-    const barHeight = Math.max(4, Math.round(day.ratio * chartHeight));
+    const barHeight = Math.max(4, Math.round(day.ratio * CHART_HEIGHT));
     ctx.fillStyle = day.weekend ? card.accent : neutrals.paper;
     ctx.fillRect(x, baseline - barHeight, column, barHeight);
-    text(ctx, day.short, x + column / 2, labelsY, {
-      family: fonts.mono,
-      size: 11,
-      weight: 500,
-      color: card.foreground,
+    drawText(ctx, day.short, x + column / 2, labelsY, {
+      ...label(fonts, card.foreground, 11),
       align: "center",
-      mono: true,
-      upper: true,
     });
   });
   ctx.fillStyle = card.foreground;
@@ -325,114 +312,135 @@ function drawRhythm(ctx: Ctx, card: RhythmCard, fonts: CardFonts) {
 }
 
 function drawEras(ctx: Ctx, card: ErasCard, fonts: CardFonts) {
-  const bottom = footer(ctx, card, fonts) - 20;
-
-  const rowHeight = 40;
-  const rowGap = 6;
-  const listHeight = card.eras.length * (rowHeight + rowGap);
-  const listTop = bottom - listHeight;
-
-  const nameStyle = {
-    family: fonts.display,
-    size: 120,
-    weight: 900,
-    color: card.foreground,
-  };
-  const size = fitSize(ctx, card.repo, INNER, 120, nameStyle);
-  const heroHeight = 14 + 14 + size * 0.8 + 60;
-  const heroTop = centeredTop(listTop - 40, heroHeight);
-  label(ctx, card.kicker, PAD_X, heroTop + 14, fonts, card.foreground);
-  text(ctx, card.repo, PAD_X, heroTop + 28 + size * 0.8, {
-    ...nameStyle,
-    size,
-  });
-  const mono: TextStyle = {
-    family: fonts.mono,
-    size: 13,
-    weight: 500,
-    color: card.foreground,
-    mono: true,
-  };
-  setFont(ctx, mono);
-  text(
-    ctx,
-    ellipsize(ctx, card.detail, INNER),
-    PAD_X,
-    heroTop + 28 + size * 0.8 + 52,
-    mono,
-  );
+  const bottom = footer(ctx, card, fonts) - BLOCK_GAP;
 
   // Era rows, bottom-anchored above the footer.
-  label(ctx, card.heading, PAD_X, listTop - 14, fonts, card.foreground, 12);
+  const listHeight = card.eras.length * (ROW_HEIGHT + ROW_GAP);
+  const listTop = bottom - listHeight;
+  const headingBaseline = listTop - 14;
+
+  // The hero: kicker, the repository name, one detail line.
+  const detail = mono(fonts, 13, card.foreground);
+  const detailDrop = BLOCK_GAP + 28;
+  const heroFixed = LABEL_ASCENT + LABEL_TO_TYPE + detailDrop;
+  const room = headingBaseline - 20 - BLOCK_GAP - HEADER_BOTTOM;
+  const name = fitText(
+    ctx,
+    card.repo,
+    INNER,
+    display(fonts, sizeForRoom(120, room, heroFixed, 1), card.foreground),
+    MIN_NAME_SCALE,
+  );
+  const heroHeight = heroFixed + name.size * CAP_HEIGHT;
+  const heroTop = centeredTop(headingBaseline - 20, heroHeight);
+  drawText(
+    ctx,
+    card.kicker,
+    PAD_X,
+    heroTop + LABEL_ASCENT,
+    label(fonts, card.foreground),
+  );
+  const nameBaseline =
+    heroTop + LABEL_ASCENT + LABEL_TO_TYPE + name.size * CAP_HEIGHT;
+  drawText(
+    ctx,
+    name.value,
+    PAD_X,
+    nameBaseline,
+    display(fonts, name.size, card.foreground),
+  );
+  drawText(
+    ctx,
+    ellipsize(ctx, card.detail, INNER, detail),
+    PAD_X,
+    nameBaseline + detailDrop,
+    detail,
+  );
+
+  drawText(
+    ctx,
+    card.heading,
+    PAD_X,
+    headingBaseline,
+    label(fonts, card.foreground, 12),
+  );
   ctx.fillStyle = card.foreground;
   ctx.fillRect(PAD_X, listTop - 8, INNER, 2);
+
+  const yearStyle = display(fonts, 26, neutrals.ink);
+  const repoStyle = mono(fonts, 12, neutrals.ink, 700);
+  const languageStyle = {
+    ...mono(fonts, 12, neutrals.ink),
+    align: "right" as const,
+  };
   card.eras.forEach((era, index) => {
-    const y = listTop + index * (rowHeight + rowGap);
+    const y = listTop + index * (ROW_HEIGHT + ROW_GAP);
     ctx.fillStyle = neutrals.paper;
-    ctx.fillRect(PAD_X, y, INNER, rowHeight);
+    ctx.fillRect(PAD_X, y, INNER, ROW_HEIGHT);
     ctx.fillStyle = era.color;
     ctx.fillRect(PAD_X + 10, y + 11, 18, 18);
-    const year: TextStyle = {
-      family: fonts.display,
-      size: 26,
-      weight: 900,
-      color: neutrals.ink,
-    };
-    text(ctx, era.year, PAD_X + 40, y + 29, year);
-    const mono: TextStyle = {
-      family: fonts.mono,
-      size: 12,
-      weight: 700,
-      color: neutrals.ink,
-      mono: true,
-    };
-    setFont(ctx, mono);
+    drawText(ctx, era.year, PAD_X + 40, y + 29, yearStyle);
+    setFont(ctx, languageStyle);
     const languageWidth = era.language
       ? ctx.measureText(era.language).width + 12
       : 0;
     if (era.language) {
-      text(ctx, era.language, W - PAD_X - 10, y + 25, {
-        ...mono,
-        weight: 500,
-        align: "right",
-      });
+      drawText(ctx, era.language, W - PAD_X - 10, y + 25, languageStyle);
     }
-    setFont(ctx, mono);
-    const repo = ellipsize(ctx, era.repo, INNER - 40 - 60 - 10 - languageWidth);
-    text(ctx, repo, PAD_X + 100, y + 25, mono);
+    const repoRoom = INNER - 40 - 60 - 10 - languageWidth;
+    drawText(
+      ctx,
+      ellipsize(ctx, era.repo, repoRoom, repoStyle),
+      PAD_X + 100,
+      y + 25,
+      repoStyle,
+    );
   });
 }
 
-/** Draws `card` onto `canvas`, `width` px wide (the height follows 9:16). */
+/**
+ * Draws `card` onto `canvas`, `width` px wide (the height follows 9:16).
+ * Returns false when the browser gave no 2D context: nothing was drawn and the
+ * caller must not treat the canvas as a card.
+ */
 export function drawCard(
   canvas: HTMLCanvasElement,
   card: ShareCard,
   fonts: CardFonts,
   width: number = CARD_SIZE.width,
-): void {
+): boolean {
   const scale = width / W;
   canvas.width = Math.round(W * scale);
   canvas.height = Math.round(H * scale);
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) return false;
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.fillStyle = card.background;
   ctx.fillRect(0, 0, W, H);
   header(ctx, card, fonts);
-  const ink: Ink = card;
-  ctx.fillStyle = ink.foreground;
   if (card.kind === "poster") drawPoster(ctx, card, fonts);
   else if (card.kind === "rhythm") drawRhythm(ctx, card, fonts);
   else drawEras(ctx, card, fonts);
+  return true;
 }
 
-/** The card as a PNG, full size. */
+/**
+ * The card as a full-size PNG, or null when it could not be drawn or encoded.
+ * The scratch canvas is released either way. Fonts must already be loaded
+ * (see `loadCardFonts`): this runs ahead of the click that saves it.
+ */
 export async function cardToBlob(
   card: ShareCard,
   fonts: CardFonts,
 ): Promise<Blob | null> {
-  await loadCardFonts(fonts);
   const canvas = document.createElement("canvas");
-  drawCard(canvas, card, fonts, CARD_SIZE.width);
-  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  try {
+    if (!drawCard(canvas, card, fonts, CARD_SIZE.width)) return null;
+    return await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
+    );
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }

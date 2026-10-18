@@ -2,82 +2,108 @@
 
 import { useEffect, useRef, useState } from "react";
 import { actionClass, focusRing } from "@/ui/classes";
-import {
-  type CardFonts,
-  cardToBlob,
-  drawCard,
-  loadCardFonts,
-  readCardFonts,
-} from "./cardCanvas";
+import { cardToBlob, drawCard } from "./cardCanvas";
+import { type CardFonts, loadCardFonts, readCardFonts } from "./cardPrimitives";
 import type { ShareCard } from "./cards";
 
 /** Width, in px, a picker thumbnail is drawn at before CSS scales it. */
 const THUMB_WIDTH = 270;
+/** The saved image's object URL lives this long, so a slow download still finds it. */
+const REVOKE_AFTER_MS = 30_000;
 
 type ShareCardsProps = { cards: readonly ShareCard[] };
+
+type Prepared = { card: ShareCard; blob: Blob | null };
+
+/** A phone or tablet: the share sheet is the way to stories, not a download. */
+function prefersShareSheet(): boolean {
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
+function startDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Revoking right away can cancel the download on some mobile browsers.
+  window.setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
+}
 
 /**
  * "Take it with you": pick one of the share cards and save it as a 9:16 PNG.
  * The cards are drawn in the browser from the history already on screen, so
  * nothing is uploaded, cached or fetched, and the saved file is the same
- * drawing as the thumbnail.
+ * drawing as the thumbnail. The chosen card's image is rendered ahead of the
+ * click, so saving starts inside the user's gesture (mobile browsers drop a
+ * share or download that waits on async work).
  */
 export function ShareCards({ cards }: ShareCardsProps) {
   const [selected, setSelected] = useState(0);
   const [status, setStatus] = useState("");
-  const [saving, setSaving] = useState(false);
-  const fontsRef = useRef<CardFonts | null>(null);
+  const [fonts, setFonts] = useState<CardFonts | null>(null);
+  const [prepared, setPrepared] = useState<Prepared | null>(null);
   const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
-  // The finale re-renders with fresh (equal) cards; only a change in content redraws.
-  const cardsRef = useRef(cards);
-  cardsRef.current = cards;
-  const contentKey = JSON.stringify(cards);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `contentKey` is the content of `cards`; the ref holds the latest copy
+  const card = cards[selected] ?? cards[0];
+
   useEffect(() => {
     let cancelled = false;
-    const fonts = readCardFonts();
-    fontsRef.current = fonts;
-    loadCardFonts(fonts)
-      .catch(() => {
-        // Draw with whatever the browser has: a fallback font beats no card.
-      })
-      .then(() => {
-        if (cancelled) return;
-        cardsRef.current.forEach((card, index) => {
-          const canvas = canvases.current[index];
-          if (canvas) drawCard(canvas, card, fonts, THUMB_WIDTH);
-        });
+    const families = readCardFonts();
+    loadCardFonts(families).then(() => {
+      if (cancelled) return;
+      cards.forEach((item, index) => {
+        const canvas = canvases.current[index];
+        if (canvas) drawCard(canvas, item, families, THUMB_WIDTH);
       });
+      setFonts(families);
+    });
     return () => {
       cancelled = true;
     };
-  }, [contentKey]);
+  }, [cards]);
 
-  const card = cards[selected] ?? cards[0];
+  useEffect(() => {
+    if (!fonts || !card) return;
+    let cancelled = false;
+    cardToBlob(card, fonts).then((blob) => {
+      if (!cancelled) setPrepared({ card, blob });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fonts, card]);
+
   if (!card) return null;
 
-  const save = async () => {
-    const fonts = fontsRef.current ?? readCardFonts();
-    setSaving(true);
-    setStatus("");
-    try {
-      const blob = await cardToBlob(card, fonts);
-      if (!blob) throw new Error("empty image");
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${card.filename}.png`;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setStatus(`Saved the ${card.label.toLowerCase()} card.`);
-    } catch {
-      setStatus("Could not save the image. Try again.");
-    } finally {
-      setSaving(false);
+  const blob = prepared?.card === card ? prepared.blob : null;
+  const failed = prepared?.card === card && prepared.blob === null;
+
+  const save = () => {
+    if (!blob) return;
+    const filename = `${card.filename}.png`;
+    const file = new File([blob], filename, { type: "image/png" });
+    const saved = () =>
+      setStatus(`Download started for the ${card.label.toLowerCase()} card.`);
+
+    if (prefersShareSheet() && navigator.canShare?.({ files: [file] })) {
+      navigator
+        .share({ files: [file], title: `@${card.login} | Committed` })
+        .then(() => setStatus(`Shared the ${card.label.toLowerCase()} card.`))
+        .catch((error: unknown) => {
+          // Closing the sheet is a choice, not a failure.
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+          }
+          startDownload(blob, filename);
+          saved();
+        });
+      return;
     }
+    startDownload(blob, filename);
+    saved();
   };
 
   return (
@@ -104,8 +130,11 @@ export function ShareCards({ cards }: ShareCardsProps) {
                 aria-pressed={isSelected}
                 aria-label={`${item.label} card`}
                 title={item.alt}
-                onClick={() => setSelected(index)}
-                className={`flex w-full min-h-11 flex-col gap-1.5 text-left font-mono text-xs uppercase [font-stretch:87.5%] ${focusRing} ${isSelected ? "font-bold" : ""}`}
+                onClick={() => {
+                  setSelected(index);
+                  setStatus("");
+                }}
+                className={`flex min-h-11 w-full flex-col gap-1.5 text-left font-mono text-xs uppercase [font-stretch:87.5%] ${focusRing} ${isSelected ? "font-bold" : ""}`}
               >
                 <canvas
                   ref={(node) => {
@@ -122,13 +151,13 @@ export function ShareCards({ cards }: ShareCardsProps) {
       <button
         type="button"
         onClick={save}
-        disabled={saving}
-        className={`${actionClass} min-h-14 bg-ink text-paper disabled:opacity-100`}
+        disabled={!blob}
+        className={`${actionClass} min-h-14 bg-ink text-paper disabled:border-dashed disabled:bg-transparent disabled:text-ink`}
       >
-        {saving ? "Saving" : "Save image"}
+        Save image
       </button>
       <p role="status" className="min-h-4 font-mono text-xs">
-        {status}
+        {failed ? "Could not prepare this card. Try another one." : status}
       </p>
     </section>
   );
