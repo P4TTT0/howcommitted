@@ -62,18 +62,17 @@ async function mockApi(
 }
 
 const pauseButton = (page: Page) => page.getByRole("button", { name: "Pause" });
-const nextButton = (page: Page) =>
-  page.getByRole("button", { name: "Next", exact: true });
+const nextButton = (page: Page) => page.getByRole("button", { name: /^Next/ });
 const prevButton = (page: Page) =>
   page.getByRole("button", { name: "Previous scene" });
 const progress = (page: Page) =>
   page.getByRole("progressbar", { name: "Playback progress" });
 
-/** Goes through every scene with Next (one more than the ticks); the end card follows. */
+/** Goes through every scene with Next (one per tick); the end card follows. */
 async function skipAllScenes(page: Page) {
   // The bar only exists once the history has loaded.
   await expect(nextButton(page)).toBeEnabled();
-  const scenes = (await page.locator("[data-scene-tick]").count()) + 1;
+  const scenes = await page.locator("[data-scene-tick]").count();
   for (let scene = 0; scene < scenes; scene += 1) {
     await expect(nextButton(page)).toBeEnabled();
     await nextButton(page).click();

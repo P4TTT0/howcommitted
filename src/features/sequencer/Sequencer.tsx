@@ -2,7 +2,6 @@
 
 import {
   type ReactNode,
-  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -67,13 +66,8 @@ export function Sequencer({
     () => sequence.map(({ id, label }) => ({ id, label })),
     [sequence],
   );
-  const durations = useMemo(
-    () => sequence.map((scene) => scene.instance.duration),
-    [sequence],
-  );
 
   const stageRef = useRef<HTMLDivElement>(null);
-  const fillRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
   const clockRef = useRef<PlaybackClock | null>(null);
@@ -93,15 +87,6 @@ export function Sequencer({
   const [speed, setSpeed] = useState<Speed>(1);
   const [failed, setFailed] = useState(false);
   const [stopped, setStopped] = useState(false);
-
-  const paintFill = useCallback(
-    (index: number, fraction: number) => {
-      const fill = fillRef.current;
-      if (!fill) return;
-      fill.style.width = `${sequenceProgress(count, index, fraction) * 100}%`;
-    },
-    [count],
-  );
 
   useEffect(() => {
     mountedRef.current = true;
@@ -164,11 +149,6 @@ export function Sequencer({
       // The scene ran out: hold on it (explore). Moving on is the user's call.
       if (next === "ended") controller.finishScene();
     });
-    clock.onFrame((seconds) => {
-      const index = controller.state.index;
-      const duration = durations[index] ?? 0;
-      paintFill(index, duration > 0 ? seconds / duration : 0);
-    });
     clockRef.current = clock;
     engineRef.current = engine;
     controllerRef.current = controller;
@@ -193,16 +173,12 @@ export function Sequencer({
     const controller = controllerRef.current;
     if (phase !== "running" || !controller) return;
     const current = seqRef.current;
-    if (current.done) {
-      paintFill(current.index, 1);
-      return;
-    }
+    if (current.done) return;
     const stage = stageRef.current;
     if (!stage) return;
-    paintFill(current.index, current.mode === "explore" ? 1 : 0);
     controller.mount(stage, current);
     return () => controller.unmount();
-  }, [phase, seq.visit, seq.done, paintFill]);
+  }, [phase, seq.visit, seq.done]);
 
   // A scene just ended: if focus sat on the pause button (now "Replay"), move
   // it to the way forward so Enter or Space cannot replay by accident.
@@ -368,7 +344,6 @@ export function Sequencer({
         index={seq.index}
         canPrev={phase === "running" && (finished ? count > 0 : seq.index > 0)}
         canNext={phase === "running" && !finished}
-        fillRef={fillRef}
         progressText={finished ? "Finished" : progressText}
         progressPercent={finished ? 100 : progressPercent}
         toggleRef={toggleRef}
@@ -378,7 +353,6 @@ export function Sequencer({
         onNext={() => controllerRef.current?.next()}
         onReplay={replay}
         onJump={(index) => controllerRef.current?.goTo(index)}
-        onSpeed={chooseSpeed}
         onCycleSpeed={() => chooseSpeed(nextSpeed(speed))}
         onMute={toggleMute}
         onCancel={cancel}
