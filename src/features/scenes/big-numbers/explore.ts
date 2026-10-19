@@ -49,6 +49,7 @@ export function exploreBigNumbers(
     const show = (picked: number | null) => {
       const entry = picked === null ? undefined : years[picked];
       readout.textContent = entry ? yearReading(number, entry) : BY_YEAR;
+      readout.toggleAttribute("data-active", Boolean(entry));
       columns.forEach((column, i) => {
         column.style.opacity = entry && i !== picked ? DIMMED : "";
       });

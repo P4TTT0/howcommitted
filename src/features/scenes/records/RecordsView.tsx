@@ -80,11 +80,11 @@ export function RecordsView({ plan }: RecordsViewProps) {
                 </p>
                 <p
                   aria-hidden="true"
-                  className="font-display text-[clamp(1.75rem,8vw,2.75rem)] font-black leading-[1] [overflow-wrap:anywhere] md:text-[clamp(1.5rem,min(3.4vw,6dvh),4.5rem)]"
+                  className="font-display text-[clamp(1.75rem,8vw,2.75rem)] font-black leading-[1] [overflow-wrap:anywhere] md:text-[clamp(1.5rem,min(3.4vw,5dvh),4.5rem)]"
                 >
                   {tile.value}
                   {tile.unit ? (
-                    <span className="ml-2 inline-block text-[clamp(0.875rem,4vw,1.125rem)] font-extrabold uppercase leading-none md:text-[clamp(0.875rem,min(1.8vw,3.2dvh),1.625rem)]">
+                    <span className="ml-2 inline-block text-[clamp(0.875rem,4vw,1.125rem)] font-extrabold uppercase leading-none md:text-[clamp(0.875rem,min(1.4vw,2.6dvh),1.25rem)]">
                       {tile.unit}
                     </span>
                   ) : null}

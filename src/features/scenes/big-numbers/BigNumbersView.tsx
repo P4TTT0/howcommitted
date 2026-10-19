@@ -3,6 +3,7 @@ import { formatCount } from "@/features/sequencer/model/format";
 import { blockForYearIndex } from "@/features/sequencer/model/plan";
 import { focusRing, labelClass } from "@/ui/classes";
 import { SceneFrame } from "@/ui/SceneFrame";
+import { compactCount } from "../week-shape/plan";
 import { type MixPlan, mixReading, visibleSegments } from "./mix";
 import {
   type BigNumbersPlan,
@@ -56,37 +57,39 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
               const colors = blockForYearIndex(number.colorIndex);
               const total = formatCount(number.total);
               const peak = Math.max(1, ...number.perYear.map((y) => y.value));
+              // Column labels are compact (1.2K, 123M); the readout keeps the full number.
               const widest = Math.max(
                 4,
-                ...number.perYear.map((y) => formatCount(y.value).length),
+                ...number.perYear.map((y) => compactCount(y.value).length),
               );
               const years = number.perYear.length;
               const cell = `100cqw / ${Math.max(years, 1)}`;
               // Values and years share one size so the widest still fits its column.
-              const columnFont = `min(12px, calc((${cell} - 4px) / ${widest * 0.62}))`;
-              // 0 (hidden) when a column is under 28px wide, else the full size.
-              const valueFont = `min(${columnFont}, clamp(0px, calc((${cell} - 28px) * 1000), 12px))`;
+              const columnFont = `min(12px, calc((${cell} - 2px) / ${widest * 0.72}))`;
+              // Hidden (0) when the label would need a font under 7px to fit its column.
+              const valueFont = `min(${columnFont}, clamp(0px, calc((${columnFont} - 7px) * 1000), 12px))`;
               // Middle year labels hide when they cannot all fit; the ends stay.
-              const middleYearFont = `min(var(--yf), clamp(0px, calc((${cell} - 36px) * 1000), 12px))`;
+              const middleYearFont = `min(var(--yf), clamp(0px, calc((${cell} - 32px) * 1000), 12px))`;
               return (
                 <li
                   key={number.key}
                   data-tile={index}
                   aria-label={totalReading(number)}
-                  className="flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden p-3 [container-type:size] md:grid md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:gap-6 md:p-4"
+                  className="relative flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden p-2 [container-type:size] md:grid md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-6 md:p-4"
                   style={
                     {
                       backgroundColor: colors.background,
                       color: colors.foreground,
                       ...charsFor(total),
-                      "--fs-stack": `min(calc((100cqw - 1.5rem) / (var(--chars) * ${CHARACTER_EM})), 22cqh)`,
+                      "--tile-bg": colors.background,
+                      "--fs-stack": `min(calc((100cqw - 1rem) / (var(--chars) * ${CHARACTER_EM})), 20cqh)`,
                       "--fs-split": `min(calc((45cqw - 1.5rem) / (var(--chars) * ${CHARACTER_EM})), 34cqh)`,
                     } as CSSProperties
                   }
                 >
                   <div
                     aria-hidden="true"
-                    className="flex min-w-0 flex-col gap-1 md:justify-between"
+                    className="flex min-w-0 flex-col gap-1 md:justify-between md:pb-2"
                   >
                     <p className="font-mono text-xs uppercase">
                       {number.label}
@@ -101,18 +104,18 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
                   {years > 0 && (
                     <div
                       data-role="years"
-                      className="flex min-h-[4.5rem] min-w-0 flex-1 flex-col gap-1 [container-type:inline-size]"
+                      className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col gap-0.5 [container-type:inline-size] md:gap-1"
                     >
                       <p
                         aria-hidden="true"
                         data-role="readout"
-                        className="min-h-4 shrink-0 text-right font-mono text-[11px] uppercase [font-stretch:87.5%]"
+                        className="min-h-4 shrink-0 text-right font-mono text-[11px] uppercase leading-tight [font-stretch:87.5%] max-md:absolute max-md:inset-x-2 max-md:top-2 max-md:z-10 max-md:bg-[var(--tile-bg)] max-md:text-left max-md:opacity-0 max-md:data-[active]:opacity-100"
                       >
                         {BY_YEAR}
                       </p>
                       <div
                         data-role="chart"
-                        className={`flex min-h-0 flex-1 cursor-pointer touch-pan-y items-end gap-px border-b-2 border-current md:gap-1 ${focusRing}`}
+                        className={`flex min-h-11 flex-1 cursor-pointer touch-pan-y items-end gap-px border-b-2 border-current md:gap-1 ${focusRing}`}
                         style={{ fontSize: valueFont }}
                       >
                         {number.perYear.map((entry, yearIndex) => (
@@ -123,7 +126,7 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
                             className="flex h-full min-w-0 flex-1 basis-0 flex-col items-stretch justify-end"
                           >
                             <span className="mb-1 block text-center font-mono font-bold leading-none">
-                              {formatCount(entry.value)}
+                              {compactCount(entry.value)}
                             </span>
                             <span
                               className="block min-h-0.5 bg-current"
@@ -151,7 +154,7 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
                             <span
                               key={entry.year}
                               data-year-label={yearIndex}
-                              className={`flex min-w-0 flex-1 basis-0 whitespace-nowrap ${yearIndex === 0 ? "justify-start" : end ? "justify-end" : "justify-center"}`}
+                              className={`flex flex-1 basis-0 whitespace-nowrap ${end ? "" : "min-w-0"} ${yearIndex === 0 ? "justify-start" : end ? "justify-end" : "justify-center"}`}
                               style={
                                 end ? undefined : { fontSize: middleYearFont }
                               }
