@@ -24,12 +24,36 @@ import {
   rateForSemitones,
   tickDbForSpeed,
 } from "../pitch";
+import {
+  acceptPop,
+  countRate,
+  countTicks,
+  fillTicks,
+  stairSemitones,
+} from "./gestures";
 import { disposePools, loadSamples, type Pool, playSample } from "./samples";
 
 const TICK_FILES = ["chip-1", "chip-2", "chip-3"] as const;
 const PAYOFF_FILES = ["payoff-thud", "payoff-rattle"] as const;
 
+const GESTURE_FILES = [
+  "pop",
+  "fill-tick",
+  "stair",
+  "count-tick",
+  "count-close",
+] as const;
+
 const TICK_VOICE_LIMIT = 6;
+const POP_VOICE_LIMIT = 4;
+const FILL_VOICE_LIMIT = 4;
+const STAIR_VOICE_LIMIT = 4;
+const COUNT_VOICE_LIMIT = 4;
+const POP_DB = -10;
+const FILL_DB = -14;
+const STAIR_DB = -8;
+const COUNT_TICK_DB = -14;
+const COUNT_CLOSE_DB = -8;
 const PAYOFF_VOICE_LIMIT = 4;
 const ACCENT_VOICE_LIMIT = 2;
 const MARKER_VOICE_LIMIT = 2;
@@ -62,7 +86,12 @@ export class SoundEngine {
     payoff: [] as Pool,
     accent: [] as Pool,
     marker: [] as Pool,
+    pop: [] as Pool,
+    fill: [] as Pool,
+    stair: [] as Pool,
+    count: [] as Pool,
   };
+  private lastPop = Number.NEGATIVE_INFINITY;
   private lastTick = -1;
   private tickSpeedDb = 0;
 
@@ -75,7 +104,11 @@ export class SoundEngine {
 
   /** Loads the samples. Rejects if any file fails to load. */
   static async load(random: () => number = Math.random): Promise<SoundEngine> {
-    const buffers = await loadSamples([...TICK_FILES, ...PAYOFF_FILES]);
+    const buffers = await loadSamples([
+      ...TICK_FILES,
+      ...PAYOFF_FILES,
+      ...GESTURE_FILES,
+    ]);
     return new SoundEngine(buffers, random);
   }
 
@@ -129,6 +162,101 @@ export class SoundEngine {
         },
       );
     }
+  }
+
+  /**
+   * Gesture: a small block appears. One per block on the beat, with slight
+   * random pitch (about +-10%). Pops landing in the same grid slot as the
+   * previous one are dropped and concurrent voices are capped, so a scene
+   * that draws hundreds of blocks never machine-guns.
+   */
+  pop(time: number, { db = 0 }: { db?: number } = {}): void {
+    if (!acceptPop(time, this.lastPop)) return;
+    this.lastPop = time;
+    playSample(
+      this.pools.pop,
+      POP_VOICE_LIMIT,
+      this.limiter,
+      this.buffers.get("pop"),
+      {
+        time,
+        rate: 1 + (this.random() * 2 - 1) * 0.1,
+        db: POP_DB + db + (this.random() * 2 - 1),
+      },
+    );
+  }
+
+  /**
+   * Gesture: a bar loads. Schedules its own ticks, accelerating (about 110ms
+   * to 30ms) and rising (rate 0.8 to 1.7) over `duration`, then silence.
+   */
+  fill(
+    startTime: number,
+    duration: number,
+    { db = 0 }: { db?: number } = {},
+  ): void {
+    for (const { offset, rate } of fillTicks(duration)) {
+      playSample(
+        this.pools.fill,
+        FILL_VOICE_LIMIT,
+        this.limiter,
+        this.buffers.get("fill-tick"),
+        { time: startTime + offset, rate, db: FILL_DB + db },
+      );
+    }
+  }
+
+  /** Gesture: step `index` (0-based) of a sequence, low to high, pentatonic. */
+  stair(time: number, index: number): void {
+    playSample(
+      this.pools.stair,
+      STAIR_VOICE_LIMIT,
+      this.limiter,
+      this.buffers.get("stair"),
+      {
+        time,
+        rate: rateForSemitones(stairSemitones(index)),
+        db: STAIR_DB,
+      },
+    );
+  }
+
+  /** Gesture: one tick of a climbing number; `progress` is 0..1. */
+  countTick(time: number, progress: number): void {
+    playSample(
+      this.pools.count,
+      COUNT_VOICE_LIMIT,
+      this.limiter,
+      this.buffers.get("count-tick"),
+      { time, rate: countRate(progress), db: COUNT_TICK_DB },
+    );
+  }
+
+  /** Gesture: the closing hit when a number settles. */
+  countClose(time: number): void {
+    playSample(
+      this.pools.count,
+      COUNT_VOICE_LIMIT,
+      this.limiter,
+      this.buffers.get("count-close"),
+      { time, rate: 1, db: COUNT_CLOSE_DB },
+    );
+  }
+
+  /**
+   * Gesture: a number climbs over `duration` in `steps` ticks, then settles
+   * with one closing hit at `startTime + duration`.
+   */
+  count(startTime: number, duration: number, steps: number): void {
+    for (const { offset, progress } of countTicks(duration, steps)) {
+      this.countTick(startTime + offset, progress);
+    }
+    this.countClose(startTime + Math.max(0, duration));
+  }
+
+  /** Gesture: a milestone ("@a passes @b"). Heavy and rare. */
+  payoff(time: number): void {
+    this.playPayoff({ time, kind: "step" });
   }
 
   /** A soft marker so a year change is heard, not just seen. */
