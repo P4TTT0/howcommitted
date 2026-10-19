@@ -43,7 +43,7 @@ function scheduleSound(
   getEngine: () => SoundEngine | null,
   race: Race,
 ) {
-  // One climb tied to the leader's total, played year by year as segments.
+  // One climb on the combined total, played only while some bar rises.
   for (const { start, duration, from, to } of fillSegments(race)) {
     scheduleFill(clock, getEngine, start, duration, { from, to });
   }

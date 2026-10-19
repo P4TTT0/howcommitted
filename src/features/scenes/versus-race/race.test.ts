@@ -19,6 +19,7 @@ import {
   niceTicks,
   passesLabel,
   passTimes,
+  type Race,
   scaleFor,
   tickLabel,
   valuesAtIndex,
@@ -215,7 +216,7 @@ describe("race readings", () => {
     expect(yearStartIndex(race, 2030)).toBe(race.length - 1);
   });
 
-  it("fills once per growing year, inside the drawing window", () => {
+  it("fills only while some bar rises, ending at the final total", () => {
     if (!race) throw new Error("race expected");
     const segments = fillSegments(race);
     expect(segments.length).toBeGreaterThan(0);
@@ -224,8 +225,6 @@ describe("race readings", () => {
       expect(segment.start + segment.duration).toBeLessThanOrEqual(
         DRAW_SECONDS + 1e-9,
       );
-      expect(segment.from).toBeGreaterThanOrEqual(0);
-      expect(segment.to).toBeLessThanOrEqual(1 + 1e-9);
       expect(segment.to).toBeGreaterThan(segment.from);
     }
     for (let i = 1; i < segments.length; i++) {
@@ -233,6 +232,61 @@ describe("race readings", () => {
         (segments[i - 1]?.to ?? 0) - 1e-9,
       );
     }
+    expect(segments.at(-1)?.to).toBeCloseTo(1);
+  });
+
+  describe("fill follows growth", () => {
+    /** A race on a hand-made daily axis: only the series matter here. */
+    function raceOf(...series: number[][]): Race {
+      return {
+        startDay: 0,
+        length: series[0]?.length ?? 0,
+        lanes: series.map((values, lane) => ({
+          login: `dev${lane}`,
+          series: values,
+          total: values.at(-1) ?? 0,
+          firstIndex: null,
+        })),
+        firstYear: 1970,
+        lastYear: 1971,
+        crossings: [],
+      };
+    }
+    const ramp = (days: number, from: number, to: number) =>
+      Array.from(
+        { length: days },
+        (_, day) => from + ((day + 1) * (to - from)) / days,
+      );
+    const flat = (days: number, value: number) =>
+      Array.from({ length: days }, () => value);
+
+    it("stays silent while nobody grows, even inside an active year", () => {
+      // 700 days: ada rises over the first 140, grace over the last 140.
+      const ada = [...ramp(140, 0, 140), ...flat(560, 140)];
+      const grace = [...flat(560, 0), ...ramp(140, 0, 140)];
+      const segments = fillSegments(raceOf(ada, grace));
+      const quietFrom = (140 / 700) * DRAW_SECONDS;
+      const quietTo = (560 / 700) * DRAW_SECONDS;
+      expect(segments).toHaveLength(2);
+      for (const { start, duration } of segments) {
+        const end = start + duration;
+        expect(end <= quietFrom + 1e-9 || start >= quietTo - 1e-9).toBe(true);
+      }
+    });
+
+    it("sounds when only a developer behind the leader grows", () => {
+      // ada holds 1000 from the start; grace keeps climbing but stays behind.
+      const ada = flat(700, 1000);
+      const grace = [...flat(200, 0), ...ramp(500, 0, 400)];
+      const segments = fillSegments(raceOf(ada, grace));
+      expect(segments.length).toBeGreaterThan(0);
+      const last = segments.at(-1);
+      expect((last?.start ?? 0) + (last?.duration ?? 0)).toBeCloseTo(
+        DRAW_SECONDS,
+      );
+      // Nothing sounds between ada's opening step and grace's climb.
+      expect(last?.start).toBeGreaterThan((200 / 700) * DRAW_SECONDS - 0.3);
+    });
   });
 
   it("times passes at the crossing and thins close ones", () => {

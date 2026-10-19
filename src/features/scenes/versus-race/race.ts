@@ -1,6 +1,7 @@
 import { type Crossing, findCrossings } from "@/domain/crossings";
 import { BPM, DRAW_SECONDS, type Plan } from "@/features/sequencer/model/plan";
 import { dayNumber } from "@/playback/aggregate";
+import { growthRuns } from "@/playback/growth";
 
 /**
  * The race model: every developer's running total on ONE shared daily axis by
@@ -238,47 +239,22 @@ export function passesLabel(count: number): string {
   return `${count.toLocaleString("en-US")} ${count === 1 ? "pass" : "passes"}`;
 }
 
-/** Shortest fill worth playing, in seconds. */
-const MIN_FILL_SECONDS = 0.2;
 /** Passes closer than this share one payoff: the chip is replaced anyway. */
 export const MIN_PAYOFF_GAP_SECONDS = 1.5;
 
 /**
- * One segment per calendar year of one continuous climb tied to the leader's
- * total: it starts where the year starts, lasts as long as the year takes on
- * the clock, and `from`/`to` (0..1) are the leader's share of its final total
- * at the year's start and end. Years where nobody gained are skipped (the bars
- * do not move).
+ * One continuous climb on the combined total of every developer, played only
+ * while some bar rises: flat stretches are silent, and a developer behind the
+ * leader still sounds. `from`/`to` (0..1) are the combined share of its final
+ * total at each segment's start and end.
  */
 export function fillSegments(
   race: Race,
 ): { start: number; duration: number; from: number; to: number }[] {
-  const marks = yearMarks(race);
-  const leader = (index: number) =>
-    Math.max(0, ...race.lanes.map((lane) => lane.series[index] ?? 0));
-  const finalLeader = leader(race.length - 1);
-  const segments: {
-    start: number;
-    duration: number;
-    from: number;
-    to: number;
-  }[] = [];
-  marks.forEach((mark, position) => {
-    const end = marks[position + 1]?.startProgress ?? 1;
-    const first = Math.round(mark.startProgress * race.length);
-    const last = Math.min(race.length - 1, Math.round(end * race.length) - 1);
-    const before = first > 0 ? leader(first - 1) : 0;
-    if (leader(last) <= before) return;
-    const duration = (end - mark.startProgress) * DRAW_SECONDS;
-    if (duration < MIN_FILL_SECONDS) return;
-    segments.push({
-      start: mark.startProgress * DRAW_SECONDS,
-      duration,
-      from: finalLeader > 0 ? before / finalLeader : 0,
-      to: finalLeader > 0 ? leader(last) / finalLeader : 1,
-    });
-  });
-  return segments;
+  const combined = Array.from({ length: race.length }, (_, day) =>
+    race.lanes.reduce((sum, lane) => sum + (lane.series[day] ?? 0), 0),
+  );
+  return growthRuns(combined, DRAW_SECONDS);
 }
 
 /**

@@ -32,7 +32,7 @@ src/app/              Thin Next routes only
 src/domain/           Pure TS types and metrics
 src/github/           Server-only GraphQL client, queries, cache
 src/playback/         One clock driving GSAP and Tone.js (clock.ts), pure scheduling
-                      helpers (aggregate, schedule, pitch), sound/ engine
+                      helpers (aggregate, schedule, pitch, growth), sound/ engine
 src/features/         search (landing lookup), experience (/{login} states), sequencer (scene
                       contract, player, shared plan model), scenes (registry, one folder per
                       scene), stats, versus
