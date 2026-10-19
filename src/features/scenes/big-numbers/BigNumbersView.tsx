@@ -9,7 +9,6 @@ import {
   BY_YEAR,
   scopeNote,
   totalReading,
-  yearReading,
 } from "./numbers";
 
 /** Width of one character of a big number, in em (digits and commas, rounded up). */
@@ -62,8 +61,13 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
                 ...number.perYear.map((y) => formatCount(y.value).length),
               );
               const years = number.perYear.length;
-              // One font size for the values and years so the widest still fits its column.
-              const columnFont = `min(12px, calc((100cqw / ${Math.max(years, 1)} - 6px) / ${widest * 0.62}))`;
+              const cell = `100cqw / ${Math.max(years, 1)}`;
+              // Values and years share one size so the widest still fits its column.
+              const columnFont = `min(12px, calc((${cell} - 4px) / ${widest * 0.62}))`;
+              // 0 (hidden) when a column is under 28px wide, else the full size.
+              const valueFont = `min(${columnFont}, clamp(0px, calc((${cell} - 28px) * 1000), 12px))`;
+              // Middle year labels hide when they cannot all fit; the ends stay.
+              const middleYearFont = `min(var(--yf), clamp(0px, calc((${cell} - 36px) * 1000), 12px))`;
               return (
                 <li
                   key={number.key}
@@ -107,47 +111,55 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
                         {BY_YEAR}
                       </p>
                       <div
-                        className="flex min-h-0 flex-1 items-end gap-0.5 border-b-2 border-current md:gap-1.5"
-                        style={{ fontSize: columnFont }}
+                        data-role="chart"
+                        className={`flex min-h-0 flex-1 cursor-pointer touch-pan-y items-end gap-px border-b-2 border-current md:gap-1 ${focusRing}`}
+                        style={{ fontSize: valueFont }}
                       >
                         {number.perYear.map((entry, yearIndex) => (
-                          <button
+                          <div
                             key={entry.year}
-                            type="button"
                             data-year-col={yearIndex}
-                            aria-label={yearReading(number, entry)}
-                            className={`flex h-full min-w-11 flex-1 basis-0 cursor-pointer flex-col items-stretch justify-end p-0 ${focusRing}`}
+                            aria-hidden="true"
+                            className="flex h-full min-w-0 flex-1 basis-0 flex-col items-stretch justify-end"
                           >
-                            <span
-                              aria-hidden="true"
-                              className="mb-1 block text-center font-mono font-bold leading-none"
-                            >
+                            <span className="mb-1 block text-center font-mono font-bold leading-none">
                               {formatCount(entry.value)}
                             </span>
                             <span
-                              aria-hidden="true"
-                              data-role="bar"
                               className="block min-h-0.5 bg-current"
                               style={{
                                 height: `max(2px, calc((100% - 1rem) * ${entry.value / peak}))`,
                               }}
                             />
-                          </button>
+                          </div>
                         ))}
                       </div>
                       <div
                         aria-hidden="true"
-                        className="flex shrink-0 gap-0.5 font-mono [font-stretch:87.5%] md:gap-1.5"
-                        style={{ fontSize: columnFont }}
+                        className="flex shrink-0 gap-px font-mono [font-stretch:87.5%] md:gap-1"
+                        style={
+                          {
+                            "--yf": columnFont,
+                            fontSize: "var(--yf)",
+                          } as CSSProperties
+                        }
                       >
-                        {number.perYear.map((entry) => (
-                          <span
-                            key={entry.year}
-                            className="min-w-11 flex-1 basis-0 text-center"
-                          >
-                            {entry.year}
-                          </span>
-                        ))}
+                        {number.perYear.map((entry, yearIndex) => {
+                          const end =
+                            yearIndex === 0 || yearIndex === years - 1;
+                          return (
+                            <span
+                              key={entry.year}
+                              data-year-label={yearIndex}
+                              className={`flex min-w-0 flex-1 basis-0 whitespace-nowrap ${yearIndex === 0 ? "justify-start" : end ? "justify-end" : "justify-center"}`}
+                              style={
+                                end ? undefined : { fontSize: middleYearFont }
+                              }
+                            >
+                              {entry.year}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
