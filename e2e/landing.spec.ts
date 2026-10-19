@@ -76,13 +76,13 @@ test("Play has a pointer, and Enter starts when a user is found", async ({
   await expect(page).toHaveURL(/\/ada$/);
 });
 
-test("the nav credits the author and links out", async ({ page }) => {
+test("the header credits the author and links out", async ({ page }) => {
   await page.goto("/");
-  const nav = page.getByRole("navigation", { name: "About" });
-  await expect(nav.getByRole("link", { name: "@P4TTT0" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "@P4TTT0" })).toHaveAttribute(
     "href",
     "https://github.com/P4TTT0",
   );
+  const nav = page.getByRole("navigation", { name: "About" });
   await expect(nav.getByRole("link", { name: "GitHub" })).toHaveAttribute(
     "href",
     "https://github.com/P4TTT0/howcommitted",
