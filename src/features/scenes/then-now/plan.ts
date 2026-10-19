@@ -159,6 +159,18 @@ export function barHeight(share: number, axisMax: number): number {
 const percent = (share: number): string => `${Math.round(share * 100)}%`;
 
 /** One weekday for both years, as text for the readout and the group label. */
+/**
+ * 0..1 hover level of a weekday: the taller of its two bars against the axis,
+ * so the pitch follows what the eye sees.
+ */
+export function dayLevel(comparison: Comparison, index: number): number {
+  const height = Math.max(
+    barHeight(comparison.earlier.week[index] ?? 0, comparison.axisMax),
+    barHeight(comparison.now.week[index] ?? 0, comparison.axisMax),
+  );
+  return Math.min(1, Math.max(0, height / 100));
+}
+
 export function dayReading(comparison: Comparison, index: number): DayReading {
   const { earlier, now } = comparison;
   const part = (model: PanelModel) =>

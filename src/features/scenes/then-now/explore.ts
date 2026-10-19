@@ -1,7 +1,9 @@
 import { findElement, indexAfterKey } from "@/features/sequencer/explore";
+import { interaction } from "@/playback/sound/interaction";
 import { panelElements, writeAxis, writePanel, writeReading } from "./mount";
 import {
   type Comparison,
+  dayLevel,
   dayReading,
   READOUT_IDLE,
   type ThenNowPlan,
@@ -10,7 +12,7 @@ import {
 /**
  * Explore phase: the year buttons and the weekday groups come alive. Click,
  * tap or Left/Right/Home/End pick the "then" year; both sides, the axis and the
- * summary line are rewritten at once (instant DOM updates, no sound, no clock).
+ * summary line are rewritten at once (instant DOM updates, no clock; each pick clicks).
  * Hovering, focusing or tapping a weekday group highlights it, dims the others
  * and fills the black readout; leaving the chart resets it. The arrows are kept
  * from the scene navigation while a picker button is focused. The cleanup puts
@@ -72,7 +74,9 @@ export function exploreThenNow(
     const button = (event.target as Element).closest<HTMLButtonElement>(
       "button[data-year]",
     );
-    if (button) select(Number(button.dataset.year));
+    if (!button) return;
+    interaction.click();
+    select(Number(button.dataset.year));
   };
   const onKeyDown = (event: KeyboardEvent) => {
     const current = buttons.indexOf(
@@ -93,9 +97,15 @@ export function exploreThenNow(
 
   const onDay = (event: Event) => {
     const group = (event.target as Element).closest<HTMLElement>("[data-day]");
-    if (group) showDay(Number(group.dataset.day));
+    if (!group) return;
+    const day = Number(group.dataset.day);
+    showDay(day);
+    interaction.hover(dayLevel(comparison, day), `day-${day}`);
   };
-  const onLeave = () => showDay(-1);
+  const onLeave = () => {
+    showDay(-1);
+    interaction.leave();
+  };
   const onFocusOut = (event: FocusEvent) => {
     if (!days.contains(event.relatedTarget as Node | null)) showDay(-1);
   };

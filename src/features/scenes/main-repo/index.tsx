@@ -17,7 +17,7 @@ export const mainRepoScene: SceneDefinition = {
       bpm: BPM,
       view: <MainRepoView plan={plan} />,
       mount: (root, runtime) => mountMainRepo(root, plan, runtime),
-      explore: (root) => exploreMainRepo(root, plan.readings),
+      explore: (root) => exploreMainRepo(root, plan.readings, plan.levels),
     };
   },
 };

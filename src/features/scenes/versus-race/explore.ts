@@ -1,4 +1,5 @@
 import { findElement, indexAfterKey } from "@/features/sequencer/explore";
+import { interaction } from "@/playback/sound/interaction";
 import { dayReading, type Race, valuesAtIndex, yearStartIndex } from "./race";
 import { createReadout } from "./readout";
 
@@ -14,8 +15,8 @@ const EXPLORE_PASS_DAYS = 14;
  * The years of the timeline become buttons that jump to the first day of a
  * year; the chart is also one slider for the keyboard (Left/Right a week,
  * Page Up/Down a year, Home/End the ends). The bars, their places, the year,
- * the passes and every exact value follow. No timers, no sound, no clock of
- * its own: rows slide with CSS, or jump under `prefers-reduced-motion`. The
+ * the passes and every exact value follow. No timers and no clock of its
+ * own; only a click on the year buttons sounds, through the interaction channel: rows slide with CSS, or jump under `prefers-reduced-motion`. The
  * cleanup puts the finished race back.
  */
 export function exploreVersusRace(root: HTMLElement, race: Race): () => void {
@@ -52,7 +53,9 @@ export function exploreVersusRace(root: HTMLElement, race: Race): () => void {
     const button = (event.target as Element).closest<HTMLButtonElement>(
       "button[data-year]",
     );
-    if (button) show(yearStartIndex(race, Number(button.dataset.year)));
+    if (!button) return;
+    interaction.click();
+    show(yearStartIndex(race, Number(button.dataset.year)));
   };
 
   scrub.hidden = false;

@@ -1,7 +1,6 @@
 import { findElement } from "@/features/sequencer/explore";
 import { formatCount } from "@/features/sequencer/model/format";
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { semitonesForDegree } from "@/playback/pitch";
 import {
   barHeight,
   type Comparison,
@@ -13,6 +12,10 @@ import {
   type ThenNowPlan,
   tickLabels,
 } from "./plan";
+
+/** "Then" sits a little under "now" so the pair reads as two sides. */
+const THEN_FILL_DB = -3;
+const NOW_FILL_DB = 0;
 
 /** The elements of one side that the animation and the picker both write. */
 export type PanelElements = {
@@ -102,7 +105,7 @@ export function writeReading(root: HTMLElement, comparison: Comparison): void {
  * Wires the scene to the sequencer's clock: the "then" panel counts up and
  * raises its week shape, then the "now" panel does, then the summary line
  * appears. Every value is a pure function of clock time, written per frame
- * only when it changes. Three soft cues, no timers of its own.
+ * only when it changes. One fill per side, no timers of its own.
  */
 export function mountThenNow(
   root: HTMLElement,
@@ -120,20 +123,14 @@ export function mountThenNow(
   ];
   const summary = findElement<HTMLElement>(root, '[data-role="summary"]');
 
-  const cues = [
-    { time: plan.thenTime, degree: 2 },
-    { time: plan.nowTime, degree: 5 },
-  ];
-  for (const cue of cues) {
-    clock.at(cue.time, (time) => {
-      sound()?.playTick({
-        time,
-        semitones: semitonesForDegree(cue.degree),
-        intensity: 0.6,
-      });
-    });
+  // Each side's bars rise together, so each side gets one fill. The two
+  // sides differ in level so "then" and "now" do not sound identical.
+  for (const { start, db } of [
+    { start: plan.thenTime, db: THEN_FILL_DB },
+    { start: plan.nowTime, db: NOW_FILL_DB },
+  ]) {
+    clock.at(start, (time) => sound()?.fill(time, PANEL_SECONDS, { db }));
   }
-  clock.at(plan.summaryTime, (time) => sound()?.playAccent(time));
 
   const shown = panels.map(() => Number.NaN);
   let summaryShown = Number.NaN;

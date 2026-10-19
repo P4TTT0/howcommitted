@@ -77,6 +77,8 @@ export type MainRepoPlan = {
   eras: EraTile[];
   /** Bars first, then eras: the order of `[data-item]` in the view. */
   readings: Reading[];
+  /** 0..1 per reading, same order: the share that sets the hover pitch. */
+  levels: number[];
   slamTime: number;
   duration: number;
 };
@@ -164,6 +166,12 @@ export function planMainRepo(
     };
   });
 
+  const eraPeak = Math.max(1, ...tiles.map((tile) => tile.commits));
+  const levels = [
+    ...bars.map((bar) => bar.ratio),
+    ...tiles.map((tile) => tile.commits / eraPeak),
+  ];
+
   const name = shortName(main.repo);
   const lastTime = tiles.at(-1)?.time ?? eraStart;
   return {
@@ -176,6 +184,7 @@ export function planMainRepo(
     bars,
     eras: tiles,
     readings: [...bars.map(barReading), ...tiles.map(eraReading)],
+    levels,
     slamTime: quantizeUp(LEAD_SECONDS, GRID_SECONDS),
     duration: Math.max(MIN_SECONDS, lastTime + FLIP_SECONDS + TAIL_SECONDS),
   };
