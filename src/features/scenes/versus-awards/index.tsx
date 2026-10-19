@@ -23,7 +23,7 @@ export const versusAwardsScene: SceneDefinition = {
       duration: REVEAL_SECONDS,
       bpm: REVEAL_BPM,
       view: <AwardsView plan={plan} />,
-      mount: (root, runtime) => mountReveal(root, runtime),
+      mount: (root, runtime) => mountReveal(root, runtime, 1),
     };
   },
 };

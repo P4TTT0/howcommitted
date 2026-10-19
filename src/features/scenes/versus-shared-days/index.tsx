@@ -22,7 +22,8 @@ export const versusSharedDaysScene: SceneDefinition = {
       duration: TOTAL_SECONDS,
       bpm: BPM,
       view: <SharedDaysView model={model} />,
-      mount: (root, runtime) => mountSharedDays(root, runtime),
+      mount: (root, runtime) =>
+        mountSharedDays(root, runtime, model.yearData(model.defaultYear)),
       explore: (root) => exploreSharedDays(root, model),
     };
   },

@@ -19,10 +19,14 @@ export function revealTime(group: number): number {
  * so it is hidden here before the first frame and shown again by the cleanup.
  * Visibility is a pure function of clock time (no timers of our own). Under
  * reduced motion everything shows at once, so only one step sounds.
+ *
+ * `base` starts the stair that many steps up the pentatonic scale, so the info
+ * scenes that follow each other do not open on the same notes.
  */
 export function mountReveal(
   root: HTMLElement,
   { clock, sound, reducedMotion }: SceneRuntime,
+  base = 0,
 ): () => void {
   const groups = new Map<number, HTMLElement[]>();
   for (const element of root.querySelectorAll<HTMLElement>("[data-reveal]")) {
@@ -35,7 +39,9 @@ export function mountReveal(
   // Sound matches what appears: one step per group, or one for all at once.
   const steps = reducedMotion ? ordered.slice(0, 1) : ordered;
   steps.forEach(([group], position) => {
-    clock.at(revealTime(group), (time) => sound()?.stair(time, position));
+    clock.at(revealTime(group), (time) =>
+      sound()?.stair(time, base + position),
+    );
   });
 
   const shown = new Map<number, boolean>();

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const audio = vi.hoisted(() => ({
+  lookAhead: 0.1,
+  outputLatency: undefined as number | undefined,
+}));
+
 const transport = vi.hoisted(() => ({
   ticks: 0,
   PPQ: 192,
@@ -14,7 +19,10 @@ const transport = vi.hoisted(() => ({
 
 vi.mock("tone", () => ({
   getTransport: () => transport,
-  getContext: () => ({ lookAhead: 0.1 }),
+  getContext: () => ({
+    lookAhead: audio.lookAhead,
+    rawContext: { outputLatency: audio.outputLatency },
+  }),
   start: vi.fn(async () => {}),
 }));
 
@@ -38,6 +46,8 @@ beforeEach(() => {
   visibility = [];
   doc.hidden = false;
   transport.ticks = 0;
+  audio.lookAhead = 0.1;
+  audio.outputLatency = undefined;
   vi.clearAllMocks();
   vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
     frames.push(callback);
@@ -183,6 +193,23 @@ describe("PlaybackClock", () => {
     transport.ticks = 10.05 * TPS;
     runFrame();
     expect(clock.status).toBe("ended");
+  });
+
+  it("drives frames from the audible time, one look-ahead behind the Transport", () => {
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    const seen: number[] = [];
+    clock.onFrame((seconds) => seen.push(seconds));
+    clock.start();
+    transport.ticks = 3 * TPS;
+    runFrame();
+    expect(seen.at(-1)).toBeCloseTo(2.9);
+  });
+
+  it("also subtracts the output latency the browser reports", () => {
+    audio.outputLatency = 0.04;
+    const clock = new PlaybackClock({ duration: 10, bpm: 120 });
+    transport.ticks = 3 * TPS;
+    expect(clock.seconds).toBeCloseTo(2.86);
   });
 
   it("ignores speeds that are not positive numbers", () => {

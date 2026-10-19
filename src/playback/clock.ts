@@ -24,7 +24,8 @@
  * The Transport position runs `lookAhead` seconds ahead of what the speakers
  * play (Tone schedules audio slightly early). Visual time subtracts it so
  * what is drawn matches what is heard. Output latency of the device is not
- * compensated here; see the spike notes if hardware offsets show up.
+ * compensated beyond what the browser reports (`outputLatency`, when it
+ * does), so Bluetooth outputs may still sit a little late.
  *
  * The browser's AudioContext only runs after a user gesture, so `unlock`
  * must be called from a click handler before `start`.
@@ -95,9 +96,25 @@ export class PlaybackClock {
     return Tone.getTransport().ticks / this.ticksPerSecond;
   }
 
+  /**
+   * Real seconds between the Transport position and the speakers: the
+   * scheduling look-ahead plus the output latency the browser reports.
+   */
+  private get audioDelay(): number {
+    const context = Tone.getContext();
+    const output = (
+      context.rawContext as { outputLatency?: number } | undefined
+    )?.outputLatency;
+    const latency =
+      typeof output === "number" && Number.isFinite(output)
+        ? Math.min(0.25, Math.max(0, output))
+        : 0;
+    return context.lookAhead + latency;
+  }
+
   /** Scene seconds as seen and heard right now. */
   get seconds(): number {
-    const heard = this.sceneSeconds - Tone.getContext().lookAhead * this.rate;
+    const heard = this.sceneSeconds - this.audioDelay * this.rate;
     return Math.min(this.duration, Math.max(0, heard));
   }
 

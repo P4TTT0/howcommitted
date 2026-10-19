@@ -1,23 +1,25 @@
 import { findElement } from "@/features/sequencer/explore";
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { findGrids } from "./paint";
+import { daySlots, findGrids } from "./paint";
 import {
-  groupPopTimes,
+  drawnGroupPopTimes,
   groupsShown,
   REVEAL_SECONDS,
   STATS_FADE_SECONDS,
+  type YearData,
 } from "./plan";
 
 /**
  * Wires the scene to the sequencer's clock: the year appears week by week on
  * wide screens and month by month on phones, then the numbers fade in. Every
  * value is a pure function of clock time, written per frame only when it
- * changes. A pop per week column (or month block) as it draws; no timers of
+ * changes. A pop per week column (or month block) that draws a day; no timers of
  * its own. Returns the cleanup.
  */
 export function mountSharedDays(
   root: HTMLElement,
   { clock, sound, reducedMotion }: SceneRuntime,
+  year: YearData,
 ): () => void {
   const grids = findGrids(root);
   const stats = findElement<HTMLElement>(root, '[data-role="stats"]');
@@ -25,8 +27,8 @@ export function mountSharedDays(
   // Only the layout on screen makes sound: the other one is display:none.
   const audible = grids.find((grid) => grid.container.offsetParent !== null);
   if (audible) {
-    const groups = Math.ceil(audible.slots.length / audible.groupSize);
-    const popTimes = groupPopTimes(groups);
+    const slots = daySlots(audible, year);
+    const popTimes = drawnGroupPopTimes(slots, audible.groupSize);
     // Under reduced motion the grid shows at once: one pop stands for all.
     for (const time of reducedMotion ? popTimes.slice(0, 1) : popTimes) {
       clock.at(time, (at) => sound()?.pop(at));

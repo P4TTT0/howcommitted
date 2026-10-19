@@ -23,7 +23,7 @@ export const versusRhythmSyncScene: SceneDefinition = {
       duration: REVEAL_SECONDS,
       bpm: REVEAL_BPM,
       view: <RhythmSyncView plan={plan} />,
-      mount: (root, runtime) => mountReveal(root, runtime),
+      mount: (root, runtime) => mountReveal(root, runtime, 2),
     };
   },
 };
