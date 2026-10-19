@@ -1,7 +1,20 @@
+import { FitText } from "@/features/scenes/finale/FitText";
 import { swatchClass } from "@/features/versus/palette";
-import { labelClass } from "@/ui/classes";
 import { SceneFrame } from "@/ui/SceneFrame";
 import type { LanguagePerson, LanguagesPlan } from "./plan";
+
+/** Meaning of the removed on-screen note, kept for assistive technology. */
+const SCOPE =
+  "Languages of each developer's own public repositories, by code size.";
+
+/** Cards per row on a tablet: two rows at most for five developers. */
+const TABLET_COLUMNS: Record<number, string> = {
+  1: "sm:grid-cols-1",
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-3",
+  4: "sm:grid-cols-2",
+  5: "sm:grid-cols-3",
+};
 
 /** Wide screens give every developer a column, up to the five a lineup holds. */
 const WIDE_COLUMNS: Record<number, string> = {
@@ -12,145 +25,111 @@ const WIDE_COLUMNS: Record<number, string> = {
   5: "lg:grid-cols-5",
 };
 
-/** The segments of a phone's bar fade out, so each language reads apart. */
-const SEGMENT_OPACITY = [1, 0.7, 0.5, 0.35, 0.22, 0.12] as const;
+/** Text on each swatch: ink where white would read too faintly. */
+const FOREGROUND = [
+  "text-paper",
+  "text-paper",
+  "text-ink",
+  "text-paper",
+  "text-ink",
+] as const;
 
-/** "Python 25% · Rust 15%": the next three languages after the favorite, as one line. */
-function othersLine(person: LanguagePerson): string {
-  return person.rows
-    .filter((row) => !row.isOther)
-    .slice(1, 4)
-    .map((row) => `${row.name} ${row.percent}%`)
-    .join(" · ");
-}
+/** A phone lists three languages per card, larger screens five. */
+const PHONE_ROWS = 3;
 
 /**
- * One developer. A phone gets a slim row (favorite and share on one line, a
- * segmented bar, the rest as text); from the small breakpoint up it is a card
- * with a bar per language.
+ * One developer, same shape for everyone: a block in their color (login, the
+ * favorite language, its share) and a thin bar per language below it.
  */
 function Card({ person }: { person: LanguagePerson }) {
+  const foreground = FOREGROUND[person.index % FOREGROUND.length];
   return (
     <li
       data-reveal={person.index}
-      className="flex min-w-0 border-2 border-ink sm:flex-col"
+      className="flex min-w-0 flex-col border-2 border-ink sm:min-h-0"
     >
       <div
-        aria-hidden="true"
-        className={`w-2.5 shrink-0 sm:h-3 sm:w-auto ${swatchClass(person.index)}`}
-      />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 p-2 sm:gap-1.5 sm:p-4">
+        className={`@container flex flex-1 sm:min-h-0 flex-col gap-1.5 px-4 py-3 sm:py-4 ${swatchClass(person.index)} ${foreground}`}
+      >
         <p className="min-w-0 [overflow-wrap:anywhere] font-mono text-xs font-bold">
           @{person.login}
         </p>
-        {person.top ? (
-          <>
-            <p className={`${labelClass} max-sm:sr-only`}>Favorite language</p>
-            <div className="flex items-baseline justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-1.5">
-              <p className="min-w-0 font-display text-[1.75rem] font-black uppercase leading-[0.9] [overflow-wrap:anywhere] sm:text-[clamp(1.75rem,3.4vw,3.75rem)]">
-                {person.top.name}
-              </p>
-              <p className="shrink-0 font-display text-lg font-extrabold leading-none sm:text-3xl">
-                {person.top.percent}% of their code
-              </p>
-            </div>
-            <div
-              aria-hidden="true"
-              className="flex h-2 gap-px bg-ink/10 sm:hidden"
-            >
-              {person.rows.map((row, position) => (
-                <div
-                  key={row.name}
-                  className={`h-full ${swatchClass(person.index)}`}
-                  style={{
-                    width: `${row.percent}%`,
-                    opacity: SEGMENT_OPACITY[position] ?? 0.12,
-                  }}
-                />
-              ))}
-            </div>
-            {othersLine(person) !== "" && (
-              <p className="font-mono text-[11px] leading-[1.5] sm:hidden">
-                {othersLine(person)}
-              </p>
-            )}
-            <ul className="mt-auto hidden flex-col gap-2 pt-2 sm:flex">
-              {person.rows.map((row, position) => (
-                <li key={row.name} className="flex flex-col gap-0.5">
-                  <p
-                    className={`flex justify-between gap-2 font-mono text-xs ${position === 0 ? "font-bold" : ""}`}
-                  >
-                    <span className="min-w-0 [overflow-wrap:anywhere]">
-                      {row.name}
-                    </span>
-                    <span className="tabular-nums">{row.percent}%</span>
-                  </p>
-                  <div aria-hidden="true" className="h-2.5 bg-ink/15">
-                    <div
-                      className={`h-full ${swatchClass(person.index)}`}
-                      style={{ width: `${row.percent}%` }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="font-mono text-xs leading-[1.6]">
-            No public code to read languages from.
-          </p>
-        )}
+        <FitText className="mt-auto font-display text-[length:min(24cqi,12dvh)] font-black uppercase leading-[0.82] max-sm:text-[length:min(20cqi,10dvh)]">
+          {person.top ? person.top.name : "—"}
+        </FitText>
+        <p className="font-mono text-xs [font-stretch:87.5%]">
+          {person.top
+            ? `${person.top.percent}% of their public code`
+            : "No public repositories"}
+        </p>
       </div>
+      <ul className="flex shrink-0 flex-col gap-2 px-4 py-3 sm:min-h-[8.5rem] lg:py-4">
+        {person.rows.map((row, position) => (
+          <li
+            key={row.name}
+            title={`${row.name}: ${row.percent}%`}
+            className={`grid grid-cols-[minmax(0,40%)_minmax(0,1fr)_2.5rem] items-center gap-2.5 font-mono text-xs [font-stretch:87.5%] ${
+              position >= PHONE_ROWS ? "max-sm:hidden" : ""
+            }`}
+          >
+            <span className={`truncate ${position === 0 ? "font-bold" : ""}`}>
+              {row.name}
+            </span>
+            <span aria-hidden="true" className="h-2.5 bg-ink/15">
+              <span
+                className={`block h-full ${swatchClass(person.index)}`}
+                style={{ width: `${row.percent}%` }}
+              />
+            </span>
+            <span className="text-right tabular-nums">{row.percent}%</span>
+          </li>
+        ))}
+      </ul>
     </li>
   );
 }
 
 /**
- * Versus scene 4, the markup: one card per developer in the order they were
- * added, each with their own languages. Slim rows on a phone, two columns on
- * a tablet, one column each on wide screens.
+ * Versus scene 4, the markup: one equal card per developer in the order they
+ * were added, with their own languages. No scroll from a tablet up (cards go
+ * to up to five columns or two rows); a phone stacks compact cards and may
+ * scroll.
  */
 export function LanguagesView({ plan }: { plan: LanguagesPlan }) {
   const count = plan.people.length;
+  const [lead, ...rest] = plan.facts;
   return (
     <div className="absolute inset-0">
       <SceneFrame
         sceneLabel="Languages"
         title="Languages."
-        note="Languages of each developer's own public repositories, by code size."
+        aside={
+          lead ? (
+            <p
+              data-reveal={count}
+              className="min-w-0 max-w-full [overflow-wrap:anywhere] bg-ink px-[18px] py-3 font-display text-[length:clamp(1.25rem,2.3vw,1.875rem)] font-black uppercase leading-none text-paper"
+            >
+              {lead}
+            </p>
+          ) : undefined
+        }
       >
         <section
           aria-label="Favorite languages of each developer"
-          className="flex h-full min-h-0 flex-col gap-2 sm:gap-4"
+          aria-describedby="languages-scope"
+          className="flex h-full min-h-0 flex-col"
         >
+          <p id="languages-scope" className="sr-only">
+            {SCOPE}
+          </p>
+          {rest.length > 0 && <p className="sr-only">{rest.join(" ")}</p>}
           <ul
-            className={`grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto sm:auto-rows-[minmax(min-content,1fr)] sm:grid-cols-2 sm:gap-4 ${WIDE_COLUMNS[count] ?? "lg:grid-cols-5"}`}
+            className={`grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto sm:auto-rows-[minmax(0,1fr)] sm:gap-4 sm:overflow-visible ${TABLET_COLUMNS[count] ?? "sm:grid-cols-3"} ${WIDE_COLUMNS[count] ?? "lg:grid-cols-5"}`}
           >
             {plan.people.map((person) => (
               <Card key={person.login.toLowerCase()} person={person} />
             ))}
           </ul>
-          {plan.facts.length > 0 && (
-            <div
-              data-reveal={count}
-              className="grid shrink-0 gap-2 sm:grid-cols-2 sm:gap-4"
-            >
-              {plan.facts.map((fact, index) => (
-                <p
-                  key={fact}
-                  className={`min-w-0 [overflow-wrap:anywhere] px-3.5 py-2 font-display text-lg font-extrabold uppercase leading-none sm:px-[18px] sm:py-3.5 sm:text-3xl ${
-                    index > 0 ? "max-sm:hidden " : ""
-                  }${
-                    index === 0
-                      ? "bg-ink text-paper"
-                      : "border-2 border-ink text-ink"
-                  }`}
-                >
-                  {fact}
-                </p>
-              ))}
-            </div>
-          )}
         </section>
       </SceneFrame>
     </div>
