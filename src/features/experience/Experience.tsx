@@ -10,6 +10,8 @@ import { Sequencer } from "@/features/sequencer/Sequencer";
 import { shortcutFor } from "@/features/sequencer/shortcuts";
 import type { SceneData } from "@/features/sequencer/types";
 import { fetchHistory } from "@/features/versus/loadHistories";
+import { interaction } from "@/playback/sound/interaction";
+import { useExperienceInteraction } from "@/playback/sound/useExperienceInteraction";
 import { isAudioUnlocked, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
 import { ScreenMain } from "@/ui/ScreenMain";
@@ -87,6 +89,7 @@ export function Experience({ login }: { login: string }) {
   const inFlightRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const router = useRouter();
+  useExperienceInteraction();
 
   async function begin() {
     // One request at a time: a double click or a retry mid-flight is a no-op.
@@ -159,6 +162,7 @@ export function Experience({ login }: { login: string }) {
 
   /** Click handler: unlocks audio synchronously, then fetches. */
   function start() {
+    interaction.click();
     void unlockAudio();
     void begin();
   }
@@ -223,7 +227,11 @@ function screen(
                   Try again
                 </button>
               )}
-              <Link href="/" className={actionClass}>
+              <Link
+                href="/"
+                className={actionClass}
+                onClick={() => interaction.click()}
+              >
                 Search again
               </Link>
             </div>
@@ -244,7 +252,11 @@ function screen(
               their GitHub profile.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Link href="/" className={actionClass}>
+              <Link
+                href="/"
+                className={actionClass}
+                onClick={() => interaction.click()}
+              >
                 Search again
               </Link>
             </div>

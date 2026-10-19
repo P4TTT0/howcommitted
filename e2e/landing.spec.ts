@@ -93,6 +93,22 @@ test("the header credits the author and links out", async ({ page }) => {
   );
 });
 
+test("the sound toggle starts off, flips on click and survives a reload", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const toggle = page
+    .getByRole("navigation", { name: "About" })
+    .getByRole("button", { name: /^Sound/ });
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle).toHaveText("Sound off");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle).toHaveText("Sound on");
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+});
+
 test("the placeholder types example usernames", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");

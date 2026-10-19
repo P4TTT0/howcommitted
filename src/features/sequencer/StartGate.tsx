@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { interaction } from "@/playback/sound/interaction";
 import { StartButton } from "@/ui/StartButton";
 
 export type StartPhase = "start" | "loading" | "running";
@@ -28,7 +29,13 @@ export function StartGate({
         starting
       ) : (
         <>
-          <StartButton onClick={onBegin} disabled={phase === "loading"} />
+          <StartButton
+            onClick={() => {
+              interaction.click();
+              onBegin();
+            }}
+            disabled={phase === "loading"}
+          />
           <p className="max-w-prose text-center font-mono text-xs">
             {phase === "loading" ? "Loading sound" : caption}
           </p>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FitText } from "@/features/scenes/finale/FitText";
+import { interaction } from "@/playback/sound/interaction";
 import { actionClass, labelClass } from "@/ui/classes";
 import {
   cellFill,
@@ -80,7 +81,10 @@ export function LoadingScreen({
           </p>
           <button
             type="button"
-            onClick={onCancel}
+            onClick={() => {
+              interaction.click();
+              onCancel();
+            }}
             className={`${actionClass} border-paper hover:border-paper hover:bg-paper hover:text-ink`}
           >
             Cancel

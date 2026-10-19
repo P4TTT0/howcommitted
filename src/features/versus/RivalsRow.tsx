@@ -9,6 +9,7 @@ import {
   lookupMessage,
   type PreviewUser,
 } from "@/features/search/lookup";
+import { interaction } from "@/playback/sound/interaction";
 import { actionClass, focusRing, pressable } from "@/ui/classes";
 import { swatchClass } from "./palette";
 import { MAX_DEVELOPERS } from "./parseVersusLogins";
@@ -142,6 +143,10 @@ export function RivalsRow({
         {rivals.map((rival, index) => (
           <li
             key={rival.login.toLowerCase()}
+            onPointerEnter={() =>
+              interaction.hover(0.5, `rival:${rival.login.toLowerCase()}`)
+            }
+            onPointerLeave={() => interaction.leave()}
             className="flex min-h-8 items-center gap-2 border-2 border-ink bg-paper pr-0.5 pl-2 wide:min-h-9 wide:pr-1"
           >
             <span
@@ -168,6 +173,7 @@ export function RivalsRow({
                 else removeRefs.current.delete(key);
               }}
               onClick={() => {
+                interaction.click();
                 onChange(rivals.filter((other) => other !== rival));
                 // Next pill's remove button, else "+ vs".
                 const next = rivals[index + 1];
@@ -189,7 +195,10 @@ export function RivalsRow({
             <button
               type="button"
               ref={addRef}
-              onClick={() => setOpen(true)}
+              onClick={() => {
+                interaction.click();
+                setOpen(true);
+              }}
               className={`${actionClass} min-h-9`}
             >
               + vs
@@ -219,7 +228,10 @@ export function RivalsRow({
             <button
               type="button"
               aria-label="Cancel adding a rival"
-              onClick={close}
+              onClick={() => {
+                interaction.click();
+                close();
+              }}
               className={`inline-flex size-9 items-center justify-center border-2 border-ink hover:bg-ink hover:text-paper ${pressable} ${focusRing}`}
             >
               <span aria-hidden="true">×</span>

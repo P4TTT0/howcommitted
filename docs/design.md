@@ -74,6 +74,7 @@ Addictive, satisfying incremental sound. Reference: Balatro.
 - Audio aggregates by week or month and is quantized to tempo with a voice limit. Never one sound per raw commit. A pop per drawn block is allowed, quantized with a voice cap.
 - Recorded or curated samples, never default synths.
 - Sound starts only after a user gesture. Mute is always visible.
+- The landing has a sound toggle, off by default, and one site-wide preference shared with the experience.
 - Under reduced motion, whatever appears at once gets one sound, not a run of them: the sound follows what is on screen.
 
 ### Gestures

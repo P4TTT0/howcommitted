@@ -12,6 +12,7 @@ import { recordIntent } from "@/features/experience/intent";
 import { versusPath } from "@/features/versus/parseVersusLogins";
 import { RivalsRow } from "@/features/versus/RivalsRow";
 import { rivalsFor } from "@/features/versus/rivals";
+import { interaction } from "@/playback/sound/interaction";
 import { preloadAudio, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
 import { StartButton } from "@/ui/StartButton";
@@ -136,6 +137,7 @@ export function Search({ versus = true }: { versus?: boolean }) {
   async function start() {
     if (!found || starting) return;
     setStarting(true);
+    interaction.click();
     // Called before any await so the click still counts as the user gesture.
     const unlocked = await unlockAudio();
     const logins = [found.login, ...rivalLogins];
@@ -258,7 +260,10 @@ export function Search({ versus = true }: { versus?: boolean }) {
               canRetry(state) && (
                 <button
                   type="button"
-                  onClick={() => setAttempt((count) => count + 1)}
+                  onClick={() => {
+                    interaction.click();
+                    setAttempt((count) => count + 1);
+                  }}
                   className={`${actionClass} min-h-11`}
                 >
                   Try again
@@ -275,6 +280,8 @@ export function Search({ versus = true }: { versus?: boolean }) {
             size="cta"
             aria-disabled={!found || starting}
             aria-label={found ? `Play @${found.login}` : undefined}
+            onPointerEnter={() => interaction.hover(0.5, "play")}
+            onPointerLeave={() => interaction.leave()}
           >
             Play
           </StartButton>
