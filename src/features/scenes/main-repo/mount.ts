@@ -1,5 +1,6 @@
 import { findElement } from "@/features/sequencer/explore";
 import type { SceneRuntime } from "@/features/sequencer/types";
+import { scheduleFill } from "@/playback/sound/ticks";
 import {
   BAR_SECONDS,
   FLIP_SECONDS,
@@ -38,11 +39,10 @@ export function mountMainRepo(
   // Under reduced motion everything shows at once: only the first sounds.
   plan.bars.forEach((bar, index) => {
     if (reducedMotion && index > 0) return;
-    clock.at(bar.time, (time) => {
-      const engine = sound();
-      engine?.fill(time, BAR_SECONDS);
-      engine?.stair(time, Math.min(MAX_STAIR_INDEX, index));
-    });
+    scheduleFill(clock, sound, bar.time, BAR_SECONDS);
+    clock.at(bar.time, (time) =>
+      sound()?.stair(time, Math.min(MAX_STAIR_INDEX, index)),
+    );
   });
   plan.eras.forEach((era, index) => {
     if (reducedMotion) return;

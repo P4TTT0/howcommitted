@@ -4,9 +4,9 @@
  * clock grid (see docs/design.md, Sound):
  *
  * - pop: a small block appears.
- * - fill: a bar loads.
+ * - fill: a bar loads (ticks scheduled by `scheduleFill`).
  * - stair: the next item in a sequence appears, low to high.
- * - count: a number climbs, then settles.
+ * - count: a number climbs, then settles (`scheduleCount`).
  * - payoff: a milestone or a pass, heavy and rare.
  *
  * Each gesture caps its simultaneous voices; past the cap the oldest is cut.
@@ -15,14 +15,14 @@
 
 import * as Tone from "tone";
 import { rateForSemitones, tickDbForSpeed } from "../pitch";
+import { acceptPop, countRate, stairSemitones } from "./gestures";
 import {
-  acceptPop,
-  countRate,
-  countTicks,
-  fillTicks,
-  stairSemitones,
-} from "./gestures";
-import { disposePools, loadSamples, type Pool, playSample } from "./samples";
+  disposePools,
+  loadSamples,
+  type Pool,
+  playSample,
+  stopPools,
+} from "./samples";
 
 const FILES = [
   "pop",
@@ -104,28 +104,17 @@ export class SoundEngine {
   }
 
   /**
-   * Gesture: a bar loads. Schedules its own ticks over `duration`, then
-   * silence. `from`/`to` (0..1) place it on one longer climb, so pitch and
-   * density follow that position and consecutive segments continue each other.
+   * Gesture: one tick of a loading bar. A bar is many of these, each scheduled
+   * on the clock by `scheduleFill`, so pause, resume and seek hold them.
    */
-  fill(
-    startTime: number,
-    duration: number,
-    {
-      db = 0,
-      from = 0,
-      to = 1,
-    }: { db?: number; from?: number; to?: number } = {},
-  ): void {
-    for (const { offset, rate } of fillTicks(duration, from, to)) {
-      playSample(
-        this.pools.fill,
-        FILL_VOICE_LIMIT,
-        this.limiter,
-        this.buffers.get("fill-tick"),
-        { time: startTime + offset, rate, db: FILL_DB + db + this.speedDb },
-      );
-    }
+  fillTick(time: number, rate: number, db = 0): void {
+    playSample(
+      this.pools.fill,
+      FILL_VOICE_LIMIT,
+      this.limiter,
+      this.buffers.get("fill-tick"),
+      { time, rate, db: FILL_DB + db + this.speedDb },
+    );
   }
 
   /** Gesture: step `index` (0-based) of a sequence, low to high, pentatonic. */
@@ -166,14 +155,11 @@ export class SoundEngine {
   }
 
   /**
-   * Gesture: a number climbs over `duration` in `steps` ticks, then settles
-   * with one closing hit at `startTime + duration`.
+   * Stops every voice in every pool now, with the short fade used for cuts.
+   * Called when the clock pauses or is cancelled so nothing rings into it.
    */
-  count(startTime: number, duration: number, steps: number): void {
-    for (const { offset, progress } of countTicks(duration, steps)) {
-      this.countTick(startTime + offset, progress);
-    }
-    this.countClose(startTime + Math.max(0, duration));
+  silence(): void {
+    stopPools(this.pools, Tone.now());
   }
 
   /** Gesture: a milestone ("@a passes @b"). Heavy and rare. */
