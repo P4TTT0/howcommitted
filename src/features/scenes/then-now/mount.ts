@@ -127,11 +127,14 @@ export function mountThenNow(
   // its total relative to the larger side. The two sides differ in level so
   // "then" and "now" do not sound identical.
   const larger = Math.max(earlier.total, now.total);
-  for (const { start, db, total } of [
+  const sides = [
     { start: plan.thenTime, db: THEN_FILL_DB, total: earlier.total },
     { start: plan.nowTime, db: NOW_FILL_DB, total: now.total },
-  ]) {
-    if (!(total > 0)) continue;
+  ].filter((side) => side.total > 0);
+  // Under reduced motion both sides show at once: one fill stands for both.
+  for (const { start, db, total } of reducedMotion
+    ? sides.slice(0, 1)
+    : sides) {
     const to = total / larger;
     clock.at(start, (time) =>
       sound()?.fill(time, PANEL_SECONDS * to, { db, to }),

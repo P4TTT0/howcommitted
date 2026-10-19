@@ -32,7 +32,8 @@ export function mountStreaks(
   });
 
   // Build everything above before scheduling: a throw leaves nothing behind.
-  for (const { time } of pops) {
+  // Under reduced motion every row shows at once: one pop stands for all.
+  for (const { time } of reducedMotion ? pops.slice(0, 1) : pops) {
     clock.at(time, (at) => sound()?.pop(at));
   }
 

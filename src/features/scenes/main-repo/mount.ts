@@ -35,7 +35,9 @@ export function mountMainRepo(
 
   // Each repo bar loads (fill) and steps up the stair as its row appears;
   // the era tiles run their own stair as each one flips in.
+  // Under reduced motion everything shows at once: only the first sounds.
   plan.bars.forEach((bar, index) => {
+    if (reducedMotion && index > 0) return;
     clock.at(bar.time, (time) => {
       const engine = sound();
       engine?.fill(time, BAR_SECONDS);
@@ -43,6 +45,7 @@ export function mountMainRepo(
     });
   });
   plan.eras.forEach((era, index) => {
+    if (reducedMotion) return;
     clock.at(era.time, (time) =>
       sound()?.stair(time, Math.min(MAX_STAIR_INDEX, index)),
     );

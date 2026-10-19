@@ -20,8 +20,9 @@ export function mountWeekShape(
 
   // Each bar loads as it grows and climbs to its own height relative to the
   // tallest, so a short bar is a short, low fill and the tallest reaches the top.
-  for (const bar of plan.bars) {
-    if (bar.ratio <= 0) continue;
+  const audible = plan.bars.filter((bar) => bar.ratio > 0);
+  // Under reduced motion the bars show at once: one fill stands for all.
+  for (const bar of reducedMotion ? audible.slice(0, 1) : audible) {
     const to = bar.ratio;
     clock.at(bar.start, (time) =>
       sound()?.fill(time, (bar.land - bar.start) * to, { to }),
