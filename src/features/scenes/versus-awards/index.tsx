@@ -1,4 +1,5 @@
 import type { SceneDefinition } from "@/features/sequencer/types";
+import { createPhoneCarousel } from "@/features/versus/mountCarousel";
 import {
   mountReveal,
   REVEAL_BPM,
@@ -19,11 +20,20 @@ export const versusAwardsScene: SceneDefinition = {
     if (!versus || versus.length < 2) return null;
     const plan = planAwards(versusProfiles(versus));
     if (!plan) return null;
+    const carousel = createPhoneCarousel();
     return {
       duration: REVEAL_SECONDS,
       bpm: REVEAL_BPM,
       view: <AwardsView plan={plan} />,
-      mount: (root, runtime) => mountReveal(root, runtime, 1),
+      mount: (root, runtime) => {
+        const stopReveal = mountReveal(root, runtime, 1);
+        const stopCarousel = carousel.mount(root, runtime);
+        return () => {
+          stopCarousel();
+          stopReveal();
+        };
+      },
+      explore: () => carousel.explore(),
     };
   },
 };

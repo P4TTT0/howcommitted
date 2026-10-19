@@ -125,6 +125,17 @@ async function open(page: Page, logins: string[]) {
   return awards;
 }
 
+/** Steps forward and back so the scene reopens finished, in explore. */
+async function toExplore(page: Page) {
+  await expect(next(page)).toBeEnabled();
+  await next(page).click();
+  await page.getByRole("button", { name: "Previous scene" }).click();
+}
+
+/** The slide on screen in the phone carousel. */
+const activeSlide = (page: Page) =>
+  page.locator("[data-carousel-track] > [data-reveal]:not([data-off])");
+
 const LINEUPS = [
   { name: "2 developers", logins: ["ada", "grace"] },
   { name: "3 developers", logins: ["ada", "grace", "linus"] },
@@ -148,11 +159,9 @@ for (const viewport of VIEWPORTS) {
     }) => {
       await page.setViewportSize(viewport);
       const awards = await open(page, [...lineup.logins]);
-      // Only a phone may scroll the scene.
-      await expectSceneFits(page, {
-        allowScroll: viewport.width < 768,
-        tapTargets: true,
-      });
+      // A phone fits too: its carousel shows one finished card at a time.
+      if (viewport.width < 768) await toExplore(page);
+      await expectSceneFits(page, { allowScroll: false, tapTargets: true });
 
       if (viewport.width >= 768) {
         const sizes = await awards
@@ -168,6 +177,23 @@ for (const viewport of VIEWPORTS) {
       }
     });
   }
+}
+
+for (const viewport of VIEWPORTS.filter(({ width }) => width < 768)) {
+  test(`awards carousel at ${viewport.name}: the active card fits and the arrow moves on`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await open(page, ["ada", "grace", "linus"]);
+    await toExplore(page);
+    await expectSceneFits(page, { tapTargets: true, allowScroll: false });
+    await expect(activeSlide(page)).toHaveCount(1);
+    await page.getByRole("button", { name: "Show @ada" }).click();
+    await expect(activeSlide(page)).toContainText("@ada");
+    await page.getByRole("button", { name: "Show next developer" }).click();
+    await expect(activeSlide(page)).toContainText("@grace");
+    await expectSceneFits(page, { tapTargets: true, allowScroll: false });
+  });
 }
 
 test("awards name habits, one column per developer", async ({ page }) => {

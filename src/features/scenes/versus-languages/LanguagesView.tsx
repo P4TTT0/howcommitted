@@ -1,4 +1,9 @@
 import { FitText } from "@/features/scenes/finale/FitText";
+import {
+  CAROUSEL_SLIDE,
+  CAROUSEL_TRACK,
+  PhoneCarousel,
+} from "@/features/versus/PhoneCarousel";
 import { swatchClass } from "@/features/versus/palette";
 import { SceneFrame } from "@/ui/SceneFrame";
 import type { LanguagePerson, LanguagesPlan } from "./plan";
@@ -9,11 +14,11 @@ const SCOPE =
 
 /** Cards per row on a tablet: two rows at most for five developers. */
 const TABLET_COLUMNS: Record<number, string> = {
-  1: "sm:grid-cols-1",
-  2: "sm:grid-cols-2",
-  3: "sm:grid-cols-3",
-  4: "sm:grid-cols-2",
-  5: "sm:grid-cols-3",
+  1: "md:grid-cols-1",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-2",
+  5: "md:grid-cols-3",
 };
 
 /** Wide screens give every developer a column, up to the five a lineup holds. */
@@ -34,9 +39,6 @@ const FOREGROUND = [
   "text-ink",
 ] as const;
 
-/** A phone lists three languages per card, larger screens five. */
-const PHONE_ROWS = 3;
-
 /**
  * One developer, same shape for everyone: a block in their color (login, the
  * favorite language, its share) and a thin bar per language below it.
@@ -46,15 +48,18 @@ function Card({ person }: { person: LanguagePerson }) {
   return (
     <li
       data-reveal={person.index}
-      className="flex min-w-0 flex-col border-2 border-ink sm:min-h-0"
+      className={`flex min-w-0 flex-col border-2 border-ink md:min-h-0 ${CAROUSEL_SLIDE}`}
     >
       <div
-        className={`@container flex flex-1 sm:min-h-0 flex-col gap-1.5 px-4 py-3 sm:py-4 ${swatchClass(person.index)} ${foreground}`}
+        className={`@container flex min-h-0 flex-1 flex-col gap-1.5 px-4 py-3 md:py-4 ${swatchClass(person.index)} ${foreground}`}
       >
-        <p className="min-w-0 [overflow-wrap:anywhere] font-mono text-xs font-bold">
+        <p
+          className="min-w-0 font-mono text-xs font-bold max-md:truncate md:[overflow-wrap:anywhere]"
+          title={`@${person.login}`}
+        >
           @{person.login}
         </p>
-        <FitText className="mt-auto font-display text-[length:min(24cqi,12dvh)] font-black uppercase leading-[0.82] max-sm:text-[length:min(20cqi,10dvh)]">
+        <FitText className="mt-auto font-display text-[length:min(24cqi,12dvh)] font-black uppercase leading-[0.82] max-md:text-[length:min(20cqi,7dvh)]">
           {person.top ? person.top.name : "—"}
         </FitText>
         <p className="font-mono text-xs [font-stretch:87.5%]">
@@ -63,14 +68,13 @@ function Card({ person }: { person: LanguagePerson }) {
             : "No public repositories"}
         </p>
       </div>
-      <ul className="flex shrink-0 flex-col gap-2 px-4 py-3 sm:min-h-[8.5rem] lg:py-4">
+      {/* A phone shows the top three; the rest stay for wider screens. */}
+      <ul className="flex shrink-0 flex-col gap-2 px-4 py-3 md:min-h-[8.5rem] lg:py-4 max-md:[&>li:nth-child(n+4)]:hidden">
         {person.rows.map((row, position) => (
           <li
             key={row.name}
             title={`${row.name}: ${row.percent}%`}
-            className={`grid grid-cols-[minmax(0,40%)_minmax(0,1fr)_2.5rem] items-center gap-2.5 font-mono text-xs [font-stretch:87.5%] ${
-              position >= PHONE_ROWS ? "max-sm:hidden" : ""
-            }`}
+            className="grid grid-cols-[minmax(0,40%)_minmax(0,1fr)_2.5rem] items-center gap-2.5 font-mono text-xs [font-stretch:87.5%]"
           >
             <span className={`truncate ${position === 0 ? "font-bold" : ""}`}>
               {row.name}
@@ -92,8 +96,8 @@ function Card({ person }: { person: LanguagePerson }) {
 /**
  * Versus scene 4, the markup: one equal card per developer in the order they
  * were added, with their own languages. No scroll from a tablet up (cards go
- * to up to five columns or two rows); a phone stacks compact cards and may
- * scroll.
+ * to up to five columns or two rows); a phone shows one card at a time in a
+ * carousel.
  */
 export function LanguagesView({ plan }: { plan: LanguagesPlan }) {
   const count = plan.people.length;
@@ -123,13 +127,22 @@ export function LanguagesView({ plan }: { plan: LanguagesPlan }) {
             {SCOPE}
           </p>
           {rest.length > 0 && <p className="sr-only">{rest.join(" ")}</p>}
-          <ul
-            className={`grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto sm:auto-rows-[minmax(0,1fr)] sm:gap-4 sm:overflow-visible ${TABLET_COLUMNS[count] ?? "sm:grid-cols-3"} ${WIDE_COLUMNS[count] ?? "lg:grid-cols-5"}`}
+          <PhoneCarousel
+            className="flex-1"
+            logins={plan.people.map((person) => ({
+              login: person.login,
+              slot: person.index,
+            }))}
           >
-            {plan.people.map((person) => (
-              <Card key={person.login.toLowerCase()} person={person} />
-            ))}
-          </ul>
+            <ul
+              data-carousel-track
+              className={`min-h-0 flex-1 md:grid md:auto-rows-[minmax(0,1fr)] md:gap-4 ${CAROUSEL_TRACK} ${TABLET_COLUMNS[count] ?? "md:grid-cols-3"} ${WIDE_COLUMNS[count] ?? "lg:grid-cols-5"}`}
+            >
+              {plan.people.map((person) => (
+                <Card key={person.login.toLowerCase()} person={person} />
+              ))}
+            </ul>
+          </PhoneCarousel>
         </section>
       </SceneFrame>
     </div>
