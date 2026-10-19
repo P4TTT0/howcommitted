@@ -8,8 +8,6 @@ import { LEVEL_ALPHA, tint, WEEKS, type YearRow } from "./plan";
 
 /** The empty square of a week without contributions. */
 const EMPTY = "#E4E1D8";
-/** Height of the tallest month bar. */
-const MONTH_BAR_PX = 64;
 const MONTH_LABELS = [
   "Jan",
   "Feb",
@@ -34,10 +32,12 @@ type HeatmapViewProps = {
 
 /**
  * Scene 2, the markup: every year as a row of 53 week squares tinted in the
- * year's block color, the year's total on the right, and below it the readout
- * and the month strip. The static markup is the finished state; `mount.ts`
- * replays the reveal week by week and `explore.ts` makes each week readable.
- * The rows scroll vertically when there are more years than the stage fits.
+ * year's block color with its total, then a summary section (range readout,
+ * month strip, legend) below the grid. The whole scene scrolls vertically in
+ * one container so nothing is squeezed or clipped. On a phone each row stacks
+ * its label and total above full-width squares; from md up they sit in line.
+ * The static markup is the finished state; `mount.ts` replays the reveal week
+ * by week and `explore.ts` makes each week readable.
  */
 export function HeatmapView({ rows, strip }: HeatmapViewProps) {
   const first = rows[0];
@@ -56,17 +56,14 @@ export function HeatmapView({ rows, strip }: HeatmapViewProps) {
             week by week.
           </>
         }
-        note="Each row is a year. Each square is one week of contributions. Tap a square to read it."
       >
-        {/* On a phone the whole scene scrolls vertically; from md up only the rows do. */}
-        <div className="absolute inset-0 flex flex-col gap-[18px] overflow-y-auto md:overflow-hidden">
-          <div className="shrink-0 [--t:2.75rem] [--y:2.75rem] md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto md:[--t:64px] md:[--y:92px]">
+        <div className="absolute inset-0 overflow-y-auto overflow-x-hidden [--t:64px] [--y:92px]">
+          <section aria-label="Weeks of each year">
             <div
               aria-hidden="true"
-              className="sticky top-0 z-10 grid gap-x-3 bg-paper pb-1.5 font-mono text-[11px] uppercase tracking-[0.06em] [font-stretch:87.5%]"
-              style={{ gridTemplateColumns: "var(--y) minmax(0,1fr) var(--t)" }}
+              className="sticky top-0 z-10 grid grid-cols-1 gap-x-3 bg-paper pb-2 font-mono text-[11px] uppercase tracking-[0.06em] [font-stretch:87.5%] md:grid-cols-[var(--y)_minmax(0,1fr)_var(--t)]"
             >
-              <span />
+              <span className="hidden md:block" />
               <div className="relative h-4">
                 {MONTH_LABELS.map((label, month) => (
                   <span
@@ -81,14 +78,14 @@ export function HeatmapView({ rows, strip }: HeatmapViewProps) {
                   </span>
                 ))}
               </div>
-              <span />
+              <span className="hidden md:block" />
             </div>
 
-            <div className="relative flex min-h-full flex-col gap-1.5">
+            <div className="relative">
               <div
                 role="img"
-                aria-label={`Contributions per week, one row per year, ${range}. ${formatCount(total)} in total.`}
-                className="flex min-h-full flex-1 flex-col gap-1.5"
+                aria-label={`Contributions per week, one row per year, ${range}. ${formatCount(total)} in total. Each square is one week.`}
+                className="flex flex-col gap-6 md:gap-4"
               >
                 {rows.map((row, rowIndex) => {
                   const color = blockForYearIndex(row.colorIndex).background;
@@ -96,28 +93,19 @@ export function HeatmapView({ rows, strip }: HeatmapViewProps) {
                     <div
                       key={row.year}
                       data-row={rowIndex}
-                      className="grid min-h-5 flex-1 items-center gap-x-3 md:min-h-4"
-                      style={{
-                        gridTemplateColumns: "var(--y) minmax(0,1fr) var(--t)",
-                      }}
+                      className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 md:grid-cols-[var(--y)_minmax(0,1fr)_var(--t)] md:gap-y-0"
                     >
                       <span
                         data-role="row-label"
-                        className="font-mono text-[11px] leading-none [font-stretch:87.5%] md:text-xs"
+                        className="font-mono text-xs uppercase tracking-[0.06em] [font-stretch:87.5%] md:col-start-1 md:row-start-1 md:text-[13px]"
                       >
-                        {row.inProgress ? (
-                          <>
-                            <span className="md:hidden">{row.year}</span>
-                            <span className="hidden md:inline">
-                              {row.label}
-                            </span>
-                          </>
-                        ) : (
-                          row.label
-                        )}
+                        {row.label}
+                      </span>
+                      <span className="col-start-2 row-start-1 text-right font-display text-[28px] font-extrabold leading-none tabular-nums md:col-start-3 md:text-[30px]">
+                        {formatCount(row.total)}
                       </span>
                       <div
-                        className="grid h-full gap-px md:gap-[3px]"
+                        className="col-span-2 row-start-2 grid h-11 gap-px md:col-span-1 md:col-start-2 md:row-start-1 md:h-14 md:gap-[3px]"
                         style={{
                           gridTemplateColumns: `repeat(${WEEKS}, minmax(0, 1fr))`,
                         }}
@@ -145,9 +133,6 @@ export function HeatmapView({ rows, strip }: HeatmapViewProps) {
                           />
                         ))}
                       </div>
-                      <span className="text-right font-display text-lg font-extrabold leading-none tabular-nums md:text-[22px]">
-                        {formatCount(row.total)}
-                      </span>
                     </div>
                   );
                 })}
@@ -164,21 +149,20 @@ export function HeatmapView({ rows, strip }: HeatmapViewProps) {
                 aria-valuemax={Math.max(0, rows.length * WEEKS - 1)}
                 aria-valuenow={0}
                 aria-valuetext={`${range}: ${formatCount(total)} contributions`}
-                className={`absolute inset-y-0 touch-none ${focusRing}`}
-                style={{
-                  left: "calc(var(--y) + 0.75rem)",
-                  right: "calc(var(--t) + 0.75rem)",
-                }}
+                className={`absolute inset-y-0 left-0 right-0 touch-none md:left-[calc(var(--y)+0.75rem)] md:right-[calc(var(--t)+0.75rem)] ${focusRing}`}
               />
             </div>
-          </div>
+          </section>
 
-          <div className="flex shrink-0 flex-col gap-3 md:flex-row md:items-stretch md:gap-8">
+          <section
+            aria-label="Summary"
+            className="mt-12 flex flex-col gap-8 pb-6 md:mt-16 md:gap-10"
+          >
             <ReadoutBox
-              className="flex flex-col justify-center md:min-w-[300px]"
-              title={<span data-role="readout-title">{range}</span>}
+              className="flex flex-col justify-center"
+              title={<span data-role="readout-title" className="block">{range}</span>}
               detail={
-                <span data-role="readout-detail">
+                <span data-role="readout-detail" className="block">
                   {formatCount(total)} contributions
                 </span>
               }
@@ -186,7 +170,7 @@ export function HeatmapView({ rows, strip }: HeatmapViewProps) {
             {strip && <MonthStripView strip={strip} />}
             <div
               aria-hidden="true"
-              className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] uppercase [font-stretch:87.5%]"
+              className="flex items-center gap-1.5 font-mono text-[11px] uppercase [font-stretch:87.5%]"
             >
               <span>Less</span>
               <span className="size-4" style={{ backgroundColor: EMPTY }} />
@@ -199,55 +183,48 @@ export function HeatmapView({ rows, strip }: HeatmapViewProps) {
               ))}
               <span>More</span>
             </div>
-          </div>
+          </section>
         </div>
       </SceneFrame>
     </div>
   );
 }
 
-/** Twelve bars of average contributions per calendar month, and what they say. */
+/** Twelve bars of average contributions per calendar month, and its headline. */
 function MonthStripView({ strip }: { strip: MonthStrip }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-center md:gap-5">
+    <div className="flex flex-col gap-5">
+      <p className="font-display text-[40px] font-black uppercase leading-[0.9] md:text-6xl">
+        {strip.headline}
+      </p>
       <div
         role="img"
-        aria-label={`Average contributions per month. ${strip.headline}`}
-        className="flex w-full max-w-[260px] items-end gap-1 md:w-[260px] md:shrink-0"
+        aria-label={`Average contributions per month. ${strip.headline} ${strip.detail}`}
+        className="grid w-full grid-cols-12 gap-1.5 md:max-w-[640px] md:gap-2"
       >
         {strip.bars.map((bar) => (
-          <div
-            key={bar.month}
-            className="flex flex-1 basis-0 flex-col items-stretch gap-1"
-          >
-            <div
-              className={`box-border ${bar.isQuiet ? "border-2 border-dashed border-ink" : ""}`}
-              style={{
-                height: Math.max(
-                  bar.isQuiet ? 6 : 2,
-                  Math.round(bar.ratio * MONTH_BAR_PX),
-                ),
-                backgroundColor: bar.isTop
-                  ? blocks.safety
-                  : bar.isQuiet
-                    ? "transparent"
-                    : neutrals.ink,
-              }}
-            />
+          <div key={bar.month} className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex h-28 items-end md:h-36">
+              <div
+                className={`box-border w-full ${bar.isQuiet ? "border-2 border-dashed border-ink" : ""}`}
+                style={{
+                  height: `${Math.max(bar.isQuiet ? 6 : 2, bar.ratio * 100)}%`,
+                  backgroundColor: bar.isTop
+                    ? blocks.safety
+                    : bar.isQuiet
+                      ? "transparent"
+                      : neutrals.ink,
+                }}
+              />
+            </div>
             <span
               aria-hidden="true"
-              className="text-center font-mono text-[10px] [font-stretch:87.5%]"
+              className="text-center font-mono text-xs [font-stretch:87.5%]"
             >
               {bar.letter}
             </span>
           </div>
         ))}
-      </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="font-display text-2xl font-extrabold uppercase leading-none md:text-[30px]">
-          {strip.headline}
-        </p>
-        <p className="font-mono text-xs [font-stretch:87.5%]">{strip.detail}</p>
       </div>
     </div>
   );
