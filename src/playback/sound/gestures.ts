@@ -13,10 +13,11 @@ export function stairSemitones(index: number): number {
   return STAIR_SEMITONES[safe] ?? 0;
 }
 
-export const FILL_START_INTERVAL = 0.11;
-export const FILL_END_INTERVAL = 0.03;
-export const FILL_START_RATE = 0.8;
-export const FILL_END_RATE = 1.7;
+/** Interval and rate at the ends of a short (2s or less) and a long (5s+) climb. */
+const FILL_SHORT = { start: 0.11, end: 0.03, rateStart: 0.8, rateEnd: 1.7 };
+const FILL_LONG = { start: 0.14, end: 0.06, rateStart: 0.85, rateEnd: 1.5 };
+const FILL_SHORT_SECONDS = 2;
+const FILL_LONG_SECONDS = 5;
 
 export type FillTick = {
   /** Seconds after the fill starts. */
@@ -24,24 +25,47 @@ export type FillTick = {
   rate: number;
 };
 
+const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n || 0));
+
+/** The look of a whole climb: longer climbs are gentler. */
+function climbShape(climbSeconds: number) {
+  const f = clamp01(
+    (climbSeconds - FILL_SHORT_SECONDS) /
+      (FILL_LONG_SECONDS - FILL_SHORT_SECONDS),
+  );
+  return {
+    start: mix(FILL_SHORT.start, FILL_LONG.start, f),
+    end: mix(FILL_SHORT.end, FILL_LONG.end, f),
+    rateStart: mix(FILL_SHORT.rateStart, FILL_LONG.rateStart, f),
+    rateEnd: mix(FILL_SHORT.rateEnd, FILL_LONG.rateEnd, f),
+  };
+}
+
 /**
- * Ticks of a loading bar: they accelerate (about 110ms down to 30ms apart) and
- * rise in pitch (rate 0.8 to 1.7) over `duration`, then stop. Always includes
- * at least one tick for a positive duration.
+ * Ticks of a loading bar. A fill is a segment (`from`..`to`, 0..1) of one
+ * overall climb: pitch and tick density follow the position on the climb, not
+ * the segment's own progress, so consecutive segments continue each other.
+ * Over the whole climb the ticks accelerate and rise in pitch; a long climb
+ * (several seconds) goes from about 140ms to 60ms apart and rate 0.85 to 1.5,
+ * a short one (2s or less) from 110ms to 30ms and rate 0.8 to 1.7. Always at
+ * least one tick for a positive duration.
  */
-export function fillTicks(duration: number): FillTick[] {
+export function fillTicks(duration: number, from = 0, to = 1): FillTick[] {
   if (!(duration > 0)) return [];
+  const start = clamp01(from);
+  const end = Math.max(start, clamp01(to));
+  const span = end - start;
+  const shape = climbShape(span > 0 ? duration / span : duration);
   const ticks: FillTick[] = [];
   let offset = 0;
   while (offset < duration) {
-    const progress = offset / duration;
+    const position = start + span * (offset / duration);
     ticks.push({
       offset,
-      rate: FILL_START_RATE + (FILL_END_RATE - FILL_START_RATE) * progress,
+      rate: mix(shape.rateStart, shape.rateEnd, position),
     });
-    offset +=
-      FILL_START_INTERVAL +
-      (FILL_END_INTERVAL - FILL_START_INTERVAL) * progress;
+    offset += mix(shape.start, shape.end, position);
   }
   return ticks;
 }

@@ -123,13 +123,19 @@ export function mountThenNow(
   ];
   const summary = findElement<HTMLElement>(root, '[data-role="summary"]');
 
-  // Each side's bars rise together, so each side gets one fill. The two
-  // sides differ in level so "then" and "now" do not sound identical.
-  for (const { start, db } of [
-    { start: plan.thenTime, db: THEN_FILL_DB },
-    { start: plan.nowTime, db: NOW_FILL_DB },
+  // Each side's bars rise together, so each side gets one fill that climbs to
+  // its total relative to the larger side. The two sides differ in level so
+  // "then" and "now" do not sound identical.
+  const larger = Math.max(earlier.total, now.total);
+  for (const { start, db, total } of [
+    { start: plan.thenTime, db: THEN_FILL_DB, total: earlier.total },
+    { start: plan.nowTime, db: NOW_FILL_DB, total: now.total },
   ]) {
-    clock.at(start, (time) => sound()?.fill(time, PANEL_SECONDS, { db }));
+    if (!(total > 0)) continue;
+    const to = total / larger;
+    clock.at(start, (time) =>
+      sound()?.fill(time, PANEL_SECONDS * to, { db, to }),
+    );
   }
 
   const shown = panels.map(() => Number.NaN);

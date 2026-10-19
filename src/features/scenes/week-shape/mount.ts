@@ -18,9 +18,14 @@ export function mountWeekShape(
   const marker = findElement<HTMLElement>(root, '[data-role="rhythm-marker"]');
   const place = plan.position * 100;
 
-  // Each bar loads as it grows: one fill over its own growth.
+  // Each bar loads as it grows and climbs to its own height relative to the
+  // tallest, so a short bar is a short, low fill and the tallest reaches the top.
   for (const bar of plan.bars) {
-    clock.at(bar.start, (time) => sound()?.fill(time, bar.land - bar.start));
+    if (bar.ratio <= 0) continue;
+    const to = bar.ratio;
+    clock.at(bar.start, (time) =>
+      sound()?.fill(time, (bar.land - bar.start) * to, { to }),
+    );
   }
 
   const shownBars = plan.bars.map(() => Number.NaN);

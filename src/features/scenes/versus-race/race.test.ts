@@ -224,6 +224,14 @@ describe("race readings", () => {
       expect(segment.start + segment.duration).toBeLessThanOrEqual(
         DRAW_SECONDS + 1e-9,
       );
+      expect(segment.from).toBeGreaterThanOrEqual(0);
+      expect(segment.to).toBeLessThanOrEqual(1 + 1e-9);
+      expect(segment.to).toBeGreaterThan(segment.from);
+    }
+    for (let i = 1; i < segments.length; i++) {
+      expect(segments[i]?.from).toBeGreaterThanOrEqual(
+        (segments[i - 1]?.to ?? 0) - 1e-9,
+      );
     }
   });
 

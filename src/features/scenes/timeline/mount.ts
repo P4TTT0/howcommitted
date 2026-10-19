@@ -36,17 +36,25 @@ export function mountTimeline(
   return stopRendering;
 }
 
-/** A year block builds as the line crosses it: one fill over that growth. */
+/**
+ * One continuous climb over the whole draw. Each year plays its segment of it,
+ * from the running total's share at the year's start to its share at the end,
+ * so the pitch follows the growing total. Empty years stay silent.
+ */
 function scheduleSound(
   clock: PlaybackClock,
   getEngine: () => SoundEngine | null,
   slots: readonly YearSlot[],
 ) {
+  const total = slots.at(-1)?.endTotal ?? 0;
+  if (total <= 0) return;
   for (const slot of slots) {
     const start = slot.startProgress * DRAW_SECONDS;
     const duration = (slot.endProgress - slot.startProgress) * DRAW_SECONDS;
     if (slot.contributions <= 0 || duration < MIN_FILL_SECONDS) continue;
-    clock.at(start, (time) => getEngine()?.fill(time, duration));
+    const from = slot.startTotal / total;
+    const to = slot.endTotal / total;
+    clock.at(start, (time) => getEngine()?.fill(time, duration, { from, to }));
   }
 }
 
