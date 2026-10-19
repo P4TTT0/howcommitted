@@ -10,7 +10,7 @@ type Props = { params: Promise<{ users: string[] }> };
 
 async function loginsFor(params: Props["params"]): Promise<string[]> {
   const { users } = await params;
-  const logins = routeLogins(users, process.env);
+  const logins = routeLogins(users);
   if (logins === null) notFound();
   return logins;
 }

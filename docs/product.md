@@ -30,7 +30,7 @@ CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 | # | Scene | Content |
 |---|-------|---------|
 | 1 | Timeline | Yearly blocks (height = calendar contributions of the year; color = year identity; the year in progress is dashed) under the running total line, with repo-creation flags and the big counter |
-| 2 | Versus race (versus only) | A race of horizontal bars in fixed lanes (order added, never re-sorted, no leader or rank) on one shared timeline, with a year label |
+| 2 | Versus race (versus only) | A race of horizontal bars that grow on one shared timeline, each with the avatar at its tip; rows slide when one passes another, with no rank numbers or "winner" |
 | 3 | Heatmap | Every year as a row of 53 week squares tinted in the year color, yearly totals on the right, plus a month strip (average per calendar month; "<Month> is your month." only when the history covers every calendar month). Same calendar data as the line; label it "contributions", never commits |
 | 4 | Language mosaic | Proportional blocks, top 5 plus "other". Label: languages of owned repos, not per-commit |
 | 5 | Big numbers | Four giant numbers: commits, PRs, reviews, issues |

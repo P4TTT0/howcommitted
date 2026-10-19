@@ -32,8 +32,7 @@ type Phase =
 /**
  * Versus: loads every history on intent (the Play gate, or the landing
  * click), one after another, then plays them through the same sequencer as
- * solo, with the versus scenes and finale. It only exists outside production
- * (see isVersusEnabled).
+ * solo, with the versus scenes and finale.
  */
 export function VersusExperience({ logins }: { logins: string[] }) {
   const router = useRouter();

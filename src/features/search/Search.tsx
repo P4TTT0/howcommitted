@@ -43,7 +43,7 @@ function warmUpAudio() {
  * preview is fetched here; the history waits for the click (fetch on intent),
  * which also unlocks audio before navigating to the experience.
  */
-export function Search({ versus = false }: { versus?: boolean }) {
+export function Search({ versus = true }: { versus?: boolean }) {
   const router = useRouter();
   const [rivalPicks, setRivalPicks] = useState<PreviewUser[]>([]);
   const [value, setValue] = useState("");
