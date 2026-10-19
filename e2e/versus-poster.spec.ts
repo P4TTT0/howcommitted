@@ -42,11 +42,14 @@ async function openPoster(page: Page, logins: string[]) {
   await mockHistories(page);
   await page.goto(`/${logins.join("/")}`);
   await page.getByRole("button", { name: "Play" }).click();
-  await expect(
-    page.getByRole("region", { name: /^When each developer joined/ }),
-  ).toBeVisible();
+  // Wait for the first scene, then walk forward, so the lineup order can change.
+  await expect(next(page)).toBeVisible();
   const poster = page.getByRole("region", { name: "Versus summary" });
-  while (!(await poster.isVisible())) await next(page).click();
+  for (let step = 0; step < 12; step += 1) {
+    if (await poster.isVisible()) break;
+    await next(page).click();
+  }
+  await expect(poster).toBeVisible();
   return poster;
 }
 
