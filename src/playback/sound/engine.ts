@@ -104,15 +104,20 @@ export class SoundEngine {
   }
 
   /**
-   * Gesture: a bar loads. Schedules its own ticks, accelerating (about 110ms
-   * to 30ms) and rising (rate 0.8 to 1.7) over `duration`, then silence.
+   * Gesture: a bar loads. Schedules its own ticks over `duration`, then
+   * silence. `from`/`to` (0..1) place it on one longer climb, so pitch and
+   * density follow that position and consecutive segments continue each other.
    */
   fill(
     startTime: number,
     duration: number,
-    { db = 0 }: { db?: number } = {},
+    {
+      db = 0,
+      from = 0,
+      to = 1,
+    }: { db?: number; from?: number; to?: number } = {},
   ): void {
-    for (const { offset, rate } of fillTicks(duration)) {
+    for (const { offset, rate } of fillTicks(duration, from, to)) {
       playSample(
         this.pools.fill,
         FILL_VOICE_LIMIT,

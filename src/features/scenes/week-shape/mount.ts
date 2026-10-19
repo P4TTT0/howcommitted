@@ -18,10 +18,15 @@ export function mountWeekShape(
   const marker = findElement<HTMLElement>(root, '[data-role="rhythm-marker"]');
   const place = plan.position * 100;
 
-  // Each bar loads as it grows: one fill over its own growth.
+  // Each bar loads as it grows and climbs to its own height relative to the
+  // tallest, so a short bar is a short, low fill and the tallest reaches the top.
+  const audible = plan.bars.filter((bar) => bar.ratio > 0);
   // Under reduced motion the bars show at once: one fill stands for all.
-  for (const bar of reducedMotion ? plan.bars.slice(0, 1) : plan.bars) {
-    clock.at(bar.start, (time) => sound()?.fill(time, bar.land - bar.start));
+  for (const bar of reducedMotion ? audible.slice(0, 1) : audible) {
+    const to = bar.ratio;
+    clock.at(bar.start, (time) =>
+      sound()?.fill(time, (bar.land - bar.start) * to, { to }),
+    );
   }
 
   const shownBars = plan.bars.map(() => Number.NaN);

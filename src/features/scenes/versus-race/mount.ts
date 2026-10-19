@@ -42,11 +42,9 @@ function scheduleSound(
   getEngine: () => SoundEngine | null,
   race: Race,
 ) {
-  // The bars load year by year: one fill per year, tied to the leader.
-  for (const segment of fillSegments(race)) {
-    clock.at(segment.start, (time) =>
-      getEngine()?.fill(time, segment.duration),
-    );
+  // One climb tied to the leader's total, played year by year as segments.
+  for (const { start, duration, from, to } of fillSegments(race)) {
+    clock.at(start, (time) => getEngine()?.fill(time, duration, { from, to }));
   }
   // The payoff lands as the "@a passes @b" chip appears.
   for (const time of passTimes(race)) {

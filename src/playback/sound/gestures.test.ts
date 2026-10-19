@@ -45,6 +45,35 @@ describe("fillTicks", () => {
     expect(ticks.at(-1)?.rate).toBeLessThanOrEqual(1.7);
   });
 
+  it("keeps a long climb gentle: 140ms down to 60ms, rate 0.85 to 1.5", () => {
+    const ticks = fillTicks(6);
+    const gaps = ticks
+      .slice(1)
+      .map((t, i) => t.offset - (ticks[i]?.offset ?? 0));
+    expect(ticks[0]).toEqual({ offset: 0, rate: 0.85 });
+    expect(gaps[0]).toBeCloseTo(0.14, 2);
+    expect(Math.min(...gaps)).toBeGreaterThan(0.06);
+    expect(ticks.at(-1)?.rate).toBeLessThanOrEqual(1.5);
+  });
+
+  it("continues one climb across consecutive segments", () => {
+    const first = fillTicks(2, 0, 0.5);
+    const second = fillTicks(2, 0.5, 1);
+    const last = first.at(-1)?.rate ?? 0;
+    const next = second[0]?.rate ?? 0;
+    expect(next).toBeGreaterThanOrEqual(last);
+    expect(next - last).toBeLessThan(0.15);
+    const rates = [...first, ...second].map((t) => t.rate);
+    for (let i = 1; i < rates.length; i++) {
+      expect(rates[i]).toBeGreaterThanOrEqual((rates[i - 1] ?? 0) - 1e-9);
+    }
+  });
+
+  it("starts a mid-climb segment at its own pitch, not at the bottom", () => {
+    const [tick] = fillTicks(1, 0.6, 0.8);
+    expect(tick?.rate).toBeGreaterThan(1.2);
+  });
+
   it("emits a single tick for a very short fill", () => {
     expect(fillTicks(0.01)).toHaveLength(1);
   });
