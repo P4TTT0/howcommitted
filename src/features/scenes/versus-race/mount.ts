@@ -7,6 +7,7 @@ import {
   DRAW_SECONDS,
   growthSlots,
   indexAtProgress,
+  playbackPassDays,
   type Race,
   yearMarks,
 } from "./race";
@@ -15,8 +16,9 @@ import { createReadout } from "./readout";
 /**
  * Wires the race to the sequencer's clock: bars, year and date are a pure
  * function of clock time, repainted per frame; sound is scheduled on the
- * Transport. The race always plays on calendar years; the same-age axis is an
- * explore-phase choice. Returns the cleanup.
+ * Transport. Clock progress maps to a point on the daily axis, so values
+ * interpolate within a day and a pass shows at the moment the lines cross; no
+ * timer of its own. Returns the cleanup.
  */
 export function mountVersusRace(
   root: HTMLElement,
@@ -24,13 +26,12 @@ export function mountVersusRace(
   { clock, sound }: SceneRuntime,
 ): () => void {
   // Everything that can throw first, sound last.
-  const readout = createReadout(root, race);
+  const readout = createReadout(root, race, playbackPassDays(race));
   const stopRendering = clock.onFrame((seconds) => {
     const progress = Math.min(1, seconds / DRAW_SECONDS);
     readout.show(
       race.lanes.map((lane) => cumulativeAt(lane.series, progress)),
       indexAtProgress(race, progress),
-      progress,
     );
   });
   scheduleSound(clock, sound, race);

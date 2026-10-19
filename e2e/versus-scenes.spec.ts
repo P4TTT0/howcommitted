@@ -180,11 +180,7 @@ async function start(page: Page, logins: string[]) {
   await mockHistories(page);
   await page.goto(`/${logins.join("/")}`);
   await play(page).click();
-  // Scenes 1 to 3 (arrival, race, shared days) come first; stop on the last.
-  await expect(
-    page.getByRole("region", { name: /^When each developer joined/ }),
-  ).toBeVisible();
-  await next(page).click();
+  // Scenes 1 and 2 (race, shared days) come first; stop on the last.
   await expect(
     page.getByRole("region", { name: /^Cumulative contributions/ }),
   ).toBeVisible();
@@ -399,8 +395,8 @@ test("a lineup without public code skips the languages scene", async ({
   });
   await page.goto("/ada/grace");
   await play(page).click();
-  // Arrival, race, shared days, then languages is skipped: streaks come next.
-  for (let i = 0; i < 3; i++) await next(page).click();
+  // Race, shared days, then languages is skipped: streaks come next.
+  for (let i = 0; i < 2; i++) await next(page).click();
   await expect(
     page.getByRole("region", { name: "Longest streaks of each developer" }),
   ).toBeVisible();
