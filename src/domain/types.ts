@@ -7,12 +7,6 @@ export type UserProfile = {
   contributionYears: number[];
 };
 
-/** One commit contribution entry: commits made to one repository on one day. */
-export type CommitContribution = {
-  occurredAt: string;
-  commitCount: number;
-};
-
 /** True commits per day, summed across repositories. `date` is YYYY-MM-DD (UTC). */
 export type DailyCommits = {
   date: string;
@@ -27,8 +21,6 @@ export type DailyCommits = {
 export type RepoCommits = {
   repo: string;
   commits: number;
-  /** Distinct days of the year with at least one commit to it. */
-  days: number;
 };
 
 /** Contributions of one day from the GitHub calendar (all types, public and shared private). */
@@ -54,26 +46,16 @@ export type YearTotals = {
   privateContributions: number;
 };
 
-export type CommitReconciliation = {
-  summed: number;
-  official: number;
-  difference: number;
-  matches: boolean;
-};
-
 export type YearSummary = {
   year: number;
-  /** Official totals. `totals.commits` is the number to show when reconciliation fails. */
+  /** Official totals. `totals.commits` is the number to show for the year. */
   totals: YearTotals;
   /**
-   * True commits per day. Can be under-counted when GitHub truncates the
-   * per-repository data (more than 100 repositories, or 100 entries per repo);
-   * `reconciliation` flags that case.
+   * Commits to public repositories, per repository. Sorted by repo name. GitHub
+   * returns at most 100 repositories per year, so a repo outside that top 100
+   * is missing here.
    */
-  dailyCommits: DailyCommits[];
-  /** Commits to public repositories, per repository. Sorted by repo name. */
   repoCommits: RepoCommits[];
-  reconciliation: CommitReconciliation;
   calendar: CalendarDay[];
   /** The calendar's own total for the year (all contribution types, public and shared private). */
   totalContributions: number;

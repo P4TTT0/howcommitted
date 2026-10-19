@@ -14,7 +14,7 @@ function dataFor(overrides: Partial<History> = {}, withRepo = true) {
   const years = [2022, 2023, 2024].map((year, index) => ({
     ...makeYear(year, steadyDays(year, 2 + index, 2)),
     repoCommits: withRepo
-      ? [{ repo: "ada/alpha", commits: 100 * (index + 1), days: 20 }]
+      ? [{ repo: "ada/alpha", commits: 100 * (index + 1) }]
       : [],
   }));
   const history: History = {

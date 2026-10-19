@@ -17,7 +17,7 @@ type Profile = {
   mixes: Pick<Totals, "commits" | "pullRequests" | "reviews" | "issues">[];
   privateContributions?: number;
   /** Public repositories, or none. */
-  repos: { repo: string; commits: number; days: number }[];
+  repos: { repo: string; commits: number }[];
   /** The calendar total of every year, to stress long numbers. */
   official?: number;
 };
@@ -30,8 +30,8 @@ const MIXES = [
 ];
 
 const REPOS = [
-  { repo: "ada/alpha", commits: 120, days: 40 },
-  { repo: "ada/beta", commits: 30, days: 10 },
+  { repo: "ada/alpha", commits: 120 },
+  { repo: "ada/beta", commits: 30 },
 ];
 
 /** A history with every solo scene's data, shaped by `profile`. */
@@ -96,7 +96,6 @@ const STRESS: { name: string; profile: Profile }[] = [
         {
           repo: `ada/portfolio-${"x".repeat(91)}`,
           commits: 4_000_000,
-          days: 900,
         },
       ],
     },

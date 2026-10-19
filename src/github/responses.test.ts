@@ -122,9 +122,6 @@ describe("history response contract", () => {
                 issues: 4,
                 privateContributions: 7,
               },
-              commitContributionsByRepo: [
-                [{ occurredAt: "2024-02-29T10:00:00Z", commitCount: 3 }],
-              ],
               publicRepoContributions: [],
               calendar: [{ date: "2024-02-29", count: 5, weekday: 4 }],
               totalContributions: 5,
@@ -164,10 +161,8 @@ describe("history response contract", () => {
       "name",
     ]);
     expect(keys(body.history.years[0])).toEqual([
-      "dailyCommits",
       "dailyContributions",
       "heatmap",
-      "reconciliation",
       "repoCommits",
       "totalContributions",
       "totals",
@@ -179,12 +174,6 @@ describe("history response contract", () => {
       "privateContributions",
       "pullRequests",
       "reviews",
-    ]);
-    expect(keys(body.history.years[0].reconciliation)).toEqual([
-      "difference",
-      "matches",
-      "official",
-      "summed",
     ]);
     expect(keys(body.history.years[0].heatmap[0])).toEqual([
       "contributions",

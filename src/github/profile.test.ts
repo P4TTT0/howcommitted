@@ -55,8 +55,6 @@ const yearBody = (commits: number) => ({
             },
           ],
         },
-      },
-      q1: {
         commitContributionsByRepository: [
           {
             repository: {
@@ -64,17 +62,10 @@ const yearBody = (commits: number) => ({
               isPrivate: false,
               visibility: "PUBLIC",
             },
-            contributions: {
-              nodes: [
-                { occurredAt: "2025-02-01T00:00:00Z", commitCount: commits },
-              ],
-            },
+            contributions: { totalCount: commits },
           },
         ],
       },
-      q2: { commitContributionsByRepository: [] },
-      q3: { commitContributionsByRepository: [] },
-      q4: { commitContributionsByRepository: [] },
     },
   },
 });
@@ -164,7 +155,9 @@ describe("getProfile", () => {
     expect(first).toMatchObject({ status: "ok", source: "fresh" });
     if (first.status !== "ok") return;
     expect(first.profile.years.map((y) => y.year)).toEqual([2024, 2025, 2026]);
-    expect(first.profile.years[0]?.reconciliation.matches).toBe(true);
+    expect(first.profile.years[0]?.repoCommits).toEqual([
+      { repo: "ada/engine", commits: 3 },
+    ]);
     expect(first.profile.repos[0]?.name).toBe("engine");
     expect(first.reposTruncated).toBe(false);
     expect(calls).toEqual({ Preview: 1, Year: 3, Repos: 1 });

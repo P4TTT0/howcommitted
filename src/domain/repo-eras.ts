@@ -4,8 +4,6 @@ export type MainRepo = {
   /** `owner/name`, a public repository. */
   repo: string;
   commits: number;
-  /** Days with at least one commit to it. */
-  days: number;
   firstYear: number;
   lastYear: number;
 };
@@ -22,28 +20,24 @@ type YearRepos = { year: number; repoCommits: RepoCommits[] };
 
 const TOP_REPOS = 5;
 
-/** More commits first, then more days, then name, so ties are deterministic. */
+/** More commits first, then name, so ties are deterministic. */
 function rankCompare(
-  a: { repo: string; commits: number; days: number },
-  b: { repo: string; commits: number; days: number },
+  a: { repo: string; commits: number },
+  b: { repo: string; commits: number },
 ): number {
-  return (
-    b.commits - a.commits || b.days - a.days || a.repo.localeCompare(b.repo)
-  );
+  return b.commits - a.commits || a.repo.localeCompare(b.repo);
 }
 
 /** Commits to public repositories across all years, most commits first. */
 function rankRepos(years: YearRepos[]): MainRepo[] {
   const byRepo = new Map<string, MainRepo>();
   for (const { year, repoCommits } of years) {
-    for (const { repo, commits, days } of repoCommits) {
+    for (const { repo, commits } of repoCommits) {
       if (commits <= 0) continue;
       const entry = byRepo.get(repo);
-      // Days are distinct within a year and years never overlap, so they add up.
       byRepo.set(repo, {
         repo,
         commits: (entry?.commits ?? 0) + commits,
-        days: (entry?.days ?? 0) + days,
         firstYear: Math.min(entry?.firstYear ?? year, year),
         lastYear: Math.max(entry?.lastYear ?? year, year),
       });

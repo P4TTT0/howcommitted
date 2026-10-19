@@ -11,7 +11,7 @@ import { mainRepoScene } from "./index";
 function dataFor(repo: boolean) {
   const year = {
     ...makeYear(2023, steadyDays(2023, 1, 30)),
-    repoCommits: repo ? [{ repo: "ada/alpha", commits: 10, days: 5 }] : [],
+    repoCommits: repo ? [{ repo: "ada/alpha", commits: 10 }] : [],
   };
   const history = makeHistory("ada", [year]);
   return { ...labSceneData(), history, model: planFromHistory(history) };

@@ -39,7 +39,6 @@ export type RepoBar = {
   /** The name without the owner. */
   name: string;
   commits: number;
-  days: number;
   /** 0..1 of the top repo. */
   ratio: number;
   background: string;
@@ -102,12 +101,10 @@ function plural(count: number, one: string, many: string): string {
   return `${formatCount(count)} ${count === 1 ? one : many}`;
 }
 
-export function barReading(
-  bar: Pick<RepoBar, "repo" | "commits" | "days">,
-): Reading {
+export function barReading(bar: Pick<RepoBar, "repo" | "commits">): Reading {
   return {
     title: shortName(bar.repo),
-    detail: `${bar.repo} · ${plural(bar.commits, "commit", "commits")} to public repositories · ${plural(bar.days, "day", "days")} with a commit`,
+    detail: `${bar.repo} · ${plural(bar.commits, "commit", "commits")} to public repositories`,
   };
 }
 
@@ -137,7 +134,6 @@ export function planMainRepo(
     repo: repo.repo,
     name: shortName(repo.repo),
     commits: repo.commits,
-    days: repo.days,
     ratio: repo.commits / peak,
     background: index === 0 ? BLOCK_COLORS.background : neutrals.ink,
     time: quantizeUp(

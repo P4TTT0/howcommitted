@@ -21,9 +21,7 @@ const summary = (year: number): YearSummary => ({
     issues: 0,
     privateContributions: 0,
   },
-  dailyCommits: [],
   repoCommits: [],
-  reconciliation: { summed: 0, official: 1, difference: 1, matches: false },
   calendar: [],
   totalContributions: 1,
 });
@@ -88,12 +86,12 @@ describe("createCache", () => {
       "preview:v3:missing:ghost",
       "preview:v3:user:torvalds",
       "preview:v4:repos:torvalds",
-      "preview:v4:year:torvalds:2024",
-      "preview:v4:year:torvalds:2026",
+      "preview:v5:year:torvalds:2024",
+      "preview:v5:year:torvalds:2026",
     ]);
     expect(ttls.get("preview:v3:user:torvalds")).toBe(TTL.user);
-    expect(ttls.get("preview:v4:year:torvalds:2024")).toBe(TTL.yearPast);
-    expect(ttls.get("preview:v4:year:torvalds:2026")).toBe(
+    expect(ttls.get("preview:v5:year:torvalds:2024")).toBe(TTL.yearPast);
+    expect(ttls.get("preview:v5:year:torvalds:2026")).toBe(
       TTL.yearCurrentRetained,
     );
     expect(ttls.get("preview:v4:repos:torvalds")).toBe(TTL.repos);

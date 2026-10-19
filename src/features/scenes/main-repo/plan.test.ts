@@ -26,12 +26,12 @@ function historyWith(byYear: Record<number, RepoCommits[]>) {
 describe("planMainRepo", () => {
   const history = historyWith({
     2022: [
-      { repo: "ada/alpha", commits: 100, days: 40 },
-      { repo: "ada/beta", commits: 30, days: 10 },
+      { repo: "ada/alpha", commits: 100 },
+      { repo: "ada/beta", commits: 30 },
     ],
     2023: [
-      { repo: "ada/alpha", commits: 200, days: 60 },
-      { repo: "org/gamma", commits: 90, days: 20 },
+      { repo: "ada/alpha", commits: 200 },
+      { repo: "org/gamma", commits: 90 },
     ],
   });
 
@@ -42,7 +42,7 @@ describe("planMainRepo", () => {
   it("names the main repo without its owner", () => {
     const plan = planMainRepo(history, 2022);
     expect(plan?.name).toBe("alpha");
-    expect(plan?.repo).toMatchObject({ commits: 300, days: 100 });
+    expect(plan?.repo).toMatchObject({ commits: 300 });
     expect(plan?.span).toBe("2022 to 2023");
   });
 
@@ -74,7 +74,7 @@ describe("planMainRepo", () => {
   it("keeps only the last eight years", () => {
     const byYear: Record<number, RepoCommits[]> = {};
     for (let year = 2010; year <= 2022; year++) {
-      byYear[year] = [{ repo: "ada/alpha", commits: 5, days: 2 }];
+      byYear[year] = [{ repo: "ada/alpha", commits: 5 }];
     }
     const plan = planMainRepo(historyWith(byYear), 2010);
     expect(plan?.eras).toHaveLength(MAX_ERAS);
@@ -92,10 +92,9 @@ describe("planMainRepo", () => {
 
 describe("readings", () => {
   it("speaks counts to public repositories", () => {
-    expect(barReading({ repo: "ada/alpha", commits: 1204, days: 1 })).toEqual({
+    expect(barReading({ repo: "ada/alpha", commits: 1204 })).toEqual({
       title: "alpha",
-      detail:
-        "ada/alpha · 1,204 commits to public repositories · 1 day with a commit",
+      detail: "ada/alpha · 1,204 commits to public repositories",
     });
     expect(
       eraReading({ year: 2024, repo: "ada/alpha", commits: 1, language: "Go" }),

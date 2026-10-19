@@ -2,20 +2,19 @@ import { describe, expect, it } from "vitest";
 import { eras, mainRepo, topRepos } from "./repo-eras";
 import type { Repo, RepoCommits } from "./types";
 
-const repo = (name: string, commits: number, days: number): RepoCommits => ({
+const repo = (name: string, commits: number): RepoCommits => ({
   repo: name,
   commits,
-  days,
 });
 
 const years = [
   {
     year: 2022,
-    repoCommits: [repo("ada/engine", 6, 2), repo("org/lib", 2, 1)],
+    repoCommits: [repo("ada/engine", 6), repo("org/lib", 2)],
   },
   {
     year: 2023,
-    repoCommits: [repo("ada/engine", 3, 1), repo("org/lib", 6, 2)],
+    repoCommits: [repo("ada/engine", 3), repo("org/lib", 6)],
   },
   { year: 2024, repoCommits: [] },
 ];
@@ -43,7 +42,6 @@ describe("mainRepo and topRepos", () => {
     expect(mainRepo(years)).toEqual({
       repo: "ada/engine",
       commits: 9,
-      days: 3,
       firstYear: 2022,
       lastYear: 2023,
     });
@@ -53,33 +51,26 @@ describe("mainRepo and topRepos", () => {
     ]);
   });
 
-  it("handles a single day", () => {
-    expect(
-      mainRepo([{ year: 2024, repoCommits: [repo("a/b", 1, 1)] }]),
-    ).toEqual({
+  it("handles a single commit", () => {
+    expect(mainRepo([{ year: 2024, repoCommits: [repo("a/b", 1)] }])).toEqual({
       repo: "a/b",
       commits: 1,
-      days: 1,
       firstYear: 2024,
       lastYear: 2024,
     });
   });
 
-  it("breaks ties by days with a commit, then by name", () => {
+  it("breaks ties by name", () => {
     const tie = [
       {
         year: 2024,
-        repoCommits: [
-          repo("z/one-day", 4, 1),
-          repo("y/two-days", 4, 2),
-          repo("x/two-days", 4, 2),
-        ],
+        repoCommits: [repo("z/three", 4), repo("x/one", 4), repo("y/two", 4)],
       },
     ];
     expect(topRepos(tie).map((r) => r.repo)).toEqual([
-      "x/two-days",
-      "y/two-days",
-      "z/one-day",
+      "x/one",
+      "y/two",
+      "z/three",
     ]);
   });
 
@@ -88,7 +79,7 @@ describe("mainRepo and topRepos", () => {
       {
         year: 2024,
         repoCommits: Array.from({ length: 7 }, (_, i) =>
-          repo(`a/r${i}`, i + 1, 1),
+          repo(`a/r${i}`, i + 1),
         ),
       },
     ];
@@ -120,12 +111,12 @@ describe("eras", () => {
     expect(eras([], repos, "ada")).toEqual([]);
   });
 
-  it("breaks a yearly tie by days, then name", () => {
+  it("breaks a yearly tie by name", () => {
     const [era] = eras(
       [
         {
           year: 2024,
-          repoCommits: [repo("b/x", 2, 1), repo("a/x", 2, 1)],
+          repoCommits: [repo("b/x", 2), repo("a/x", 2)],
         },
       ],
       [],
