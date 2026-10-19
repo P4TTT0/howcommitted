@@ -160,7 +160,11 @@ export function HeatmapView({ rows, strip }: HeatmapViewProps) {
           >
             <ReadoutBox
               className="flex flex-col justify-center"
-              title={<span data-role="readout-title" className="block">{range}</span>}
+              title={
+                <span data-role="readout-title" className="block">
+                  {range}
+                </span>
+              }
               detail={
                 <span data-role="readout-detail" className="block">
                   {formatCount(total)} contributions
