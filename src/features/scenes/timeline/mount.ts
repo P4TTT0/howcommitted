@@ -3,13 +3,11 @@ import { DRAW_SECONDS, type Plan } from "@/features/sequencer/model/plan";
 import type { SceneRuntime } from "@/features/sequencer/types";
 import { cumulativeAt } from "@/playback/aggregate";
 import type { PlaybackClock } from "@/playback/clock";
+import { growthRuns } from "@/playback/growth";
 import type { SoundEngine } from "@/playback/sound/engine";
 import { scheduleFill } from "@/playback/sound/ticks";
 import { CHART_WIDTH, topPercent } from "./chart";
 import { slotX, type YearSlot, yearFill } from "./years";
-
-/** Shorter than this a fill is just a click; skip it. */
-const MIN_FILL_SECONDS = 0.2;
 
 function find<T extends Element>(root: HTMLElement, selector: string): T {
   const element = root.querySelector<T>(selector);
@@ -33,28 +31,24 @@ export function mountTimeline(
   const render = createRenderer(root, plan, slots);
   const stopRendering = clock.onFrame(render);
   // Last, so nothing is left scheduled if anything above threw.
-  scheduleSound(clock, sound, slots);
+  scheduleSound(clock, sound, plan);
   return stopRendering;
 }
 
 /**
- * One continuous climb over the whole draw. Each year plays its segment of it,
- * from the running total's share at the year's start to its share at the end,
- * so the pitch follows the growing total. Empty years stay silent.
+ * One continuous climb over the whole draw, played only while the running
+ * total rises. Each growth run covers the share of the climb it adds, so the
+ * pitch follows the growing total and flat stretches stay silent.
  */
 function scheduleSound(
   clock: PlaybackClock,
   getEngine: () => SoundEngine | null,
-  slots: readonly YearSlot[],
+  plan: Plan,
 ) {
-  const total = slots.at(-1)?.endTotal ?? 0;
-  if (total <= 0) return;
-  for (const slot of slots) {
-    const start = slot.startProgress * DRAW_SECONDS;
-    const duration = (slot.endProgress - slot.startProgress) * DRAW_SECONDS;
-    if (slot.contributions <= 0 || duration < MIN_FILL_SECONDS) continue;
-    const from = slot.startTotal / total;
-    const to = slot.endTotal / total;
+  for (const { start, duration, from, to } of growthRuns(
+    plan.cumulative,
+    DRAW_SECONDS,
+  )) {
     scheduleFill(clock, getEngine, start, duration, { from, to });
   }
 }
