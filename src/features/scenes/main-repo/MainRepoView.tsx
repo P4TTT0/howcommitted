@@ -17,9 +17,10 @@ const MONO = "font-mono [font-stretch:87.5%]";
 const PHONE_BARS = 3;
 
 /**
- * Shortens `text` to `max` characters with an ellipsis. Done in markup, not
- * with CSS, so the visible text always fits its box; the full name stays in
- * the aria-labels.
+ * Shortens `text` to `max` characters with an ellipsis, for the hero name,
+ * which scales as a whole. Narrow boxes truncate with CSS instead, because a
+ * character budget overflows by a pixel when font metrics differ. The full
+ * name stays in the aria-labels.
  */
 function ellipsize(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
@@ -136,13 +137,8 @@ export function MainRepoView({ plan }: MainRepoViewProps) {
                       aria-hidden="true"
                       className={`${MONO} flex items-baseline justify-between gap-3 text-xs xl:text-[13px]`}
                     >
-                      <span className="min-w-0 font-bold">
-                        <span className="xl:hidden">
-                          {ellipsize(bar.name, 22)}
-                        </span>
-                        <span className="hidden xl:inline">
-                          {ellipsize(bar.name, 30)}
-                        </span>
+                      <span className="min-w-0 truncate font-bold">
+                        {bar.name}
                       </span>
                       <span className="tabular-nums">
                         {formatCount(bar.commits)}
@@ -201,18 +197,9 @@ export function MainRepoView({ plan }: MainRepoViewProps) {
                     aria-hidden="true"
                     className={`${MONO} min-w-0 text-[10px] leading-tight xl:text-xs xl:leading-normal`}
                   >
-                    <p className="font-bold">
-                      <span className="xl:hidden">
-                        {ellipsize(era.name, 9)}
-                      </span>
-                      <span className="hidden xl:inline">
-                        {ellipsize(era.name, 14)}
-                      </span>
-                    </p>
+                    <p className="truncate font-bold">{era.name}</p>
                     {era.language && (
-                      <p className="hidden xl:block">
-                        {ellipsize(era.language, 14)}
-                      </p>
+                      <p className="hidden truncate xl:block">{era.language}</p>
                     )}
                   </div>
                 </li>
