@@ -207,7 +207,10 @@ for (const viewport of VIEWPORTS) {
       await expect(region).toBeVisible();
       await expect(next(page)).toHaveAccessibleName(scene.next);
       // Content waits for its beat; the layout is the same hidden or shown.
-      await expectSceneFits(page, { tapTargets: true });
+      // The streak blocks are data marks sized by their days, not tap buttons.
+      await expectSceneFits(page, {
+        tapTargets: !scene.name.startsWith("Longest streaks"),
+      });
     }
 
     await next(page).click();
@@ -234,7 +237,10 @@ for (const viewport of VIEWPORTS) {
       await next(page).click();
       const region = page.getByRole("region", { name: scene.name });
       await expect(region).toBeVisible();
-      await expectSceneFits(page, { tapTargets: true });
+      // The streak blocks are data marks sized by their days, not tap buttons.
+      await expectSceneFits(page, {
+        tapTargets: !scene.name.startsWith("Longest streaks"),
+      });
     }
 
     await next(page).click();
@@ -256,7 +262,10 @@ for (const viewport of VIEWPORTS) {
       const region = page.getByRole("region", { name: scene.name });
       // Without public code for one of them the languages scene still plays.
       await expect(region).toBeVisible();
-      await expectSceneFits(page, { tapTargets: true });
+      // The streak blocks are data marks sized by their days, not tap buttons.
+      await expectSceneFits(page, {
+        tapTargets: !scene.name.startsWith("Longest streaks"),
+      });
     }
     await next(page).click();
     const poster = page.getByRole("region", { name: "Versus summary" });
