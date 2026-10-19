@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 import {
   makeHistory,
@@ -79,17 +80,13 @@ for (const viewport of VIEWPORTS) {
         allowScroll: viewport.width < 768,
       });
 
-      if (viewport.width >= 768) {
-        const boxes = await poster
-          .locator("[data-role=dev-card]")
-          .evaluateAll((items) =>
-            items.map((item) => {
-              const { width, height } = item.getBoundingClientRect();
-              return { width: Math.round(width), height: Math.round(height) };
-            }),
-          );
-        expect(boxes).toHaveLength(set.logins.length);
-        for (const box of boxes) expect(box).toEqual(boxes[0]);
+      await expect(poster.locator("[data-role=dev-band]")).toHaveCount(
+        set.logins.length,
+      );
+      for (const name of ["Together", "Race", "Habits"]) {
+        await expect(
+          poster.getByRole("button", { name: `${name} card` }),
+        ).toBeVisible();
       }
     });
   }
@@ -97,14 +94,21 @@ for (const viewport of VIEWPORTS) {
 
 test("the poster reads as the approved design", async ({ page }) => {
   const poster = await openPoster(page, ["ada", "grace", "linus"]);
-  await expect(poster).toContainText(/Together · \d{4} — \d{4}/);
-  await expect(poster).toContainText("Contributions between three of you.");
+  await expect(poster).toContainText(
+    /@ada vs @grace vs @linus · \d{4} — \d{4}/,
+  );
+  await expect(poster).toContainText("Contributions, together.");
   await expect(poster).toContainText(
     "Contributions are not productivity. This is rhythm, not value.",
   );
   await expect(poster).toContainText(/\d contributions · \d{4} to \d{4}/);
+  await expect(poster.getByText("Take it with you")).toBeVisible();
   await expect(
-    poster.getByRole("button", { name: "Save image" }),
+    poster.getByRole("button", { name: "Save together image" }),
+  ).toBeVisible();
+  await poster.getByRole("button", { name: "Race card" }).click();
+  await expect(
+    poster.getByRole("button", { name: "Save race image" }),
   ).toBeVisible();
   await expect(poster.getByRole("button", { name: "Share" })).toBeVisible();
   await expect(poster.getByRole("button", { name: "Replay" })).toBeVisible();
@@ -115,7 +119,33 @@ test("the poster reads as the approved design", async ({ page }) => {
   await expect(poster).not.toContainText("private");
 });
 
+test("saving the selected card downloads a 1080x1920 PNG", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "canShare", { value: undefined });
+  });
+  const poster = await openPoster(page, ["ada", "grace", "linus"]);
+  for (const name of ["Together", "Race", "Habits"]) {
+    await poster.getByRole("button", { name: `${name} card` }).click();
+    const save = poster.getByRole("button", {
+      name: `Save ${name.toLowerCase()} image`,
+    });
+    await expect(save).toBeEnabled();
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      save.click(),
+    ]);
+    expect(download.suggestedFilename()).toBe(
+      `committed-ada-vs-grace-vs-linus-${name.toLowerCase()}.png`,
+    );
+    const file = readFileSync(await download.path());
+    expect(file.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    // IHDR: width and height as big-endian 32-bit integers.
+    expect(file.readUInt32BE(16)).toBe(1080);
+    expect(file.readUInt32BE(20)).toBe(1920);
+  }
+});
+
 test("the poster shows the shared private count once", async ({ page }) => {
   const poster = await openPoster(page, [LONG_A, LONG_B]);
-  await expect(poster).toContainText(/Includes [\d,]+ private\./);
+  await expect(poster).toContainText(/Includes [\d,]+ private/);
 });

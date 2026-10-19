@@ -265,7 +265,7 @@ for (const viewport of VIEWPORTS) {
     }
     await next(page).click();
     const poster = page.getByRole("region", { name: "Versus summary" });
-    await expect(poster).toContainText(/Includes [\d,]+ private\./);
+    await expect(poster).toContainText(/Includes [\d,]+ private/);
     await expectSceneFits(page, { tapTargets: true });
   });
 }
@@ -318,7 +318,7 @@ async function openPoster(page: Page) {
   await expect(poster).toContainText(
     "Contributions are not productivity. This is rhythm, not value.",
   );
-  await expect(poster).toContainText("Contributions between three of you.");
+  await expect(poster).toContainText("Contributions, together.");
   return poster;
 }
 
@@ -329,22 +329,24 @@ test("the poster downloads a real image where files cannot be shared", async ({
     Object.defineProperty(navigator, "canShare", { value: undefined });
   });
   const poster = await openPoster(page);
-  const save = poster.getByRole("button", { name: "Save image" });
+  const save = poster.getByRole("button", { name: "Save together image" });
 
-  // The image is drawn ahead of the click; wait for it instead of guessing.
+  // The image is drawn ahead of the click: the button waits for it.
+  await expect(save).toBeEnabled();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    expect(async () => {
-      await save.click();
-      await expect(poster.getByRole("status")).not.toContainText("still being");
-    }).toPass(),
+    save.click(),
   ]);
-  expect(download.suggestedFilename()).toBe("committed-versus.png");
+  expect(download.suggestedFilename()).toBe(
+    "committed-ada-vs-grace-vs-linus-together.png",
+  );
   const file = readFileSync(await download.path());
   // PNG signature, and a real picture rather than an empty canvas.
   expect(file.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
   expect(file.length).toBeGreaterThan(20_000);
-  await expect(poster.getByRole("status")).toHaveText("Download started.");
+  await expect(poster.getByRole("status")).toHaveText(
+    "Download started for the together card.",
+  );
 });
 
 test("the poster shares the image file when the browser can", async ({
@@ -352,6 +354,12 @@ test("the poster shares the image file when the browser can", async ({
 }) => {
   await page.addInitScript(() => {
     const target = window as unknown as { shared?: string[] };
+    // The share sheet is for touch screens; the cards check the pointer type.
+    const matchMedia = window.matchMedia.bind(window);
+    window.matchMedia = (query: string) =>
+      query === "(pointer: coarse)"
+        ? ({ ...matchMedia(query), matches: true } as MediaQueryList)
+        : matchMedia(query);
     Object.defineProperty(navigator, "canShare", { value: () => true });
     Object.defineProperty(navigator, "share", {
       value: async (data: { files?: File[] }) => {
@@ -362,16 +370,17 @@ test("the poster shares the image file when the browser can", async ({
     });
   });
   const poster = await openPoster(page);
-  await expect(async () => {
-    await poster.getByRole("button", { name: "Save image" }).click();
-    await expect(poster.getByRole("status")).not.toContainText("still being");
-  }).toPass();
-  await expect(poster.getByRole("status")).toHaveText("Image shared.");
+  const save = poster.getByRole("button", { name: "Save together image" });
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(poster.getByRole("status")).toHaveText(
+    "Shared the together card.",
+  );
   expect(
     await page.evaluate(
       () => (window as unknown as { shared?: string[] }).shared,
     ),
-  ).toEqual(["committed-versus.png|image/png|true"]);
+  ).toEqual(["committed-ada-vs-grace-vs-linus-together.png|image/png|true"]);
 });
 
 test("a lineup without public code skips the languages scene", async ({
