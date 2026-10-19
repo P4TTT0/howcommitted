@@ -1,13 +1,13 @@
 import { findElement } from "@/features/sequencer/explore";
 import { formatCount } from "@/features/sequencer/model/format";
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { semitonesForDegree } from "@/playback/pitch";
-import { type BigNumber, countAt } from "./numbers";
+import { type BigNumber, countAt, countSounds } from "./numbers";
 
 /**
  * Wires the four numbers to the sequencer's clock. Each count is a pure
- * function of clock time, written per frame only when it changes; one soft cue
- * is scheduled as each number lands. No timers of its own.
+ * function of clock time, written per frame only when it changes; its sound is
+ * scheduled with it: rising ticks matching the displayed value, then one
+ * closing hit when it settles. No timers of its own.
  */
 export function mountBigNumbers(
   root: HTMLElement,
@@ -21,17 +21,13 @@ export function mountBigNumbers(
     ),
   );
 
-  numbers.forEach((number, index) => {
-    const isLast = index === numbers.length - 1;
-    clock.at(number.land, (time) => {
-      const engine = sound();
-      engine?.playTick({
-        time,
-        semitones: semitonesForDegree(number.degree),
-        intensity: 0.7,
-      });
-      if (isLast) engine?.playPayoff({ time, kind: "final" });
-    });
+  numbers.forEach((number) => {
+    for (const { time: at, progress } of countSounds(number, reducedMotion)) {
+      clock.at(at, (time) => sound()?.countTick(time, progress));
+    }
+    // With reduced motion the value appears at once: close when it does.
+    const closeAt = reducedMotion ? number.start : number.land;
+    clock.at(closeAt, (time) => sound()?.countClose(time));
   });
 
   const shown = numbers.map(() => Number.NaN);

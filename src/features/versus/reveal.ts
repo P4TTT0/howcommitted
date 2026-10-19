@@ -1,5 +1,6 @@
 import type { SceneRuntime } from "@/features/sequencer/types";
 import { semitonesForDegree } from "@/playback/pitch";
+import type { SoundEngine } from "@/playback/sound/engine";
 
 /** Seconds a versus info scene takes to reveal itself, then hold. */
 export const REVEAL_SECONDS = 6;
@@ -13,6 +14,15 @@ export function revealTime(group: number): number {
   return FIRST_AT + group * STEP;
 }
 
+export type RevealOptions = {
+  /**
+   * Replaces the default tick: called on the beat each group shows, with the
+   * group's position in order of appearance. Scenes use it to pick the gesture
+   * that matches what appears (for example `stair`).
+   */
+  onReveal?: (engine: SoundEngine, position: number, time: number) => void;
+};
+
 /**
  * The shared reveal of the versus info scenes. Elements marked
  * `data-reveal="<group>"` appear one group at a time, in order, each on a beat
@@ -24,6 +34,7 @@ export function revealTime(group: number): number {
 export function mountReveal(
   root: HTMLElement,
   { clock, sound, reducedMotion }: SceneRuntime,
+  { onReveal }: RevealOptions = {},
 ): () => void {
   const groups = new Map<number, HTMLElement[]>();
   for (const element of root.querySelectorAll<HTMLElement>("[data-reveal]")) {
@@ -37,6 +48,10 @@ export function mountReveal(
     const isLast = position === ordered.length - 1;
     clock.at(revealTime(group), (time) => {
       const engine = sound();
+      if (engine && onReveal) {
+        onReveal(engine, position, time);
+        return;
+      }
       engine?.playTick({
         time,
         semitones: semitonesForDegree(position),
@@ -68,3 +83,8 @@ export function mountReveal(
     }
   };
 }
+
+/** The common versus reveal sound: one `stair` step per group, low to high. */
+export const stairReveal: RevealOptions = {
+  onReveal: (engine, position, time) => engine.stair(time, position),
+};

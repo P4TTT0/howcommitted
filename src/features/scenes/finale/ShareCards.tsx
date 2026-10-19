@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { interaction } from "@/playback/sound/interaction";
 import { actionClass, focusRing } from "@/ui/classes";
 import { cardToBlob, drawCard } from "./cardCanvas";
 import { type CardFonts, loadCardFonts, readCardFonts } from "./cardPrimitives";
@@ -132,6 +133,7 @@ export function ShareCards({ cards, children }: ShareCardsProps) {
                 aria-label={`${item.label} card`}
                 title={item.alt}
                 onClick={() => {
+                  interaction.click();
                   setSelected(index);
                   setStatus("");
                 }}
@@ -151,7 +153,10 @@ export function ShareCards({ cards, children }: ShareCardsProps) {
       </ul>
       <button
         type="button"
-        onClick={save}
+        onClick={() => {
+          interaction.click();
+          save();
+        }}
         disabled={!blob}
         className={`${actionClass} min-h-14 bg-ink text-paper disabled:border-dashed disabled:bg-transparent disabled:text-ink`}
       >

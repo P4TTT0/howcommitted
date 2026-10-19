@@ -10,6 +10,7 @@ import {
 import { bigNumbersScene } from "./index";
 import {
   countAt,
+  countSounds,
   GRID_SECONDS,
   planBigNumbers,
   scopeNote,
@@ -156,5 +157,35 @@ describe("bigNumbersScene.create", () => {
     });
     expect(scene?.duration).toBeGreaterThanOrEqual(4);
     expect(scene?.explore).toBeTypeOf("function");
+  });
+});
+
+describe("countSounds", () => {
+  const number = { start: 1, land: 2 };
+
+  it("rises with the displayed value, from 0 and never past 1", () => {
+    const ticks = countSounds(number, false, 5);
+    expect(ticks).toHaveLength(5);
+    expect(ticks[0]).toEqual({ time: 1, progress: 0 });
+    for (const [i, tick] of ticks.entries()) {
+      expect(tick.time).toBeGreaterThanOrEqual(1);
+      expect(tick.time).toBeLessThan(2);
+      expect(tick.progress).toBeLessThan(1);
+      if (i > 0)
+        expect(tick.progress).toBeGreaterThan(ticks[i - 1]?.progress ?? 0);
+    }
+  });
+
+  it("matches countAt at each tick", () => {
+    const full = { ...number, total: 1000 };
+    for (const tick of countSounds(number, false)) {
+      expect(Math.round(tick.progress * 1000)).toBe(
+        countAt(full, tick.time, false),
+      );
+    }
+  });
+
+  it("is silent when the number does not count", () => {
+    expect(countSounds(number, true)).toEqual([]);
   });
 });
