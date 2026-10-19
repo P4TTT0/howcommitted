@@ -162,9 +162,12 @@ export async function expectSceneFits(page: Page, options: Options = {}) {
 
         // Holds more than it shows: clipped, or spilling out of its own box.
         // A deliberate ellipsis (CSS `truncate`) hides on purpose and says so.
+        // So does a carousel track, whose other slides wait beside the frame.
         const truncates =
-          style.textOverflow === "ellipsis" &&
-          (style.overflowX === "hidden" || style.overflowX === "clip");
+          (style.textOverflow === "ellipsis" &&
+            (style.overflowX === "hidden" || style.overflowX === "clip")) ||
+          (element.hasAttribute("data-carousel-track") &&
+            style.overflowX !== "visible");
         if (
           !truncates &&
           !scrolls(style, "x") &&

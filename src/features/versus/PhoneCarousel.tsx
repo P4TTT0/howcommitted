@@ -1,9 +1,13 @@
 import type { ReactNode } from "react";
 import { swatchClass } from "./palette";
 
-/** Classes for the list that holds the slides: a clipped stage on a phone. */
+/**
+ * Classes for the list that holds the slides: a clipped stage on a phone.
+ * `contain: paint` keeps the slides parked to the side from widening the
+ * scene around it; the track itself is a deliberate clip.
+ */
 export const CAROUSEL_TRACK =
-  "max-md:relative max-md:min-h-0 max-md:flex-1 max-md:touch-pan-y max-md:overflow-hidden";
+  "max-md:relative max-md:min-h-0 max-md:flex-1 max-md:touch-pan-y max-md:overflow-hidden max-md:[contain:paint]";
 
 /**
  * Classes for each slide: on a phone every slide fills the track and is moved
