@@ -26,6 +26,26 @@ export const WEEKDAY_LABELS = [
   "Sun",
 ] as const;
 
+export const WEEKDAY_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+
+/** Shown in the readout until a weekday is picked. */
+export const READOUT_IDLE = {
+  day: "Pick a day",
+  detail: "Hover or tap a weekday",
+} as const;
+
+/** Gridlines of the chart: the baseline plus this many steps above it. */
+export const AXIS_STEPS = 3;
+const AXIS_STEP_UNIT = 0.05;
+
 export type PanelModel = {
   year: number;
   tag: string;
@@ -34,9 +54,11 @@ export type PanelModel = {
   total: number;
   activeDays: number;
   longestStreak: number;
-  /** 0..1 per weekday, Monday first, of the busiest weekday of the year. */
+  /** Contributions per weekday, Monday first. */
+  counts: number[];
+  /** 0..1 per weekday, Monday first: the share of the year's total. */
   week: number[];
-  /** Spoken in full, since the panel is drawn with numbers and bars. */
+  /** Spoken in full, since the panel is drawn with numbers and blocks. */
   reading: string;
 };
 
@@ -44,7 +66,12 @@ export type Comparison = {
   earlier: PanelModel;
   now: PanelModel;
   summary: string;
+  /** Top of the share axis, a multiple of AXIS_STEPS * 5%. */
+  axisMax: number;
 };
+
+/** The weekday as read out: a name and both years' counts and shares. */
+export type DayReading = { day: string; detail: string; label: string };
 
 export type ThenNowPlan = {
   /** Past years that can be "then", oldest first. */
@@ -89,11 +116,9 @@ function plural(count: number, one: string, many: string): string {
 
 function panel(stats: YearStats, tag: string, firstYear: number): PanelModel {
   const colors = blockForYearIndex(stats.year - firstYear);
-  const peak = Math.max(...stats.weekShape.weekdays);
-  const week = stats.weekShape.weekdays.map((n) => (peak > 0 ? n / peak : 0));
-  const days = stats.weekShape.weekdays
-    .map((n, i) => `${WEEKDAY_LABELS[i]} ${formatCount(n)}`)
-    .join(", ");
+  const counts = stats.weekShape.weekdays;
+  const sum = counts.reduce((total, n) => total + n, 0);
+  const week = counts.map((n) => (sum > 0 ? n / sum : 0));
   return {
     year: stats.year,
     tag,
@@ -102,9 +127,45 @@ function panel(stats: YearStats, tag: string, firstYear: number): PanelModel {
     total: stats.total,
     activeDays: stats.activeDays,
     longestStreak: stats.longestStreak,
+    counts,
     week,
-    reading: `${tag} ${stats.year}: ${plural(stats.total, "contribution", "contributions")}, ${plural(stats.activeDays, "active day", "active days")}, longest streak ${plural(stats.longestStreak, "day", "days")}. By weekday: ${days}.`,
+    reading: `${tag} ${stats.year}: ${plural(stats.total, "contribution", "contributions")}, ${plural(stats.activeDays, "active day", "active days")}, longest streak ${plural(stats.longestStreak, "day", "days")}.`,
   };
+}
+
+/** Top of the share axis: the smallest multiple of 15% that fits both years. */
+export function axisMaxFor(...weeks: number[][]): number {
+  const peak = Math.max(0, ...weeks.flat());
+  const step = Math.max(
+    AXIS_STEP_UNIT,
+    Math.ceil(peak / AXIS_STEPS / AXIS_STEP_UNIT - 1e-9) * AXIS_STEP_UNIT,
+  );
+  return step * AXIS_STEPS;
+}
+
+/** Labels of the gridlines, baseline first: "0%", "10%", ... */
+export function tickLabels(axisMax: number): string[] {
+  return Array.from(
+    { length: AXIS_STEPS + 1 },
+    (_, i) => `${Math.round((axisMax * 100 * i) / AXIS_STEPS)}%`,
+  );
+}
+
+/** Height of a bar as a percentage of the plot. */
+export function barHeight(share: number, axisMax: number): number {
+  return Math.min(100, Math.round((share / axisMax) * 100));
+}
+
+const percent = (share: number): string => `${Math.round(share * 100)}%`;
+
+/** One weekday for both years, as text for the readout and the group label. */
+export function dayReading(comparison: Comparison, index: number): DayReading {
+  const { earlier, now } = comparison;
+  const part = (model: PanelModel) =>
+    `${model.year}: ${formatCount(model.counts[index] ?? 0)} (${percent(model.week[index] ?? 0)})`;
+  const day = WEEKDAY_NAMES[index] ?? "";
+  const detail = `${part(earlier)} · ${part(now)}`;
+  return { day, detail, label: `${day}. ${detail}` };
 }
 
 /**
@@ -133,10 +194,13 @@ export function planThenNow(
 
   const compare = (thenYear: number): Comparison => {
     const { a, b } = yearCompare(days, thenYear, nowEntry.year);
+    const earlier = panel(a, "Then", firstYear);
+    const now = panel(b, "Now · last full year", firstYear);
     return {
-      earlier: panel(a, "Then", firstYear),
-      now: panel(b, "Now · last full year", firstYear),
+      earlier,
+      now,
       summary: summaryLine(a, b),
+      axisMax: axisMaxFor(earlier.week, now.week),
     };
   };
 
