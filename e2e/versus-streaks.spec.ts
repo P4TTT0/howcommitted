@@ -176,7 +176,8 @@ test("the tooltip of a streak at the far right stays inside the frame", async ({
 test("a phone row toggles both date ranges on tap", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   const region = await open(page, ["ada", "grace", "edge"]);
-  const row = region.getByRole("button", { name: /^@edge: .* in a row: /i });
+  // @grace has both a run and a quiet stretch; @edge never goes quiet.
+  const row = region.getByRole("button", { name: /^@grace: .* in a row: /i });
   await expect(row).toHaveAttribute("aria-expanded", "false");
   await row.click();
   await expect(row).toHaveAttribute("aria-expanded", "true");
