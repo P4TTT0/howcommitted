@@ -218,8 +218,8 @@ test("the heatmap reads a week by keyboard and shows the month strip", async ({
     "aria-valuetext",
     new RegExp(`^Scene 2 of ${await sceneCount(page)}\\b`),
   );
-  await expect(page.locator("[data-role=readout-title]")).toHaveText(
-    "2023 · week 1",
+  await expect(page.locator("[data-role=tip-detail]")).toHaveText(
+    /^2023 · Jan 1 – /,
   );
 
   // The fixture lives through every calendar month, so the strip is shown.

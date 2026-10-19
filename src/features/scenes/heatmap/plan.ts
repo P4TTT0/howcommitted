@@ -38,6 +38,9 @@ export type WeekCell = {
    * (drawn dashed). "absent": the calendar has no day in that column.
    */
   state: "past" | "future" | "absent";
+  /** First and last ISO day the calendar has in that column, or null when empty. */
+  from: string | null;
+  to: string | null;
 };
 
 export type YearRow = {
@@ -81,6 +84,7 @@ export function planRows(
   const rows = years.map((entry) => {
     const sums = new Array<number>(WEEKS).fill(0);
     const firstDay = new Array<string | null>(WEEKS).fill(null);
+    const lastDay = new Array<string | null>(WEEKS).fill(null);
     for (const cell of entry.heatmap) {
       if (cell.week < 0 || cell.week >= WEEKS) continue;
       sums[cell.week] = (sums[cell.week] ?? 0) + cell.contributions;
@@ -88,8 +92,12 @@ export function planRows(
       if (earliest === null || cell.date < (earliest ?? "")) {
         firstDay[cell.week] = cell.date;
       }
+      const latest = lastDay[cell.week];
+      if (latest === null || cell.date > (latest ?? "")) {
+        lastDay[cell.week] = cell.date;
+      }
     }
-    return { entry, sums, firstDay };
+    return { entry, sums, firstDay, lastDay };
   });
 
   const busy = rows
@@ -98,7 +106,7 @@ export function planRows(
     .sort((a, b) => a - b);
   const cap = Math.max(1, quantileOf(busy, LEVEL_CAP_QUANTILE));
 
-  return rows.map(({ entry, sums, firstDay }) => {
+  return rows.map(({ entry, sums, firstDay, lastDay }) => {
     const inProgress = entry.year >= currentYear;
     const weeks = sums.map((contributions, week): WeekCell => {
       const start = firstDay[week] ?? null;
@@ -113,7 +121,14 @@ export function planRows(
               | 3
               | 4)
           : 0;
-      return { week, contributions, level, state };
+      return {
+        week,
+        contributions,
+        level,
+        state,
+        from: start,
+        to: lastDay[week] ?? null,
+      };
     });
     return {
       year: entry.year,
@@ -274,4 +289,40 @@ export function weekDetail(contributions: number): string {
 /** Spoken reading of one week. */
 export function weekReading(row: Pick<YearRow, "year">, cell: WeekCell) {
   return `${weekTitle(row, cell.week)}: ${weekDetail(cell.contributions)}`;
+}
+
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** "2024-04-08" as "Apr 8", without going through a time zone. */
+function shortDay(iso: string): string {
+  const month = MONTH_SHORT[Number(iso.slice(5, 7)) - 1] ?? "";
+  return `${month} ${Number(iso.slice(8, 10))}`;
+}
+
+/** The tooltip headline: "12 contributions". */
+export function tipTitle(contributions: number): string {
+  const unit = contributions === 1 ? "contribution" : "contributions";
+  return `${formatCount(contributions)} ${unit}`;
+}
+
+/** The tooltip detail: "2024 · Apr 8 – Apr 14", the real dates of the week. */
+export function tipDetail(
+  row: Pick<YearRow, "year">,
+  cell: Pick<WeekCell, "from" | "to">,
+): string {
+  if (!cell.from || !cell.to) return String(row.year);
+  return `${row.year} · ${shortDay(cell.from)} – ${shortDay(cell.to)}`;
 }
