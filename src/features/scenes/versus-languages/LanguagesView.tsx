@@ -51,12 +51,15 @@ function Card({ person }: { person: LanguagePerson }) {
       className={`flex min-w-0 flex-col border-2 border-ink md:min-h-0 ${CAROUSEL_SLIDE}`}
     >
       <div
-        className={`@container flex flex-1 md:min-h-0 flex-col gap-1.5 px-4 py-3 md:py-4 ${swatchClass(person.index)} ${foreground}`}
+        className={`@container flex min-h-0 flex-1 flex-col gap-1.5 px-4 py-3 md:py-4 ${swatchClass(person.index)} ${foreground}`}
       >
-        <p className="min-w-0 [overflow-wrap:anywhere] font-mono text-xs font-bold">
+        <p
+          className="min-w-0 font-mono text-xs font-bold max-md:truncate md:[overflow-wrap:anywhere]"
+          title={`@${person.login}`}
+        >
           @{person.login}
         </p>
-        <FitText className="mt-auto font-display text-[length:min(24cqi,12dvh)] font-black uppercase leading-[0.82] max-md:text-[length:min(20cqi,10dvh)]">
+        <FitText className="mt-auto font-display text-[length:min(24cqi,12dvh)] font-black uppercase leading-[0.82] max-md:text-[length:min(20cqi,7dvh)]">
           {person.top ? person.top.name : "—"}
         </FitText>
         <p className="font-mono text-xs [font-stretch:87.5%]">
@@ -65,7 +68,8 @@ function Card({ person }: { person: LanguagePerson }) {
             : "No public repositories"}
         </p>
       </div>
-      <ul className="flex shrink-0 flex-col gap-2 px-4 py-3 md:min-h-[8.5rem] lg:py-4">
+      {/* A phone shows the top three; the rest stay for wider screens. */}
+      <ul className="flex shrink-0 flex-col gap-2 px-4 py-3 md:min-h-[8.5rem] lg:py-4 max-md:[&>li:nth-child(n+4)]:hidden">
         {person.rows.map((row, position) => (
           <li
             key={row.name}
