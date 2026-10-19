@@ -161,7 +161,12 @@ export async function expectSceneFits(page: Page, options: Options = {}) {
         }
 
         // Holds more than it shows: clipped, or spilling out of its own box.
+        // A deliberate ellipsis (CSS `truncate`) hides on purpose and says so.
+        const truncates =
+          style.textOverflow === "ellipsis" &&
+          (style.overflowX === "hidden" || style.overflowX === "clip");
         if (
+          !truncates &&
           !scrolls(style, "x") &&
           element.scrollWidth > element.clientWidth + 1 &&
           element.clientWidth > 0
