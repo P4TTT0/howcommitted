@@ -1,13 +1,20 @@
 import { findElement, indexAfterKey } from "@/features/sequencer/explore";
-import { panelElements, writePanel, writeReading } from "./mount";
-import type { ThenNowPlan } from "./plan";
+import { panelElements, writeAxis, writePanel, writeReading } from "./mount";
+import {
+  type Comparison,
+  dayReading,
+  READOUT_IDLE,
+  type ThenNowPlan,
+} from "./plan";
 
 /**
- * Explore phase: the year buttons come alive. Click, tap or Left/Right/Home/End
- * pick the "then" year; both sides and the summary line are rewritten at once
- * (instant DOM updates, no sound, no clock). The arrows are kept from the
- * scene navigation while a picker button is focused. The cleanup puts the
- * default comparison and the disabled buttons back.
+ * Explore phase: the year buttons and the weekday groups come alive. Click,
+ * tap or Left/Right/Home/End pick the "then" year; both sides, the axis and the
+ * summary line are rewritten at once (instant DOM updates, no sound, no clock).
+ * Hovering, focusing or tapping a weekday group highlights it, dims the others
+ * and fills the black readout; leaving the chart resets it. The arrows are kept
+ * from the scene navigation while a picker button is focused. The cleanup puts
+ * the default comparison and the disabled buttons back.
  */
 export function exploreThenNow(
   root: HTMLElement,
@@ -15,16 +22,45 @@ export function exploreThenNow(
 ): () => void {
   const picker = findElement<HTMLElement>(root, '[data-role="picker"]');
   const summary = findElement<HTMLElement>(root, '[data-role="summary"]');
+  const days = findElement<HTMLElement>(root, '[data-role="weekdays"]');
+  const readoutDay = findElement<HTMLElement>(
+    root,
+    '[data-role="readout-day"]',
+  );
+  const readoutDetail = findElement<HTMLElement>(
+    root,
+    '[data-role="readout-detail"]',
+  );
   const thenPanel = panelElements(root, "then");
   const nowPanel = panelElements(root, "now");
   const buttons = [...picker.querySelectorAll<HTMLButtonElement>("button")];
+  const groups = [...days.querySelectorAll<HTMLElement>("[data-day]")];
+  const dayLabels = [...root.querySelectorAll<HTMLElement>("[data-day-label]")];
+
+  let comparison: Comparison = plan.compare(plan.defaultThen);
+  let active = -1;
+
+  const showDay = (index: number) => {
+    active = index;
+    groups.forEach((group, i) => {
+      group.dataset.state = index < 0 ? "rest" : i === index ? "active" : "dim";
+    });
+    dayLabels.forEach((label, i) => {
+      label.dataset.state = i === index ? "active" : "rest";
+    });
+    const reading = index < 0 ? READOUT_IDLE : dayReading(comparison, index);
+    readoutDay.textContent = reading.day;
+    readoutDetail.textContent = reading.detail;
+  };
 
   const select = (year: number) => {
-    const comparison = plan.compare(year);
-    writePanel(thenPanel, comparison.earlier);
-    writePanel(nowPanel, comparison.now);
+    comparison = plan.compare(year);
+    writePanel(thenPanel, comparison.earlier, comparison.axisMax);
+    writePanel(nowPanel, comparison.now, comparison.axisMax);
+    writeAxis(root, comparison);
     writeReading(root, comparison);
     summary.textContent = comparison.summary;
+    showDay(active);
     for (const button of buttons) {
       const selected = Number(button.dataset.year) === year;
       button.dataset.selected = String(selected);
@@ -55,13 +91,33 @@ export function exploreThenNow(
     select(Number(button.dataset.year));
   };
 
+  const onDay = (event: Event) => {
+    const group = (event.target as Element).closest<HTMLElement>("[data-day]");
+    if (group) showDay(Number(group.dataset.day));
+  };
+  const onLeave = () => showDay(-1);
+  const onFocusOut = (event: FocusEvent) => {
+    if (!days.contains(event.relatedTarget as Node | null)) showDay(-1);
+  };
+
   for (const button of buttons) button.disabled = false;
   picker.addEventListener("click", onClick);
   picker.addEventListener("keydown", onKeyDown);
+  days.addEventListener("mouseover", onDay);
+  days.addEventListener("focusin", onDay);
+  days.addEventListener("click", onDay);
+  days.addEventListener("mouseleave", onLeave);
+  days.addEventListener("focusout", onFocusOut);
 
   return () => {
     picker.removeEventListener("click", onClick);
     picker.removeEventListener("keydown", onKeyDown);
+    days.removeEventListener("mouseover", onDay);
+    days.removeEventListener("focusin", onDay);
+    days.removeEventListener("click", onDay);
+    days.removeEventListener("mouseleave", onLeave);
+    days.removeEventListener("focusout", onFocusOut);
+    showDay(-1);
     select(plan.defaultThen);
     for (const button of buttons) button.disabled = true;
   };

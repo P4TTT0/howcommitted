@@ -3,12 +3,15 @@ import { formatCount } from "@/features/sequencer/model/format";
 import type { SceneRuntime } from "@/features/sequencer/types";
 import { semitonesForDegree } from "@/playback/pitch";
 import {
+  barHeight,
   type Comparison,
+  dayReading,
   PANEL_SECONDS,
   type PanelModel,
   progressAt,
   SUMMARY_SECONDS,
   type ThenNowPlan,
+  tickLabels,
 } from "./plan";
 
 /** The elements of one side that the animation and the picker both write. */
@@ -16,6 +19,8 @@ export type PanelElements = {
   /** Blocks painted with the side's background and foreground. */
   tones: HTMLElement[];
   year: HTMLElement;
+  /** The year in the chart legend. */
+  legend: HTMLElement;
   tag: HTMLElement;
   total: HTMLElement;
   days: HTMLElement;
@@ -35,6 +40,7 @@ export function panelElements(
   return {
     tones: [...root.querySelectorAll<HTMLElement>(`[data-tone="${side}"]`)],
     year: role("year"),
+    legend: role("legend"),
     tag: role("tag"),
     total: role("total"),
     days: role("days"),
@@ -49,20 +55,39 @@ export function panelElements(
 }
 
 /** Writes a finished side: colors, numbers and week shape. */
-export function writePanel(elements: PanelElements, model: PanelModel): void {
+export function writePanel(
+  elements: PanelElements,
+  model: PanelModel,
+  axisMax: number,
+): void {
   for (const tone of elements.tones) {
     tone.style.backgroundColor = model.background;
     tone.style.color = model.foreground;
   }
   elements.year.textContent = String(model.year);
+  elements.legend.textContent = String(model.year);
   elements.tag.textContent = model.tag;
   elements.total.textContent = formatCount(model.total);
   elements.days.textContent = formatCount(model.activeDays);
   elements.streak.textContent = `${formatCount(model.longestStreak)}d`;
   elements.bars.forEach((bar, index) => {
     bar.style.backgroundColor = model.background;
-    bar.style.height = `${Math.round((model.week[index] ?? 0) * 100)}%`;
+    bar.style.height = `${barHeight(model.week[index] ?? 0, axisMax)}%`;
   });
+}
+
+/** Writes the axis labels and each weekday group's spoken label. */
+export function writeAxis(root: HTMLElement, comparison: Comparison): void {
+  const labels = tickLabels(comparison.axisMax);
+  for (const tick of root.querySelectorAll<HTMLElement>("[data-tick]")) {
+    tick.textContent = labels[Number(tick.dataset.tick)] ?? "";
+  }
+  for (const group of root.querySelectorAll<HTMLElement>("[data-day]")) {
+    group.setAttribute(
+      "aria-label",
+      dayReading(comparison, Number(group.dataset.day)).label,
+    );
+  }
 }
 
 /** Writes the spoken form of the whole pair. */

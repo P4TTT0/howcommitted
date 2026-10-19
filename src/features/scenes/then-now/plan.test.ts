@@ -4,7 +4,13 @@ import {
   makeYear,
   steadyDays,
 } from "@/test-support/historyFixture";
-import { planThenNow, progressAt, summaryLine } from "./plan";
+import {
+  axisMaxFor,
+  dayReading,
+  planThenNow,
+  progressAt,
+  summaryLine,
+} from "./plan";
 
 const TODAY = new Date(Date.UTC(2026, 5, 1));
 
@@ -71,7 +77,8 @@ describe("planThenNow", () => {
     expect(earlier).toMatchObject({ year: 2023, tag: "Then" });
     expect(now).toMatchObject({ year: 2025, activeDays: 365 });
     expect(earlier?.week).toHaveLength(7);
-    expect(Math.max(...(earlier?.week ?? []))).toBe(1);
+    const shares = earlier?.week.reduce((sum, n) => sum + n, 0) ?? 0;
+    expect(shares).toBeCloseTo(1);
     expect(summary).toMatch(/^Since 2023: /);
     expect(earlier?.reading).toContain("contributions");
   });
@@ -131,5 +138,31 @@ describe("progressAt", () => {
     expect(progressAt(1, 1, 0.5, false)).toBe(0);
     expect(progressAt(1, 1, 3, false)).toBe(1);
     expect(progressAt(1, 1, 1.01, true)).toBe(1);
+  });
+});
+
+describe("axisMaxFor", () => {
+  it("fits the tallest share on a 5% grid in three steps", () => {
+    expect(axisMaxFor([0.1, 0.16])).toBeCloseTo(0.3);
+    expect(axisMaxFor([0.3, 0.1])).toBeCloseTo(0.3);
+    expect(axisMaxFor([0.31])).toBeCloseTo(0.45);
+    expect(axisMaxFor([0, 0])).toBeCloseTo(0.15);
+  });
+});
+
+describe("dayReading", () => {
+  it("reads both years for one weekday", () => {
+    const plan = planThenNow(
+      history([
+        [2023, 1, 7],
+        [2025, 1, 7],
+      ]),
+      TODAY,
+    );
+    if (!plan) throw new Error("expected a plan");
+    const reading = dayReading(plan.compare(2023), 1);
+    expect(reading.day).toBe("Tuesday");
+    expect(reading.detail).toMatch(/^2023: \d+ \(\d+%\) · 2025: \d+ \(\d+%\)$/);
+    expect(reading.label).toBe(`Tuesday. ${reading.detail}`);
   });
 });

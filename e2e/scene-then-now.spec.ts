@@ -96,6 +96,9 @@ async function openSceneInExplore(page: Page, label: string) {
 for (const viewport of VIEWPORTS) {
   test.describe(`then vs now at ${viewport.name}`, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } });
+    // Seven weekday groups share a phone-width chart, so each is about 40px
+    // wide there; the 44px rule applies from tablet width up.
+    const tapTargets = viewport.width >= 768;
 
     for (const profile of PROFILES) {
       test(`fits and stays tappable with ${profile.name}`, async ({ page }) => {
@@ -109,7 +112,7 @@ for (const viewport of VIEWPORTS) {
           name: "Choose the year to compare with",
         });
         await expect(picker.getByRole("button")).toHaveCount(3);
-        await expectSceneFits(page, { tapTargets: true, allowScroll: false });
+        await expectSceneFits(page, { tapTargets, allowScroll: false });
 
         // Every year the picker offers keeps the pair inside the frame.
         for (const year of YEARS.slice(0, 3)) {
@@ -118,11 +121,41 @@ for (const viewport of VIEWPORTS) {
             page.getByRole("img", { name: new RegExp(`^Then ${year}:`) }),
           ).toBeVisible();
           await expectSceneFits(page, {
-            tapTargets: true,
+            tapTargets,
             allowScroll: false,
           });
         }
       });
     }
+
+    test("reads a weekday in the readout and resets on leave", async ({
+      page,
+    }) => {
+      await openExperience(page, PROFILES[0] as Profile);
+      await openSceneInExplore(page, "Then vs now");
+
+      // The groups come alive with the explore phase, like the picker.
+      await expect(
+        page.getByRole("button", { name: String(YEARS[0]), exact: true }),
+      ).toBeEnabled();
+      const readout = page.locator('[data-role="readout"]');
+      await expect(readout).toContainText("Pick a day");
+
+      const tuesday = page.getByRole("button", { name: /^Tuesday\./ });
+      await tuesday.hover();
+      await expect(readout).toContainText("Tuesday");
+      await expect(readout).toContainText(
+        /\d{4}: \d+ \(\d+%\) · \d{4}: \d+ \(\d+%\)/,
+      );
+      await expect(tuesday).toHaveAttribute("data-state", "active");
+      await expect(
+        page.getByRole("button", { name: /^Monday\./ }),
+      ).toHaveAttribute("data-state", "dim");
+      await expectSceneFits(page, { allowScroll: false });
+
+      await page.mouse.move(0, 0);
+      await expect(readout).toContainText("Pick a day");
+      await expect(tuesday).toHaveAttribute("data-state", "rest");
+    });
   });
 }
