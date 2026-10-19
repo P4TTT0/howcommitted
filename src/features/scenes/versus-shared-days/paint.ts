@@ -57,8 +57,6 @@ export type YearElements = {
   legend: HTMLElement[];
   stats: { everyone: HTMLElement; anyone: HTMLElement; run: HTMLElement };
   everyoneLabel: HTMLElement;
-  title: HTMLElement;
-  detail: HTMLElement;
   monthLabels: HTMLElement[];
   yearCurrent: HTMLElement;
 };
@@ -84,8 +82,6 @@ export function findYearElements(
       root,
       '[data-stat-label="everyone"]',
     ),
-    title: findElement<HTMLElement>(root, '[data-role="readout-title"]'),
-    detail: findElement<HTMLElement>(root, '[data-role="readout-detail"]'),
     monthLabels: Array.from({ length: 12 }, (_, month) =>
       findElement<HTMLElement>(root, `[data-month-label="${month}"]`),
     ),
