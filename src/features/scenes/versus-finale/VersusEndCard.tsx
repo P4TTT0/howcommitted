@@ -127,16 +127,17 @@ export function VersusEndCard({ summaries, poster, onReplay }: Props) {
               <li
                 key={summary.login.toLowerCase()}
                 data-role="dev-band"
-                style={{
-                  flexGrow: summary.total / sum,
-                  flexBasis: 0,
-                }}
-                className={`grid min-w-0 grid-cols-[minmax(0,1fr)_45%] items-center gap-x-2 gap-y-1 p-3 max-md:min-h-16 md:min-w-[6.5rem] md:grid-cols-1 md:content-between md:items-start md:p-4 ${swatchClass(index)} ${swatchTextClass(index)}`}
+                // The share sets how much extra room a band takes. On a phone
+                // a band starts at its content height, so a small share never
+                // squeezes the login and awards out of it.
+                style={{ flexGrow: summary.total / sum }}
+                className={`grid min-w-0 grid-cols-[minmax(0,1fr)_45%] items-center gap-x-2 gap-y-1 p-3 max-md:min-h-16 max-md:basis-auto md:min-w-[6.5rem] md:basis-0 md:grid-cols-1 md:content-between md:items-start md:p-4 ${swatchClass(index)} ${swatchTextClass(index)}`}
               >
                 <div className="col-start-1 flex min-w-0 items-center gap-2">
                   <Avatar login={summary.login} />
                   <span
-                    className={`${MONO} min-w-0 text-xs font-bold leading-tight [overflow-wrap:anywhere]`}
+                    className={`${MONO} min-w-0 text-xs font-bold leading-tight [overflow-wrap:anywhere] md:truncate`}
+                    title={`@${summary.login}`}
                   >
                     @{summary.login}
                   </span>
