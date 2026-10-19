@@ -50,7 +50,7 @@ function Legend() {
         />
         Quiet
       </span>
-      <span className="flex items-center gap-2">
+      <span className="hidden items-center gap-2 md:flex">
         <span
           aria-hidden="true"
           className="h-3.5 w-[22px] shrink-0 bg-ink/20"
@@ -181,6 +181,103 @@ function Row({ row, position, picked, dimmed, onPick }: RowProps) {
   );
 }
 
+/** Narrowest bar drawn, in percent of the track, so a short stretch shows. */
+const MIN_BAR = 3;
+
+function phoneDetail(row: StreakRow): string {
+  const parts: string[] = [];
+  if (row.streak) {
+    parts.push(
+      `${dayCount(row.streak.days)} in a row: ${rangeText(row.streak.start, row.streak.end)}`,
+    );
+  }
+  if (row.quiet) {
+    parts.push(
+      `${dayCount(row.quiet.days)} quiet: ${rangeText(row.quiet.start, row.quiet.end)}`,
+    );
+  }
+  return parts.join("; ");
+}
+
+type PhoneRowProps = {
+  row: StreakRow;
+  maxStreak: number;
+  maxQuiet: number;
+  open: boolean;
+  onToggle: () => void;
+};
+
+/** A phone row: the number, then both bars on one scale for the whole lineup. */
+function PhoneRow({ row, maxStreak, maxQuiet, open, onToggle }: PhoneRowProps) {
+  const detail = phoneDetail(row);
+  return (
+    <li
+      data-reveal={row.index}
+      className="shrink-0 border-b border-ink/20 first:border-t"
+    >
+      <button
+        type="button"
+        data-phone-row
+        aria-expanded={open}
+        aria-label={`@${row.login}: ${detail || "no run"}`}
+        onClick={onToggle}
+        className={`flex min-h-11 w-full cursor-pointer flex-col gap-1.5 py-1.5 text-left ${open ? "bg-ink/5" : ""}`}
+      >
+        <span className="flex items-baseline justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-2 font-mono text-[13px] font-bold [font-stretch:87.5%]">
+            <span
+              aria-hidden="true"
+              className={`size-2.5 shrink-0 rounded-full ${swatchClass(row.index)}`}
+            />
+            <span className="min-w-0 [overflow-wrap:anywhere]">
+              @{row.login}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-baseline gap-[0.2em] font-display text-[32px] font-black leading-[0.9]">
+            <span>
+              {row.streak ? row.streak.days.toLocaleString("en-US") : "No run"}
+            </span>
+            {row.streak && (
+              <span className="text-base leading-none">
+                {row.streak.days === 1 ? "day" : "days"}
+              </span>
+            )}
+          </span>
+        </span>
+        <span aria-hidden="true" className="flex flex-col gap-1">
+          <span className="block h-3.5">
+            {row.streak && (
+              <span
+                data-block="streak"
+                className={`block h-full ${swatchClass(row.index)}`}
+                style={{
+                  width: `${Math.max(MIN_BAR, (row.streak.days / maxStreak) * 100)}%`,
+                }}
+              />
+            )}
+          </span>
+          <span className="block h-2.5">
+            {row.quiet && (
+              <span
+                data-block="quiet"
+                className="box-border block h-full border-2 border-dashed border-ink"
+                style={{
+                  width: `${Math.max(MIN_BAR, (row.quiet.days / maxQuiet) * 100)}%`,
+                }}
+              />
+            )}
+          </span>
+        </span>
+        {open && detail && (
+          <span className="font-mono text-[11px] [font-stretch:87.5%]">
+            {detail}
+          </span>
+        )}
+      </button>
+    </li>
+  );
+}
+
 /**
  * Versus scene 5, the markup: one shared year axis, then a row per developer
  * (in the order they were added) with their activity month by month, their
@@ -191,6 +288,9 @@ function Row({ row, position, picked, dimmed, onPick }: RowProps) {
 export function StreaksView({ plan }: { plan: StreaksPlan }) {
   const labelEvery = Math.ceil(plan.years.length / MAX_YEAR_LABELS);
   const [pick, setPick] = useState<Pick>(null);
+  const [openRow, setOpenRow] = useState(-1);
+  const maxStreak = Math.max(1, ...plan.rows.map((r) => r.streak?.days ?? 0));
+  const maxQuiet = Math.max(1, ...plan.rows.map((r) => r.quiet?.days ?? 0));
 
   useEffect(() => {
     if (!pick) return;
@@ -215,7 +315,21 @@ export function StreaksView({ plan }: { plan: StreaksPlan }) {
           className="flex h-full min-h-0 flex-col gap-3"
         >
           {plan.privateNote && <p className="sr-only">{plan.privateNote}</p>}
-          <div className="flex gap-6" aria-hidden="true">
+          <ul className="streaks-scroll flex min-h-0 flex-1 flex-col overflow-y-auto md:hidden">
+            {plan.rows.map((row, position) => (
+              <PhoneRow
+                key={row.login.toLowerCase()}
+                row={row}
+                maxStreak={maxStreak}
+                maxQuiet={maxQuiet}
+                open={openRow === position}
+                onToggle={() =>
+                  setOpenRow(openRow === position ? -1 : position)
+                }
+              />
+            ))}
+          </ul>
+          <div className="hidden gap-6 md:flex" aria-hidden="true">
             <div className={`hidden ${SIDE_CLASS} sm:block`} />
             <div className="relative h-6 min-w-0 flex-1 border-b-2 border-ink font-mono text-[11px] [font-stretch:87.5%]">
               {plan.years.map((year, index) =>
@@ -232,7 +346,7 @@ export function StreaksView({ plan }: { plan: StreaksPlan }) {
             </div>
           </div>
           <ul
-            className="streaks-scroll flex min-h-0 flex-1 flex-col overflow-y-auto"
+            className="streaks-scroll hidden min-h-0 flex-1 flex-col overflow-y-auto md:flex"
             onMouseLeave={() => setPick(null)}
             onBlur={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget)) {

@@ -4,6 +4,7 @@ import type { SceneRuntime } from "@/features/sequencer/types";
 import { cumulativeAt } from "@/playback/aggregate";
 import type { PlaybackClock } from "@/playback/clock";
 import type { SoundEngine } from "@/playback/sound/engine";
+import { scheduleFill } from "@/playback/sound/ticks";
 import { CHART_WIDTH, topPercent } from "./chart";
 import { slotX, type YearSlot, yearFill } from "./years";
 
@@ -54,7 +55,7 @@ function scheduleSound(
     if (slot.contributions <= 0 || duration < MIN_FILL_SECONDS) continue;
     const from = slot.startTotal / total;
     const to = slot.endTotal / total;
-    clock.at(start, (time) => getEngine()?.fill(time, duration, { from, to }));
+    scheduleFill(clock, getEngine, start, duration, { from, to });
   }
 }
 

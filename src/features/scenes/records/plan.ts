@@ -21,7 +21,7 @@ export type RecordTile = {
   key: string;
   label: string;
   value: string;
-  /** Unit shown small after the value, e.g. "days". */
+  /** Unit shown after the value in smaller uppercase, e.g. "days"; none for dates. */
   unit?: string;
   /** The full reading, for screen readers only. */
   note: string;
@@ -82,6 +82,9 @@ export function formatMonthDay(monthDay: string): string {
 const plural = (count: number, one: string, many: string) =>
   `${formatCount(count)} ${count === 1 ? one : many}`;
 
+const unitFor = (count: number, one: string, many: string) =>
+  count === 1 ? one : many;
+
 function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
   const tiles: Omit<RecordTile, "start">[] = [];
   const day = found.busiestDay;
@@ -97,6 +100,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
       key: "busiest-day",
       label: "Busiest day",
       value: formatCount(day.count),
+      unit: unitFor(day.count, "contribution", "contributions"),
       note: FULL.format(utc(day.date)),
       caption: MONTH_DAY_YEAR.format(utc(day.date)),
       tone: "signal",
@@ -106,6 +110,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
     key: "average",
     label: "Average per active day",
     value: found.averagePerActiveDay.toFixed(1),
+    unit: "contributions",
     note: `${formatCount(total)} contributions over ${formatCount(found.activeDays)} days`,
     caption: "",
     tone: "plain",
@@ -114,6 +119,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
     key: "active-days",
     label: "Days with a contribution",
     value: formatCount(found.activeDays),
+    unit: unitFor(found.activeDays, "day", "days"),
     note: found.firstDate
       ? `Since your first, on ${MONTH_DAY_YEAR.format(utc(found.firstDate))}`
       : "",
@@ -124,7 +130,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
     key: "quiet",
     label: "Longest quiet stretch",
     value: formatCount(quiet?.length ?? 0),
-    unit: quiet?.length === 1 ? "day" : "days",
+    unit: unitFor(quiet?.length ?? 0, "day", "days"),
     note: quiet
       ? `Then you came back on ${MONTH_DAY_YEAR.format(utc(quiet.comeback))}`
       : "No gap between two active days",
@@ -136,6 +142,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
       key: "busiest-week",
       label: "Busiest week",
       value: formatCount(week.count),
+      unit: unitFor(week.count, "contribution", "contributions"),
       note: formatWeek(week.start, week.end),
       caption: formatWeek(week.start, week.end),
       tone: "plain",
@@ -146,6 +153,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
       key: "busiest-month",
       label: "Busiest month",
       value: formatCount(month.count),
+      unit: unitFor(month.count, "contribution", "contributions"),
       note: MONTH_YEAR.format(utc(`${month.month}-01`)),
       caption: MONTH_YEAR.format(utc(`${month.month}-01`)),
       tone: "plain",
@@ -166,6 +174,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
       key: "busiest-year",
       label: "Busiest year",
       value: formatCount(year.count),
+      unit: unitFor(year.count, "contribution", "contributions"),
       note: String(year.year),
       caption: String(year.year),
       tone: "plain",

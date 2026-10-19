@@ -39,8 +39,22 @@ export function exploreThenNow(
   const groups = [...days.querySelectorAll<HTMLElement>("[data-day]")];
   const dayLabels = [...root.querySelectorAll<HTMLElement>("[data-day-label]")];
 
+  const stepper = findElement<HTMLElement>(root, '[data-role="stepper"]');
+  const stepButtons = [
+    ...stepper.querySelectorAll<HTMLButtonElement>("button[data-step]"),
+  ];
+
   let comparison: Comparison = plan.compare(plan.defaultThen);
+  let year = plan.defaultThen;
   let active = -1;
+
+  const syncStepper = (enabled: boolean) => {
+    const at = plan.years.indexOf(year);
+    for (const button of stepButtons) {
+      const target = at + Number(button.dataset.step);
+      button.disabled = !enabled || target < 0 || target >= plan.years.length;
+    }
+  };
 
   const showDay = (index: number) => {
     active = index;
@@ -55,8 +69,9 @@ export function exploreThenNow(
     readoutDetail.textContent = reading.detail;
   };
 
-  const select = (year: number) => {
-    comparison = plan.compare(year);
+  const select = (picked: number, enabled = true) => {
+    year = picked;
+    comparison = plan.compare(picked);
     writePanel(thenPanel, comparison.earlier, comparison.axisMax);
     writePanel(nowPanel, comparison.now, comparison.axisMax);
     writeAxis(root, comparison);
@@ -64,10 +79,23 @@ export function exploreThenNow(
     summary.textContent = comparison.summary;
     showDay(active);
     for (const button of buttons) {
-      const selected = Number(button.dataset.year) === year;
+      const selected = Number(button.dataset.year) === picked;
       button.dataset.selected = String(selected);
       button.setAttribute("aria-pressed", String(selected));
     }
+    syncStepper(enabled);
+  };
+
+  const onStep = (event: MouseEvent) => {
+    const button = (event.target as Element).closest<HTMLButtonElement>(
+      "button[data-step]",
+    );
+    if (!button) return;
+    const target =
+      plan.years[plan.years.indexOf(year) + Number(button.dataset.step)];
+    if (target === undefined) return;
+    interaction.click();
+    select(target);
   };
 
   const onClick = (event: MouseEvent) => {
@@ -111,8 +139,10 @@ export function exploreThenNow(
   };
 
   for (const button of buttons) button.disabled = false;
+  syncStepper(true);
   picker.addEventListener("click", onClick);
   picker.addEventListener("keydown", onKeyDown);
+  stepper.addEventListener("click", onStep);
   days.addEventListener("mouseover", onDay);
   days.addEventListener("focusin", onDay);
   days.addEventListener("click", onDay);
@@ -122,13 +152,14 @@ export function exploreThenNow(
   return () => {
     picker.removeEventListener("click", onClick);
     picker.removeEventListener("keydown", onKeyDown);
+    stepper.removeEventListener("click", onStep);
     days.removeEventListener("mouseover", onDay);
     days.removeEventListener("focusin", onDay);
     days.removeEventListener("click", onDay);
     days.removeEventListener("mouseleave", onLeave);
     days.removeEventListener("focusout", onFocusOut);
     showDay(-1);
-    select(plan.defaultThen);
+    select(plan.defaultThen, false);
     for (const button of buttons) button.disabled = true;
   };
 }

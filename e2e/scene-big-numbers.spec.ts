@@ -21,9 +21,13 @@ const NINE_DIGITS: Mix = {
   issues: 456_789_123,
 };
 
-const YEARS = [2022, 2025];
+const SIXTEEN_YEARS = Array.from({ length: 16 }, (_, i) => 2011 + i);
 
-async function openBigNumbers(page: Page, mix: Mix) {
+async function openBigNumbers(
+  page: Page,
+  mix: Mix,
+  YEARS: number[] = [2022, 2025],
+) {
   const years = YEARS.map((year) => ({
     ...makeYear(year, steadyDays(year, 3, 2), { privateContributions: 12 }),
     totals: { ...mix, privateContributions: 12 },
@@ -116,3 +120,20 @@ for (const viewport of VIEWPORTS) {
     }
   });
 }
+
+test.describe("big numbers with 16 years at 360x740", () => {
+  test.use({ viewport: { width: 360, height: 740 } });
+
+  test("fits, and each chart is one slider that scrubs the years", async ({
+    page,
+  }) => {
+    await openBigNumbers(page, NORMAL, SIXTEEN_YEARS);
+    await expectSceneFits(page, { tapTargets: true, allowScroll: false });
+    const chart = page.getByRole("slider", { name: "Commits by year" });
+    await chart.focus();
+    await chart.press("Home");
+    await expect(chart).toHaveAttribute("aria-valuetext", "2011: 920 commits");
+    await chart.press("End");
+    await expect(chart).toHaveAttribute("aria-valuetext", "2026: 920 commits");
+  });
+});

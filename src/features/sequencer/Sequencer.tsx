@@ -170,6 +170,8 @@ export function Sequencer({
     );
     clock.onStatus((next) => {
       setStatus(next);
+      // Voices already ringing must not carry into a pause or the next scene.
+      if (next === "paused" || next === "idle") engineRef.current?.silence();
       // The scene ran out: hold on it (explore). Moving on is the user's call.
       if (next === "ended") controller.finishScene();
     });

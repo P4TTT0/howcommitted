@@ -1,4 +1,5 @@
 import { awardsFor } from "@/features/scenes/versus-awards/plan";
+import { buildRace } from "@/features/scenes/versus-race/race";
 import type { VersusEntry } from "@/features/sequencer/types";
 import {
   privateNoteFor,
@@ -17,6 +18,8 @@ export type PosterPerson = {
   span: string;
   /** Award titles: habits, in the order they were handed out. */
   awards: string[];
+  /** The same awards with the value each one names ("104 days in a row"). */
+  awardDetails: { title: string; value: string }[];
 };
 
 export type PosterModel = {
@@ -25,15 +28,15 @@ export type PosterModel = {
   total: number;
   /** "Together, 2016 to 2026" */
   together: string;
-  /** "Contributions between three of you." */
-  sentence: string;
+  /** First and last calendar year of the lineup; null without any year. */
+  years: { first: number; last: number } | null;
+  /** Times one running total passed another in the race; 0 without a race. */
+  passes: number;
   /** Set when shared private contributions are part of the totals. */
   privateNote: string | null;
   /** Shared private contributions inside the totals; 0 when nobody shared. */
   privateTotal: number;
 };
-
-const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five"] as const;
 
 /**
  * The versus poster: one entry per developer in the order they were added,
@@ -53,6 +56,9 @@ export function buildPoster(entries: readonly VersusEntry[]): PosterModel {
     awards: awards
       .filter((award) => award.person === index)
       .map((award) => award.title),
+    awardDetails: awards
+      .filter((award) => award.person === index)
+      .map((award) => ({ title: award.title, value: award.value })),
   }));
   const total = people.reduce((sum, person) => sum + person.total, 0);
 
@@ -64,12 +70,15 @@ export function buildPoster(entries: readonly VersusEntry[]): PosterModel {
   if (first !== null && last !== null) {
     together = `Together, ${first === last ? first : `${first} to ${last}`}`;
   }
-  const count = COUNT_WORDS[people.length] ?? `${people.length}`;
+  const race = buildRace(
+    entries.map(({ login, model }) => ({ login, plan: model.plan })),
+  );
   return {
     people,
     total,
     together,
-    sentence: `Contributions between ${count} of you.`,
+    years: first !== null && last !== null ? { first, last } : null,
+    passes: race?.crossings.length ?? 0,
     privateNote: privateNoteFor(profiles),
     privateTotal: profiles.reduce(
       (sum, profile) => sum + profile.privateContributions,

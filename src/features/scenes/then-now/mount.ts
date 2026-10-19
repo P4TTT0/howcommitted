@@ -1,6 +1,7 @@
 import { findElement } from "@/features/sequencer/explore";
 import { formatCount } from "@/features/sequencer/model/format";
 import type { SceneRuntime } from "@/features/sequencer/types";
+import { scheduleFill } from "@/playback/sound/ticks";
 import {
   barHeight,
   type Comparison,
@@ -136,9 +137,7 @@ export function mountThenNow(
     ? sides.slice(0, 1)
     : sides) {
     const to = total / larger;
-    clock.at(start, (time) =>
-      sound()?.fill(time, PANEL_SECONDS * to, { db, to }),
-    );
+    scheduleFill(clock, sound, start, PANEL_SECONDS * to, { db, to });
   }
 
   const shown = panels.map(() => Number.NaN);
