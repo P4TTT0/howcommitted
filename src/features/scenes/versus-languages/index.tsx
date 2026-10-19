@@ -3,7 +3,6 @@ import {
   mountReveal,
   REVEAL_BPM,
   REVEAL_SECONDS,
-  stairReveal,
 } from "@/features/versus/reveal";
 import { versusProfiles } from "@/features/versus/versusProfiles";
 import { LanguagesView } from "./LanguagesView";
@@ -24,7 +23,7 @@ export const versusLanguagesScene: SceneDefinition = {
       duration: REVEAL_SECONDS,
       bpm: REVEAL_BPM,
       view: <LanguagesView plan={plan} />,
-      mount: (root, runtime) => mountReveal(root, runtime, stairReveal(0)),
+      mount: (root, runtime) => mountReveal(root, runtime, 0),
     };
   },
 };

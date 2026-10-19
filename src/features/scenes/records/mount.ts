@@ -19,10 +19,13 @@ export function mountRecords(
     findElement<HTMLElement>(root, `[data-tile="${index}"]`),
   );
 
-  for (const time of stripPopTimes(plan)) {
+  // Under reduced motion the strip and tiles show at once: one pop, one step.
+  const popTimes = stripPopTimes(plan);
+  for (const time of reducedMotion ? popTimes.slice(0, 1) : popTimes) {
     clock.at(time, (at) => sound()?.pop(at));
   }
   plan.tiles.forEach((tile, index) => {
+    if (reducedMotion && index > 0) return;
     clock.at(tile.start, (at) => sound()?.stair(at, index));
   });
 

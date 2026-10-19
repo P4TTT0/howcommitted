@@ -125,10 +125,12 @@ export function mountThenNow(
 
   // Each side's bars rise together, so each side gets one fill. The two
   // sides differ in level so "then" and "now" do not sound identical.
-  for (const { start, db } of [
+  const sides = [
     { start: plan.thenTime, db: THEN_FILL_DB },
     { start: plan.nowTime, db: NOW_FILL_DB },
-  ]) {
+  ];
+  // Under reduced motion both sides show at once: one fill stands for both.
+  for (const { start, db } of reducedMotion ? sides.slice(0, 1) : sides) {
     clock.at(start, (time) => sound()?.fill(time, PANEL_SECONDS, { db }));
   }
 
