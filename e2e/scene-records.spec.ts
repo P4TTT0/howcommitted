@@ -88,7 +88,57 @@ async function openSceneInExplore(page: Page, label: string) {
   ).toBeVisible();
 }
 
-for (const viewport of VIEWPORTS) {
+/** Laptop sizes where the tiles get shorter than their content. */
+const LAPTOPS = [
+  { name: "1366x768", width: 1366, height: 768 },
+  { name: "1440x900", width: 1440, height: 900 },
+  { name: "1536x864", width: 1536, height: 864 },
+  { name: "1920x950", width: 1920, height: 950 },
+] as const;
+
+const MIN_INSET = 8;
+
+/** Every tile's label, value and caption keeps 8px from the tile's padding box. */
+async function expectTextInsideTiles(page: Page) {
+  const problems = await page.evaluate((minInset) => {
+    const found: string[] = [];
+    const tiles = document.querySelectorAll<HTMLElement>(
+      '[aria-label="Records"] > li',
+    );
+    for (const tile of tiles) {
+      const style = getComputedStyle(tile);
+      const outer = tile.getBoundingClientRect();
+      const inner = {
+        left: outer.left + Number.parseFloat(style.borderLeftWidth),
+        right: outer.right - Number.parseFloat(style.borderRightWidth),
+        top: outer.top + Number.parseFloat(style.borderTopWidth),
+        bottom: outer.bottom - Number.parseFloat(style.borderBottomWidth),
+      };
+      for (const text of tile.querySelectorAll<HTMLElement>("p, p span")) {
+        const rect = text.getBoundingClientRect();
+        const name = `${tile.dataset.tile}: "${text.textContent?.trim()}"`;
+        const gaps = {
+          left: rect.left - inner.left,
+          right: inner.right - rect.right,
+          top: rect.top - inner.top,
+          bottom: inner.bottom - rect.bottom,
+        };
+        for (const [side, gap] of Object.entries(gaps)) {
+          if (gap < minInset - 0.5) {
+            found.push(`tile ${name} is ${Math.round(gap)}px from the ${side}`);
+          }
+        }
+        if (getComputedStyle(text).textAlign === "right") {
+          found.push(`tile ${name} is right-aligned`);
+        }
+      }
+    }
+    return found;
+  }, MIN_INSET);
+  expect(problems, problems.join("\n")).toEqual([]);
+}
+
+for (const viewport of [...VIEWPORTS, ...LAPTOPS]) {
   const phone = viewport.width < 768;
   test.describe(`records at ${viewport.name}`, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } });
@@ -106,6 +156,7 @@ for (const viewport of VIEWPORTS) {
           tapTargets: true,
           allowScroll: phone,
         });
+        await expectTextInsideTiles(page);
       });
     }
   });
