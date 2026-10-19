@@ -20,6 +20,7 @@ import {
   type HistoryOutcome,
 } from "./historyResult";
 import { consumeIntent } from "./intent";
+import { LoadingScreen } from "./LoadingScreen";
 import { LoadingMoment, Poster } from "./Poster";
 import { SignInLink } from "./SignInLink";
 
@@ -201,19 +202,7 @@ function screen(
     case "loading":
       return (
         <ScreenMain>
-          <LoadingMoment
-            login={login}
-            label="Reading the contribution history"
-            action={
-              <button
-                type="button"
-                onClick={cancel}
-                className={`${actionClass} self-start`}
-              >
-                Cancel
-              </button>
-            }
-          />
+          <LoadingScreen login={login} onCancel={cancel} />
         </ScreenMain>
       );
 
