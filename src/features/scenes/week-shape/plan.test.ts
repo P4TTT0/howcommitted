@@ -8,6 +8,7 @@ import {
 import { weekShapeScene } from "./index";
 import {
   barDetail,
+  compactCount,
   GRID_SECONDS,
   growthAt,
   planWeekShape,
@@ -108,5 +109,13 @@ describe("weekShapeScene", () => {
     const data = labSceneData();
     const instance = weekShapeScene.create({ ...data, history });
     expect(instance?.duration).toBe(planWeekShape(history)?.duration);
+  });
+});
+
+describe("compactCount", () => {
+  it("keeps bar labels short", () => {
+    expect(compactCount(950)).toBe("950");
+    expect(compactCount(1234)).toBe("1.2K");
+    expect(compactCount(52_000_000)).toBe("52M");
   });
 });
