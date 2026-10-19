@@ -2,6 +2,7 @@ import type { SceneRuntime } from "@/features/sequencer/types";
 import { cumulativeAt } from "@/playback/aggregate";
 import type { PlaybackClock } from "@/playback/clock";
 import type { SoundEngine } from "@/playback/sound/engine";
+import { scheduleFill } from "@/playback/sound/ticks";
 import {
   DRAW_SECONDS,
   fillSegments,
@@ -44,7 +45,7 @@ function scheduleSound(
 ) {
   // One climb tied to the leader's total, played year by year as segments.
   for (const { start, duration, from, to } of fillSegments(race)) {
-    clock.at(start, (time) => getEngine()?.fill(time, duration, { from, to }));
+    scheduleFill(clock, getEngine, start, duration, { from, to });
   }
   // The payoff lands as the "@a passes @b" chip appears.
   for (const time of passTimes(race)) {

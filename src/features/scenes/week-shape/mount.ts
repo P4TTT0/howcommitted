@@ -1,5 +1,6 @@
 import { findElement } from "@/features/sequencer/explore";
 import type { SceneRuntime } from "@/features/sequencer/types";
+import { scheduleFill } from "@/playback/sound/ticks";
 import { growthAt, rhythmProgressAt, type WeekPlan } from "./plan";
 
 /**
@@ -24,9 +25,7 @@ export function mountWeekShape(
   // Under reduced motion the bars show at once: one fill stands for all.
   for (const bar of reducedMotion ? audible.slice(0, 1) : audible) {
     const to = bar.ratio;
-    clock.at(bar.start, (time) =>
-      sound()?.fill(time, (bar.land - bar.start) * to, { to }),
-    );
+    scheduleFill(clock, sound, bar.start, (bar.land - bar.start) * to, { to });
   }
 
   const shownBars = plan.bars.map(() => Number.NaN);

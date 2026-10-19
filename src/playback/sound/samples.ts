@@ -78,3 +78,11 @@ export function disposePools(pools: Record<string, Pool>): void {
     pool.length = 0;
   }
 }
+
+/** Stops every voice in every pool at `time`; the source fade avoids clicks. */
+export function stopPools(pools: Record<string, Pool>, time: number): void {
+  for (const pool of Object.values(pools)) {
+    for (const voice of pool) voice.stop(time);
+    pool.length = 0;
+  }
+}
