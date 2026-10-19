@@ -31,10 +31,11 @@ test("the landing is the question, with the input inside the sentence", async ({
     name: "How committed is GitHub username",
   });
   await expect(input).toBeVisible();
-  // The small wordmark is the page title; the question is the headline.
+  // The page title is for screen readers; the question is the headline.
   await expect(
-    page.getByRole("heading", { level: 1, name: "Committed" }),
-  ).toBeVisible();
+    page.getByRole("heading", { level: 1, name: "How Committed" }),
+  ).toBeAttached();
+  await expect(page.getByRole("link", { name: "@P4TTT0" })).toBeVisible();
 });
 
 test("typing a username finds the user in a clickable row", async ({
@@ -227,7 +228,7 @@ for (const [width, height] of VIEWPORTS) {
       const targets = [
         page.locator("form"),
         page.getByRole("button", { name: /^Play( @\w+)?$/ }).first(),
-        page.getByRole("heading", { level: 1 }),
+        page.getByRole("link", { name: "@P4TTT0" }),
         page.getByText("Type a GitHub username.", { exact: false }),
       ];
       if (state !== "empty") {
