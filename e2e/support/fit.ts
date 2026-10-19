@@ -24,6 +24,11 @@ type Options = {
   frame?: string;
   /** Also require every button, link and slider in the frame to be tappable. */
   tapTargets?: boolean;
+  /**
+   * Whether a container inside the frame may scroll vertically. Defaults to
+   * true; pass false for scenes that must show everything at once.
+   */
+  allowScroll?: boolean;
 };
 
 /**
@@ -49,7 +54,7 @@ export async function expectSceneFits(page: Page, options: Options = {}) {
   });
 
   const problems = await page.evaluate(
-    ({ frameSelector, tapTargets, minTap }) => {
+    ({ frameSelector, tapTargets, minTap, allowScroll }) => {
       const found: string[] = [];
       const frame = document.querySelector(frameSelector);
       if (!frame) return [`no frame matches ${frameSelector}`];
@@ -131,6 +136,11 @@ export async function expectSceneFits(page: Page, options: Options = {}) {
             exempt = parent;
             break;
           }
+        }
+        if (exempt && !allowScroll) {
+          const message = `${describe(exempt)} scrolls, but this scene must fit without scrolling`;
+          if (!found.includes(message)) found.push(message);
+          exempt = null;
         }
         if (exempt && !scrollers.includes(exempt)) scrollers.push(exempt);
 
@@ -260,6 +270,7 @@ export async function expectSceneFits(page: Page, options: Options = {}) {
       frameSelector: options.frame ?? FRAME,
       tapTargets: options.tapTargets ?? false,
       minTap: MIN_TAP,
+      allowScroll: options.allowScroll ?? true,
     },
   );
   expect(problems, problems.join("\n")).toEqual([]);

@@ -31,10 +31,11 @@ test("the landing is the question, with the input inside the sentence", async ({
     name: "How committed is GitHub username",
   });
   await expect(input).toBeVisible();
-  // The small wordmark is the page title; the question is the headline.
+  // The page title is for screen readers; the question is the headline.
   await expect(
-    page.getByRole("heading", { level: 1, name: "Committed" }),
-  ).toBeVisible();
+    page.getByRole("heading", { level: 1, name: "How Committed" }),
+  ).toBeAttached();
+  await expect(page.getByRole("link", { name: "@P4TTT0" })).toBeVisible();
 });
 
 test("typing a username finds the user in a clickable row", async ({
@@ -75,13 +76,13 @@ test("Play has a pointer, and Enter starts when a user is found", async ({
   await expect(page).toHaveURL(/\/ada$/);
 });
 
-test("the nav credits the author and links out", async ({ page }) => {
+test("the header credits the author and links out", async ({ page }) => {
   await page.goto("/");
-  const nav = page.getByRole("navigation", { name: "About" });
-  await expect(nav.getByRole("link", { name: "@P4TTT0" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "@P4TTT0" })).toHaveAttribute(
     "href",
     "https://github.com/P4TTT0",
   );
+  const nav = page.getByRole("navigation", { name: "About" });
   await expect(nav.getByRole("link", { name: "GitHub" })).toHaveAttribute(
     "href",
     "https://github.com/P4TTT0/howcommitted",
@@ -227,7 +228,7 @@ for (const [width, height] of VIEWPORTS) {
       const targets = [
         page.locator("form"),
         page.getByRole("button", { name: /^Play( @\w+)?$/ }).first(),
-        page.getByRole("heading", { level: 1 }),
+        page.getByRole("link", { name: "@P4TTT0" }),
         page.getByText("Type a GitHub username.", { exact: false }),
       ];
       if (state !== "empty") {

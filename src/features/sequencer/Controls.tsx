@@ -44,7 +44,8 @@ export type ControlsProps = {
 };
 
 /* Every button: 44px, flat, transparent, 2px ink border, mono label. */
-const button = `inline-flex h-11 min-w-0 items-center justify-center whitespace-nowrap border-2 border-ink bg-transparent px-4 ${labelClass} ${pressable} ${focusRing}`;
+/* No background here: it would fight `primary`'s fill and hide its paper text. */
+const button = `inline-flex h-11 min-w-0 items-center justify-center whitespace-nowrap border-2 border-ink px-4 ${labelClass} ${pressable} ${focusRing}`;
 /* Disabled keeps full contrast: a dashed border says "not now". */
 const disabled =
   "disabled:cursor-not-allowed disabled:border-dashed disabled:bg-transparent disabled:text-ink disabled:active:translate-y-0";
