@@ -5,6 +5,8 @@ import {
   PHRASES,
   PROGRESS_CELLS,
   phraseIndex,
+  phrasesFor,
+  playerBlockClass,
 } from "./loadingProgress";
 
 describe("easedPercent", () => {
@@ -42,5 +44,34 @@ describe("cellFill", () => {
     const mid = cellFill(50, 5);
     expect(mid).toBeGreaterThan(0);
     expect(mid).toBeLessThan(1);
+  });
+});
+
+describe("phrasesFor", () => {
+  it("keeps the shared list for one developer", () => {
+    expect(phrasesFor(1)).toEqual(PHRASES);
+  });
+
+  it("adds versus phrases for several, keeping every shared one", () => {
+    const list = phrasesFor(3);
+    expect(list).toHaveLength(PHRASES.length + 2);
+    for (const phrase of PHRASES) expect(list).toContain(phrase);
+    expect(list[list.length - 1]).toBe(PHRASES[PHRASES.length - 1]);
+  });
+});
+
+describe("phraseIndex with a custom count", () => {
+  it("stays in range for any list length", () => {
+    expect(phraseIndex(0, 10)).toBe(0);
+    expect(phraseIndex(99, 10)).toBe(9);
+    expect(phraseIndex(50, 10)).toBe(5);
+  });
+});
+
+describe("playerBlockClass", () => {
+  it("follows player order and wraps", () => {
+    expect(playerBlockClass(0)).toContain("bg-versus-p1");
+    expect(playerBlockClass(4)).toContain("bg-versus-p5");
+    expect(playerBlockClass(5)).toBe(playerBlockClass(0));
   });
 });

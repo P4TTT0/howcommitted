@@ -9,6 +9,7 @@ import {
   type HistoryFailure,
 } from "@/features/experience/historyResult";
 import { consumeIntent } from "@/features/experience/intent";
+import { LoadingScreen } from "@/features/experience/LoadingScreen";
 import { LoadingMoment, Poster } from "@/features/experience/Poster";
 import { SignInLink } from "@/features/experience/SignInLink";
 import { VERSUS_FINALE, VERSUS_SCENES } from "@/features/scenes/registry";
@@ -88,6 +89,13 @@ export function VersusExperience({ logins }: { logins: string[] }) {
     };
   }, []);
 
+  function cancel() {
+    mountedRef.current = false;
+    controllerRef.current?.abort();
+    inFlightRef.current = false;
+    router.push("/");
+  }
+
   function start() {
     void unlockAudio();
     void begin();
@@ -118,9 +126,10 @@ export function VersusExperience({ logins }: { logins: string[] }) {
     case "loading":
       return (
         <ScreenMain>
-          <LoadingMoment
-            login={phase.login}
-            label={`Reading the contribution history, ${phase.position} of ${logins.length}`}
+          <LoadingScreen
+            logins={logins}
+            status={`Reading the contribution history, ${phase.position} of ${logins.length}`}
+            onCancel={cancel}
           />
         </ScreenMain>
       );
