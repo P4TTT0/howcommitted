@@ -269,7 +269,7 @@ for (const viewport of VIEWPORTS) {
     }
     await next(page).click();
     const poster = page.getByRole("region", { name: "Versus summary" });
-    await expect(poster).toContainText("Includes shared private contributions");
+    await expect(poster).toContainText(/Includes [\d,]+ private\./);
     await expectSceneFits(page, { tapTargets: true });
   });
 }
