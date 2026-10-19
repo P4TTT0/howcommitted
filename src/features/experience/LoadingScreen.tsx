@@ -177,6 +177,8 @@ const LINEUP_TEXT = "font-display font-black uppercase leading-[1.05]";
  * Every login in its own versus color, joined by "vs". Wide screens keep one
  * line and shrink it to the measured width; phones give each login its own
  * line, each shrunk to fit. FitText measures, so nothing counts characters.
+ * The color blocks are inline-block: an inline box is as tall as the font's
+ * ascent and descent, taller than this tight line, so it would poke out.
  */
 function Lineup({ logins }: { logins: string[] }) {
   return (
@@ -186,7 +188,7 @@ function Lineup({ logins }: { logins: string[] }) {
           {logins.map((login, index) => (
             <span key={login.toLowerCase()}>
               {index > 0 && <span className="px-[0.3em]">vs</span>}
-              <span className={`px-[0.15em] ${playerBlockClass(index)}`}>
+              <span className={`inline-block px-[0.15em] ${playerBlockClass(index)}`}>
                 @{login}
               </span>
             </span>
@@ -200,7 +202,7 @@ function Lineup({ logins }: { logins: string[] }) {
               <span className="font-mono text-xs font-bold uppercase">vs</span>
             )}
             <FitText className={`${LINEUP_TEXT} text-[min(11vw,5.5dvh)]`}>
-              <span className={`px-[0.15em] ${playerBlockClass(index)}`}>
+              <span className={`inline-block px-[0.15em] ${playerBlockClass(index)}`}>
                 @{login}
               </span>
             </FitText>
