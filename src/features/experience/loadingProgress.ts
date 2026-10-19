@@ -16,8 +16,11 @@ export const PHRASES = [
   "Almost there. Headphones on.",
 ] as const;
 
-/** Year cells shown on the screen. */
-export const YEAR_CELLS = 11;
+/**
+ * Progress cells shown on the screen. They are not years: the account's years
+ * are unknown until the history arrives, so a year label would be invented.
+ */
+export const PROGRESS_CELLS = 11;
 
 /** Time for the estimate to cover about 63% of its range. */
 const TAU_MS = 6000;
@@ -38,17 +41,8 @@ export function phraseIndex(percent: number): number {
   return Math.max(0, Math.min(PHRASES.length - 1, step));
 }
 
-/** Fill of one year cell, 0..1, as the percentage sweeps across the cells. */
-export function yearFill(percent: number, index: number): number {
-  const per = 100 / YEAR_CELLS;
+/** Fill of one cell, 0..1, as the percentage sweeps across the cells. */
+export function cellFill(percent: number, index: number): number {
+  const per = 100 / PROGRESS_CELLS;
   return Math.max(0, Math.min(1, (percent - index * per) / per));
-}
-
-/** The calendar years the cells stand for, oldest first, ending this year. */
-export function cellYears(now: Date): number[] {
-  const last = now.getFullYear();
-  return Array.from(
-    { length: YEAR_CELLS },
-    (_, i) => last - YEAR_CELLS + 1 + i,
-  );
 }

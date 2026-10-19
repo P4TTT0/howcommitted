@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 import { actionClass, labelClass } from "@/ui/classes";
 import {
-  cellYears,
+  cellFill,
   easedPercent,
   PHRASES,
+  PROGRESS_CELLS,
   phraseIndex,
-  yearFill,
 } from "./loadingProgress";
 import { loginTypography } from "./Poster";
 
-/** The year palette, in scene order. Full class names so Tailwind keeps them. */
-const YEAR_COLORS = [
+/** The block palette, in scene order. Full class names so Tailwind keeps them. */
+const CELL_COLORS = [
   "bg-block-ultramarine",
   "bg-block-safety",
   "bg-block-forest",
@@ -37,7 +37,6 @@ export function LoadingScreen({
   onCancel: () => void;
 }) {
   const [percent, setPercent] = useState(0);
-  const [years] = useState(() => cellYears(new Date()));
 
   useEffect(() => {
     const startedAt = Date.now();
@@ -127,25 +126,18 @@ export function LoadingScreen({
             aria-hidden="true"
             className="flex min-h-0 flex-1 flex-col justify-between gap-1 md:grid md:flex-none md:grid-cols-11 md:gap-x-1"
           >
-            {years.map((year, i) => {
-              const fill = yearFill(percent, i);
-              const active = fill > 0 && fill < 1;
+            {Array.from({ length: PROGRESS_CELLS }, (_, i) => {
+              const fill = cellFill(percent, i);
               return (
                 <li
-                  key={year}
-                  className="grid max-h-[26px] min-h-3 flex-1 grid-cols-[44px_minmax(0,1fr)] items-center gap-2.5 md:flex md:max-h-none md:flex-none md:flex-col md:items-stretch md:gap-2"
+                  // biome-ignore lint/suspicious/noArrayIndexKey: fixed cells
+                  key={i}
+                  className="relative block max-h-[26px] min-h-3 flex-1 overflow-hidden bg-ink/10 md:h-10 md:max-h-none md:flex-none"
                 >
                   <span
-                    className={`font-mono text-[11px] [font-stretch:87.5%] max-lg:md:text-[9px] md:order-2 ${active ? "font-bold" : ""} ${fill > 0 ? "" : "opacity-45 md:opacity-100"}`}
-                  >
-                    {year}
-                  </span>
-                  <span className="relative block h-full min-h-3 overflow-hidden bg-ink/10 md:order-1 md:h-10">
-                    <span
-                      className={`absolute inset-y-0 left-0 ${YEAR_COLORS[i % YEAR_COLORS.length]}`}
-                      style={{ width: `${Math.round(fill * 100)}%` }}
-                    />
-                  </span>
+                    className={`absolute inset-y-0 left-0 ${CELL_COLORS[i % CELL_COLORS.length]}`}
+                    style={{ width: `${Math.round(fill * 100)}%` }}
+                  />
                 </li>
               );
             })}

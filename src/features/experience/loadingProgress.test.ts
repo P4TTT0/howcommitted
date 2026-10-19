@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  cellYears,
+  cellFill,
   easedPercent,
   PHRASES,
+  PROGRESS_CELLS,
   phraseIndex,
-  YEAR_CELLS,
-  yearFill,
 } from "./loadingProgress";
 
 describe("easedPercent", () => {
@@ -34,23 +33,14 @@ describe("phraseIndex", () => {
   });
 });
 
-describe("yearFill", () => {
+describe("cellFill", () => {
   it("fills cells one after another", () => {
-    expect(yearFill(0, 0)).toBe(0);
-    expect(yearFill(100, YEAR_CELLS - 1)).toBeCloseTo(1, 9);
-    expect(yearFill(50, 0)).toBe(1);
-    expect(yearFill(50, YEAR_CELLS - 1)).toBe(0);
-    const mid = yearFill(50, 5);
+    expect(cellFill(0, 0)).toBe(0);
+    expect(cellFill(100, PROGRESS_CELLS - 1)).toBeCloseTo(1, 9);
+    expect(cellFill(50, 0)).toBe(1);
+    expect(cellFill(50, PROGRESS_CELLS - 1)).toBe(0);
+    const mid = cellFill(50, 5);
     expect(mid).toBeGreaterThan(0);
     expect(mid).toBeLessThan(1);
-  });
-});
-
-describe("cellYears", () => {
-  it("ends on the current year", () => {
-    const years = cellYears(new Date("2026-10-18T12:00:00Z"));
-    expect(years).toHaveLength(YEAR_CELLS);
-    expect(years[0]).toBe(2016);
-    expect(years.at(-1)).toBe(2026);
   });
 });
