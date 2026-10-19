@@ -3,11 +3,13 @@ import {
   indexAfterKey,
   indexAtPointer,
 } from "@/features/sequencer/explore";
-import { formatCount } from "@/features/sequencer/model/format";
-import { type BigNumber, totalReading, yearReading } from "./numbers";
+import { interaction } from "@/playback/sound/interaction";
+import { type BigNumber, BY_YEAR, yearReading } from "./numbers";
 
+const DIMMED = "0.35";
 const SLIDER_ATTRIBUTES = [
   "role",
+  "aria-label",
   "aria-orientation",
   "aria-valuemin",
   "aria-valuemax",
@@ -16,10 +18,12 @@ const SLIDER_ATTRIBUTES = [
 ];
 
 /**
- * Explore phase: each finished number becomes one focusable slider over the
- * years. Left/Right, Page and Home/End (or the pointer across the block) pick a
- * year; the exact value is shown small under the number and spoken through
- * `aria-valuetext`. Nothing here moves, makes sound or keeps a clock.
+ * Explore phase: each number's year chart becomes one focusable slider over its
+ * years, so the whole chart is the tap target at any year count. The pointer
+ * snaps to the nearest column (press and move scrub, a tap picks); the arrows,
+ * Home and End step through the years. The picked column stays solid, the rest
+ * dim, and its reading shows above the chart and in `aria-valuetext`. The
+ * pointer makes the quiet hover sound; a press makes the click.
  */
 export function exploreBigNumbers(
   root: HTMLElement,
@@ -27,77 +31,101 @@ export function exploreBigNumbers(
 ): () => void {
   const cleanups = numbers.map((number, index) => {
     const tile = findElement<HTMLElement>(root, `[data-tile="${index}"]`);
-    const detail = findElement<HTMLElement>(tile, '[data-role="detail"]');
     const years = number.perYear;
+    if (years.length === 0) return () => {};
+
+    const chart = findElement<HTMLElement>(tile, '[data-role="chart"]');
+    const readout = findElement<HTMLElement>(tile, '[data-role="readout"]');
+    const columns = years.map((_, i) =>
+      findElement<HTMLElement>(tile, `[data-year-col="${i}"]`),
+    );
+    const labels = years.map((_, i) =>
+      findElement<HTMLElement>(tile, `[data-year-label="${i}"]`),
+    );
+    const peak = Math.max(1, ...years.map((entry) => entry.value));
     const last = years.length - 1;
     let current = last;
 
     const show = (picked: number | null) => {
       const entry = picked === null ? undefined : years[picked];
-      if (picked === null || !entry) {
-        detail.textContent = "";
-        tile.setAttribute("aria-valuetext", totalReading(number));
-        return;
+      readout.textContent = entry ? yearReading(number, entry) : BY_YEAR;
+      readout.toggleAttribute("data-active", Boolean(entry));
+      columns.forEach((column, i) => {
+        column.style.opacity = entry && i !== picked ? DIMMED : "";
+      });
+      // The picked year is always named, even where the labels thin out.
+      labels.forEach((label, i) => {
+        label.style.fontSize = i === picked ? "var(--yf)" : "";
+      });
+      if (entry && picked !== null) {
+        current = picked;
+        chart.setAttribute("aria-valuenow", String(picked));
+        chart.setAttribute("aria-valuetext", yearReading(number, entry));
       }
-      current = picked;
-      detail.textContent = `${entry.year}: ${formatCount(entry.value)}`;
-      tile.setAttribute("aria-valuenow", String(picked));
-      tile.setAttribute("aria-valuetext", yearReading(number, entry));
+    };
+    const hover = (picked: number) => {
+      const entry = years[picked];
+      show(picked);
+      interaction.hover((entry?.value ?? 0) / peak, `${number.key}-${picked}`);
     };
 
-    const pick = (event: PointerEvent) =>
-      show(
-        indexAtPointer(
-          event.clientX,
-          tile.getBoundingClientRect(),
-          years.length,
-        ),
+    const at = (event: PointerEvent) =>
+      indexAtPointer(
+        event.clientX,
+        chart.getBoundingClientRect(),
+        years.length,
       );
+    const onPointerMove = (event: PointerEvent) => hover(at(event));
+    const onPointerDown = (event: PointerEvent) => {
+      hover(at(event));
+      interaction.click();
+    };
     const onPointerLeave = (event: PointerEvent) => {
-      if (event.pointerType === "mouse") show(null);
+      if (event.pointerType !== "mouse") return;
+      if (document.activeElement !== chart) show(null);
+      interaction.leave();
     };
     const onKeyDown = (event: KeyboardEvent) => {
       const next = indexAfterKey(event.key, current, years.length, {
         bigStep: 5,
       });
       if (next === null) return;
-      // The arrows belong to the number while it is focused, not to the scenes.
+      // The arrows belong to the chart while it is focused, not to the scenes.
       event.preventDefault();
       event.stopPropagation();
-      show(next);
+      hover(next);
     };
-    const onFocus = () => show(current);
+    const onFocus = () => hover(current);
     const onBlur = () => show(null);
 
-    if (years.length === 0) return () => {};
-
-    const previousLabel = tile.getAttribute("aria-label");
-    tile.setAttribute("role", "slider");
-    tile.setAttribute("aria-label", number.label);
-    tile.setAttribute("aria-orientation", "horizontal");
-    tile.setAttribute("aria-valuemin", "0");
-    tile.setAttribute("aria-valuemax", String(last));
-    tile.setAttribute("aria-valuenow", String(last));
-    tile.setAttribute("aria-valuetext", totalReading(number));
-    tile.tabIndex = 0;
-    tile.addEventListener("pointermove", pick);
-    tile.addEventListener("pointerdown", pick);
-    tile.addEventListener("pointerleave", onPointerLeave);
-    tile.addEventListener("keydown", onKeyDown);
-    tile.addEventListener("focus", onFocus);
-    tile.addEventListener("blur", onBlur);
+    chart.setAttribute("role", "slider");
+    chart.setAttribute("aria-label", `${number.label} by year`);
+    chart.setAttribute("aria-orientation", "horizontal");
+    chart.setAttribute("aria-valuemin", "0");
+    chart.setAttribute("aria-valuemax", String(last));
+    chart.setAttribute("aria-valuenow", String(last));
+    const lastEntry = years[last];
+    if (lastEntry) {
+      chart.setAttribute("aria-valuetext", yearReading(number, lastEntry));
+    }
+    chart.tabIndex = 0;
+    chart.addEventListener("pointermove", onPointerMove);
+    chart.addEventListener("pointerdown", onPointerDown);
+    chart.addEventListener("pointerleave", onPointerLeave);
+    chart.addEventListener("keydown", onKeyDown);
+    chart.addEventListener("focus", onFocus);
+    chart.addEventListener("blur", onBlur);
 
     return () => {
-      tile.removeEventListener("pointermove", pick);
-      tile.removeEventListener("pointerdown", pick);
-      tile.removeEventListener("pointerleave", onPointerLeave);
-      tile.removeEventListener("keydown", onKeyDown);
-      tile.removeEventListener("focus", onFocus);
-      tile.removeEventListener("blur", onBlur);
-      detail.textContent = "";
-      for (const name of SLIDER_ATTRIBUTES) tile.removeAttribute(name);
-      if (previousLabel) tile.setAttribute("aria-label", previousLabel);
-      tile.removeAttribute("tabindex");
+      chart.removeEventListener("pointermove", onPointerMove);
+      chart.removeEventListener("pointerdown", onPointerDown);
+      chart.removeEventListener("pointerleave", onPointerLeave);
+      chart.removeEventListener("keydown", onKeyDown);
+      chart.removeEventListener("focus", onFocus);
+      chart.removeEventListener("blur", onBlur);
+      show(null);
+      for (const name of SLIDER_ATTRIBUTES) chart.removeAttribute(name);
+      chart.removeAttribute("tabindex");
     };
   });
 

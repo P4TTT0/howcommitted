@@ -3,8 +3,14 @@ import { formatCount } from "@/features/sequencer/model/format";
 import { blockForYearIndex } from "@/features/sequencer/model/plan";
 import { focusRing, labelClass } from "@/ui/classes";
 import { SceneFrame } from "@/ui/SceneFrame";
+import { compactCount } from "../week-shape/plan";
 import { type MixPlan, mixReading, visibleSegments } from "./mix";
-import { type BigNumbersPlan, scopeNote, totalReading } from "./numbers";
+import {
+  type BigNumbersPlan,
+  BY_YEAR,
+  scopeNote,
+  totalReading,
+} from "./numbers";
 
 /** Width of one character of a big number, in em (digits and commas, rounded up). */
 const CHARACTER_EM = 0.5;
@@ -20,8 +26,8 @@ type BigNumbersViewProps = { plan: BigNumbersPlan };
  * Scene 8, the markup: four color blocks in a 2x2 grid, one per total, and the
  * mix of contribution types in the first year against the latest. The scope
  * and the mix sentences are spoken, not shown. The static markup is the
- * finished state; `mount.ts` counts it up and `explore.ts` makes each block
- * readable year by year.
+ * finished state; `mount.ts` counts it up and `explore.ts` highlights a year's
+ * column on hover, focus or tap.
  */
 export function BigNumbersView({ plan }: BigNumbersViewProps) {
   return (
@@ -50,36 +56,116 @@ export function BigNumbersView({ plan }: BigNumbersViewProps) {
             {plan.numbers.map((number, index) => {
               const colors = blockForYearIndex(number.colorIndex);
               const total = formatCount(number.total);
+              const peak = Math.max(1, ...number.perYear.map((y) => y.value));
+              // Column labels are compact (1.2K, 123M); the readout keeps the full number.
+              const widest = Math.max(
+                4,
+                ...number.perYear.map((y) => compactCount(y.value).length),
+              );
+              const years = number.perYear.length;
+              const cell = `100cqw / ${Math.max(years, 1)}`;
+              // Values and years share one size so the widest still fits its column.
+              const columnFont = `min(12px, calc((${cell} - 2px) / ${widest * 0.72}))`;
+              // Hidden (0) when the label would need a font under 7px to fit its column.
+              const valueFont = `min(${columnFont}, clamp(0px, calc((${columnFont} - 7px) * 1000), 12px))`;
+              // Middle year labels hide when they cannot all fit; the ends stay.
+              const middleYearFont = `min(var(--yf), clamp(0px, calc((${cell} - 32px) * 1000), 12px))`;
               return (
                 <li
                   key={number.key}
                   data-tile={index}
                   aria-label={totalReading(number)}
-                  className={`flex min-h-0 min-w-0 flex-col justify-between overflow-hidden p-3 [container-type:size] md:p-4 ${focusRing}`}
-                  style={{
-                    backgroundColor: colors.background,
-                    color: colors.foreground,
-                  }}
+                  className="relative flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden p-2 [container-type:size] md:grid md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-6 md:p-4"
+                  style={
+                    {
+                      backgroundColor: colors.background,
+                      color: colors.foreground,
+                      ...charsFor(total),
+                      "--tile-bg": colors.background,
+                      "--fs-stack": `min(calc((100cqw - 1rem) / (var(--chars) * ${CHARACTER_EM})), 20cqh)`,
+                      "--fs-split": `min(calc((45cqw - 1.5rem) / (var(--chars) * ${CHARACTER_EM})), 34cqh)`,
+                    } as CSSProperties
+                  }
                 >
-                  <p aria-hidden="true" className="font-mono text-xs uppercase">
-                    {number.label}
-                  </p>
-                  <div aria-hidden="true">
+                  <div
+                    aria-hidden="true"
+                    className="flex min-w-0 flex-col gap-1 md:justify-between md:pb-2"
+                  >
+                    <p className="font-mono text-xs uppercase">
+                      {number.label}
+                    </p>
                     <p
                       data-role="count"
-                      className="font-display font-black leading-[0.85] tabular-nums"
-                      style={{
-                        ...charsFor(total),
-                        fontSize: `min(calc((100cqw - 1.5rem) / (var(--chars) * ${CHARACTER_EM})), 34cqh)`,
-                      }}
+                      className="font-display text-[length:var(--fs-stack)] font-black leading-[0.85] tabular-nums md:text-[length:var(--fs-split)]"
                     >
                       {total}
                     </p>
-                    <p
-                      data-role="detail"
-                      className="mt-1 min-h-4 font-mono text-xs"
-                    />
                   </div>
+                  {years > 0 && (
+                    <div
+                      data-role="years"
+                      className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col gap-0.5 [container-type:inline-size] md:gap-1"
+                    >
+                      <p
+                        aria-hidden="true"
+                        data-role="readout"
+                        className="min-h-4 shrink-0 text-right font-mono text-[11px] uppercase leading-tight [font-stretch:87.5%] max-md:absolute max-md:inset-x-2 max-md:top-2 max-md:z-10 max-md:bg-[var(--tile-bg)] max-md:text-left max-md:opacity-0 max-md:data-[active]:opacity-100"
+                      >
+                        {BY_YEAR}
+                      </p>
+                      <div
+                        data-role="chart"
+                        className={`flex min-h-11 flex-1 cursor-pointer touch-pan-y items-end gap-px border-b-2 border-current md:gap-1 ${focusRing}`}
+                        style={{ fontSize: valueFont }}
+                      >
+                        {number.perYear.map((entry, yearIndex) => (
+                          <div
+                            key={entry.year}
+                            data-year-col={yearIndex}
+                            aria-hidden="true"
+                            className="flex h-full min-w-0 flex-1 basis-0 flex-col items-stretch justify-end"
+                          >
+                            <span className="mb-1 block text-center font-mono font-bold leading-none">
+                              {compactCount(entry.value)}
+                            </span>
+                            <span
+                              className="block min-h-0.5 bg-current"
+                              style={{
+                                height: `max(2px, calc((100% - 1rem) * ${entry.value / peak}))`,
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div
+                        aria-hidden="true"
+                        className="flex shrink-0 gap-px font-mono [font-stretch:87.5%] md:gap-1"
+                        style={
+                          {
+                            "--yf": columnFont,
+                            fontSize: "var(--yf)",
+                          } as CSSProperties
+                        }
+                      >
+                        {number.perYear.map((entry, yearIndex) => {
+                          const end =
+                            yearIndex === 0 || yearIndex === years - 1;
+                          return (
+                            <span
+                              key={entry.year}
+                              data-year-label={yearIndex}
+                              className={`flex flex-1 basis-0 whitespace-nowrap ${end ? "" : "min-w-0"} ${yearIndex === 0 ? "justify-start" : end ? "justify-end" : "justify-center"}`}
+                              style={
+                                end ? undefined : { fontSize: middleYearFont }
+                              }
+                            >
+                              {entry.year}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </li>
               );
             })}

@@ -2,9 +2,9 @@ import { findElement } from "@/features/sequencer/explore";
 import type { RecordsPlan } from "./plan";
 
 /**
- * Explore phase: each tile becomes focusable; hovering or focusing one inverts
- * it (ink on paper) so the pick is clear, and its full reading is already the
- * accessible name. Nothing moves, makes sound or keeps a clock.
+ * Explore phase: each tile becomes focusable; hovering or focusing one adds a
+ * thicker outline (never a color change, so tiles do not read as buttons), and
+ * its full reading is already the accessible name. Nothing moves, makes sound or keeps a clock.
  */
 export function exploreRecords(
   root: HTMLElement,

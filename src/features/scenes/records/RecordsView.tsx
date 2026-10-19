@@ -70,7 +70,7 @@ export function RecordsView({ plan }: RecordsViewProps) {
                 key={tile.key}
                 data-tile={index}
                 aria-label={tileReading(tile)}
-                className={`flex min-h-[104px] min-w-0 flex-col items-start justify-between gap-2 border-2 text-left border-ink px-3 py-3 data-[picked]:bg-ink data-[picked]:text-paper md:px-4 md:py-3 ${TONES[tile.tone]} ${focusRing}`}
+                className={`flex min-h-[104px] min-w-0 flex-col items-start justify-between gap-2 border-2 text-left border-ink px-3 py-3 data-[picked]:outline-[3px] data-[picked]:outline-offset-2 data-[picked]:outline-ink md:px-4 md:py-3 ${TONES[tile.tone]} ${focusRing}`}
               >
                 <p
                   aria-hidden="true"
@@ -80,11 +80,11 @@ export function RecordsView({ plan }: RecordsViewProps) {
                 </p>
                 <p
                   aria-hidden="true"
-                  className="font-display text-[clamp(1.75rem,8vw,2.75rem)] font-black leading-[1] [overflow-wrap:anywhere] md:text-[clamp(1.5rem,min(3.4vw,6dvh),4.5rem)]"
+                  className="font-display text-[clamp(1.75rem,8vw,2.75rem)] font-black leading-[1] [overflow-wrap:anywhere] md:text-[clamp(1.5rem,min(3.4vw,5dvh),4.5rem)]"
                 >
                   {tile.value}
                   {tile.unit ? (
-                    <span className="ml-1.5 font-mono text-xs font-normal [font-stretch:87.5%]">
+                    <span className="ml-2 inline-block text-[clamp(0.875rem,4vw,1.125rem)] font-extrabold uppercase leading-none md:text-[clamp(0.875rem,min(1.4vw,2.6dvh),1.25rem)]">
                       {tile.unit}
                     </span>
                   ) : null}

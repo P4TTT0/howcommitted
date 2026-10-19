@@ -119,7 +119,7 @@ describe("readings", () => {
     const number = { label: "Commits", total: 4458 };
     expect(totalReading(number)).toBe("Commits: 4,458 in total");
     expect(yearReading(number, { year: 2023, value: 12 })).toBe(
-      "Commits in 2023: 12",
+      "2023: 12 commits",
     );
   });
 
