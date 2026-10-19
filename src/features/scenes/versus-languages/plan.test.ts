@@ -76,6 +76,26 @@ describe("planLanguages", () => {
     expect(plan?.facts).toEqual(["Go shows up for both."]);
   });
 
+  it("skips rows that round to 0% and folds extras into Other", () => {
+    const plan = planLanguages([
+      profile("ada", 0, [
+        ["A", 0.4],
+        ["B", 0.2],
+        ["C", 0.15],
+        ["D", 0.1],
+        ["E", 0.08],
+        ["F", 0.04],
+        ["G", 0.02],
+        ["H", 0.001],
+      ]),
+      profile("g", 1, [["Go", 1]]),
+    ]);
+    const rows = plan?.people[0]?.rows ?? [];
+    expect(rows.map((row) => row.name)).toEqual(["A", "B", "C", "D", "Other"]);
+    expect(rows.at(-1)?.percent).toBe(14);
+    expect(rows.at(-1)?.isOther).toBe(true);
+  });
+
   it("is null when nobody has public code", () => {
     expect(
       planLanguages([profile("ada", 0, null), profile("g", 1, [])]),

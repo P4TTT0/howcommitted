@@ -1,3 +1,4 @@
+import type { LanguageShare } from "@/domain/languages";
 import type { VersusProfile } from "@/features/versus/versusProfiles";
 
 export type LanguageRow = {
@@ -30,11 +31,7 @@ export function planLanguages(
   profiles: readonly VersusProfile[],
 ): LanguagesPlan | null {
   const people = profiles.map<LanguagePerson>((profile) => {
-    const rows = (profile.languages ?? []).map((language) => ({
-      name: language.name,
-      percent: Math.round(language.share * 100),
-      isOther: language.isOther,
-    }));
+    const rows = rowsOf(profile.languages ?? []);
     return {
       login: profile.login,
       index: profile.index,
@@ -44,6 +41,44 @@ export function planLanguages(
   });
   if (people.every((person) => person.top === null)) return null;
   return { people, facts: factsOf(people) };
+}
+
+/** Most rows a card lists, "Other" included. */
+export const MAX_ROWS = 5;
+
+/**
+ * At most five rows. Languages that round to 0% are skipped and, with the
+ * ones that do not fit, folded into "Other" so the shares still add up.
+ */
+function rowsOf(languages: readonly LanguageShare[]): LanguageRow[] {
+  const percentOf = (share: number) => Math.round(share * 100);
+  const named = languages.filter(
+    (language) => !language.isOther && percentOf(language.share) > 0,
+  );
+  let otherShare = languages.reduce(
+    (sum, language) =>
+      language.isOther || percentOf(language.share) === 0
+        ? sum + language.share
+        : sum,
+    0,
+  );
+  const hasOther = () => percentOf(otherShare) > 0;
+  let shown = named;
+  if (named.length + (hasOther() ? 1 : 0) > MAX_ROWS) {
+    shown = named.slice(0, MAX_ROWS - 1);
+    otherShare += named
+      .slice(MAX_ROWS - 1)
+      .reduce((sum, language) => sum + language.share, 0);
+  }
+  const rows = shown.map<LanguageRow>((language) => ({
+    name: language.name,
+    percent: percentOf(language.share),
+    isOther: false,
+  }));
+  if (hasOther()) {
+    rows.push({ name: "Other", percent: percentOf(otherShare), isOther: true });
+  }
+  return rows;
 }
 
 function factsOf(people: readonly LanguagePerson[]): string[] {

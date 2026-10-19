@@ -282,7 +282,7 @@ test("the scenes describe habits and never rank", async ({ page }) => {
     name: "Favorite languages of each developer",
   });
   await expect(languages).toContainText("TypeScript");
-  await expect(languages).toContainText("TypeScript shows up for all 3.");
+  await expect(page.getByText("TypeScript shows up for all 3.")).toBeVisible();
   await expect(languages).toContainText("Only @ada has Go");
 
   await next(page).click();
