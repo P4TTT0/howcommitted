@@ -2,20 +2,16 @@
 
 import Link from "next/link";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
-import type { YearBlock } from "@/domain/year-summary";
 import { formatCount } from "@/features/sequencer/model/format";
-import { blockForYearIndex } from "@/features/sequencer/model/plan";
 import { actionClass } from "@/ui/classes";
 import type { ShareCard } from "./cards";
 import {
   challengeHref,
   FIXED_LINE,
-  privateNote,
+  posterLabel,
   type ShareOutcome,
   shareMessage,
   shareProfile,
-  summaryLine,
-  yearBars,
 } from "./poster";
 import { ShareCards } from "./ShareCards";
 
@@ -30,68 +26,22 @@ type PosterProps = {
   total: number;
   firstYear: number;
   lastYear: number;
-  yearBlocks: readonly YearBlock[];
   note: string | null;
   /** The share cards this profile has data for; none hides the section. */
   cards: readonly ShareCard[];
-  /** Private contributions included in `total`; the line is hidden at 0. */
+  /** Private contributions included in `total`; the label omits them at 0. */
   privateContributions: number;
   /** Versus only exists outside production; the action is hidden otherwise. */
   versusEnabled: boolean;
   onReplay: () => void;
 };
 
-/** One block per calendar year: height = calendar contributions, color = year identity. */
-function YearBars({
-  firstYear,
-  lastYear,
-  yearBlocks,
-}: Pick<PosterProps, "firstYear" | "lastYear" | "yearBlocks">) {
-  const bars = yearBars(
-    firstYear,
-    lastYear,
-    new Map(yearBlocks.map((block) => [block.year, block.contributions])),
-  );
-  const label = bars
-    .map((bar) => `${bar.year} ${formatCount(bar.contributions)}`)
-    .join(", ");
-
-  return (
-    <div className="flex min-h-24 flex-1 flex-col">
-      <div
-        role="img"
-        aria-label={`Contributions per year: ${label}`}
-        className="flex min-h-12 flex-1 items-end gap-px border-b-4 border-ink"
-      >
-        {bars.map((bar, index) => (
-          <div
-            key={bar.year}
-            className="min-w-px flex-1"
-            style={{
-              height: `${Math.max(bar.ratio * 100, 2)}%`,
-              backgroundColor: blockForYearIndex(index).background,
-            }}
-          />
-        ))}
-      </div>
-      <div
-        aria-hidden="true"
-        className="mt-1 flex shrink-0 justify-between font-mono text-xs"
-      >
-        <span>{firstYear}</span>
-        <span>{lastYear}</span>
-      </div>
-    </div>
-  );
-}
-
-/** The final poster: big total, year blocks, the fixed line, then what to do next. */
+/** The final poster: one label, the big total, the fixed line, then the cards. */
 export function EndCard({
   login,
   total,
   firstYear,
   lastYear,
-  yearBlocks,
   note,
   cards,
   privateContributions,
@@ -124,12 +74,11 @@ export function EndCard({
     setMessage(shareMessage(outcome));
   };
 
-  const privateText = privateNote(privateContributions);
   return (
-    <div className="flex h-full min-h-0 flex-col gap-8 overflow-y-auto p-4 md:p-8 lg:flex-row lg:gap-12 lg:overflow-hidden">
-      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
-        <p className="font-mono text-xs uppercase">
-          {summaryLine(login, total, firstYear, lastYear)}
+    <div className="flex h-full min-h-0 flex-col gap-6 overflow-y-auto p-4 md:p-8 lg:flex-row lg:gap-12 lg:overflow-hidden">
+      <div className="flex min-w-0 shrink-0 flex-col justify-center gap-4 lg:min-h-0 lg:flex-1 lg:shrink lg:overflow-y-auto">
+        <p className="break-words font-mono text-xs uppercase [font-stretch:87.5%]">
+          {posterLabel(login, total, firstYear, lastYear, privateContributions)}
         </p>
         <p
           aria-hidden="true"
@@ -145,16 +94,8 @@ export function EndCard({
         >
           {formatCount(total)}
         </p>
-        <YearBars
-          firstYear={firstYear}
-          lastYear={lastYear}
-          yearBlocks={yearBlocks}
-        />
         <div className="flex flex-col gap-1">
           <p className="font-mono text-xs">{FIXED_LINE}</p>
-          {privateText && (
-            <p className="font-mono text-xs leading-4">{privateText}</p>
-          )}
           {note && <p className="font-mono text-xs leading-4">{note}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">

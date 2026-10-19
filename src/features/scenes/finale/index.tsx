@@ -19,7 +19,6 @@ export const endCardFinale: FinaleDefinition = {
         total={model.plan.total}
         firstYear={firstYear}
         lastYear={lastYear}
-        yearBlocks={model.yearBlocks}
         note={model.note}
         cards={shareCardsFor(data)}
         privateContributions={model.privateContributions}
