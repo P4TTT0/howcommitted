@@ -12,6 +12,8 @@ type SceneFrameProps = {
   title?: ReactNode;
   /** Mono note on the right of the title row. */
   note?: ReactNode;
+  /** Block content on the right of the title row (a small chart, say). */
+  aside?: ReactNode;
   children: ReactNode;
   className?: string;
 };
@@ -25,6 +27,7 @@ export function SceneFrame({
   sceneLabel,
   title,
   note,
+  aside,
   children,
   className = "",
 }: SceneFrameProps) {
@@ -42,7 +45,7 @@ export function SceneFrame({
         </p>
         <p className={`text-right ${labelClass}`}>{headerLabel}</p>
       </header>
-      {(title || note) && (
+      {(title || note || aside) && (
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           {title && (
             <h2 className="font-display text-[clamp(2.5rem,8vw,5.5rem)] font-black uppercase leading-[0.86]">
@@ -54,6 +57,7 @@ export function SceneFrame({
               {note}
             </p>
           )}
+          {aside}
         </div>
       )}
       <div className="relative min-h-0 flex-1">{children}</div>

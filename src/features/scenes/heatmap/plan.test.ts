@@ -5,6 +5,8 @@ import {
   planRows,
   positionAfterKey,
   tint,
+  tipDetail,
+  tipTitle,
   WEEKS,
   weekDetail,
   weeklyTotals,
@@ -186,9 +188,37 @@ describe("readings", () => {
     expect(weekDetail(1)).toBe("1 contribution that week");
     const text = weekReading(
       { year: 2022 },
-      { week: 13, contributions: 1234, level: 4, state: "past" },
+      {
+        week: 13,
+        contributions: 1234,
+        level: 4,
+        state: "past",
+        from: "2022-04-03",
+        to: "2022-04-09",
+      },
     );
     expect(text).toBe("2022 · week 14: 1,234 contributions that week");
+  });
+});
+
+describe("tooltip text", () => {
+  it("says contributions and the real dates of the week", () => {
+    expect(tipTitle(1234)).toBe("1,234 contributions");
+    expect(tipTitle(1)).toBe("1 contribution");
+    expect(
+      tipDetail({ year: 2024 }, { from: "2024-04-08", to: "2024-04-14" }),
+    ).toBe("2024 · Apr 8 – Apr 14");
+  });
+
+  it("carries the first and last day of each column", () => {
+    const [row] = planRows(
+      [{ year: 2023, totalContributions: 520, heatmap: fullYear(2023, 10) }],
+      TODAY,
+    );
+    expect(row?.weeks[1]).toMatchObject({
+      from: "2023-01-08",
+      to: "2023-01-08",
+    });
   });
 });
 

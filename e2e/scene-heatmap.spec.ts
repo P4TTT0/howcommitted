@@ -85,3 +85,46 @@ for (const viewport of VIEWPORTS) {
     await expectSceneFits(page, { tapTargets: true, allowScroll: true });
   });
 }
+
+test("a hovered week shows a tooltip that stays inside the frame", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openExperience(page);
+  await openHeatmapInExplore(page);
+
+  const frame = page.locator("[data-scene-frame]");
+  const tip = page.locator("[data-role=tip]");
+  const cell = (index: number) => page.locator(`[data-cell="${index}"]`);
+  const lastRow = YEARS.length - 1;
+  // First row start, first row end and a middle week of the last row.
+  const targets = [0, 51, lastRow * 53 + 20];
+
+  for (const index of targets) {
+    await cell(index).scrollIntoViewIfNeeded();
+    const box = await cell(index).boundingBox();
+    if (!box) throw new Error(`cell ${index} has no box`);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(tip).toBeVisible();
+    await expect(page.locator("[data-role=tip-title]")).toHaveText(
+      /^\d[\d,]* contributions?$/,
+    );
+    await expect(page.locator("[data-role=tip-detail]")).toHaveText(
+      /^\d{4} · [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+$/,
+    );
+    const frameBox = await frame.boundingBox();
+    const tipBox = await tip.boundingBox();
+    if (!frameBox || !tipBox) throw new Error("missing boxes");
+    expect(tipBox.x).toBeGreaterThanOrEqual(frameBox.x);
+    expect(tipBox.y).toBeGreaterThanOrEqual(frameBox.y);
+    expect(tipBox.x + tipBox.width).toBeLessThanOrEqual(
+      frameBox.x + frameBox.width,
+    );
+    expect(tipBox.y + tipBox.height).toBeLessThanOrEqual(
+      frameBox.y + frameBox.height,
+    );
+  }
+
+  await page.mouse.move(2, 2);
+  await expect(tip).toBeHidden();
+});
