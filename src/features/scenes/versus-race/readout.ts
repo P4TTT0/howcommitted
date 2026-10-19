@@ -1,143 +1,152 @@
-import { crossingCount, crossingsUpTo } from "@/domain/crossings";
+import { crossingCount } from "@/domain/crossings";
 import { findElement } from "@/features/sequencer/explore";
 import { formatCount } from "@/features/sequencer/model/format";
 import { swatchClass } from "@/features/versus/palette";
 import {
-  axisLabels,
-  dateLabel,
+  activePass,
   laneOrder,
-  notThereYet,
+  MAX_TICKS,
+  niceTicks,
+  passesLabel,
   type Race,
-  whenLabel,
-  yearLabel,
+  scaleFor,
+  yearAtIndex,
 } from "./race";
 
-/** How many of the latest crossings the readout names. */
-export const CROSSING_SLOTS = 3;
-
-/** The subtitle under the headline, per time axis. */
-export const SUBTITLES = {
-  calendar:
-    "Running total of contributions. The bars swap places as the years go by.",
-  age: "Everyone starts at their own first year with a contribution.",
-} as const;
-
-const DOT_BASE = "size-2.5 shrink-0 rounded-full";
+const DOT_BASE = "size-3 shrink-0 rounded-full md:size-3.5";
 
 export type Readout = {
   /**
-   * Switches the readout to another axis of the same lanes: the axis labels,
-   * the subtitle and the toggle. Call `show` afterwards.
+   * Paints the race at one moment: every lane's value, bar and place, the
+   * gridlines, the big year, the timeline, the passes so far and the pass
+   * being announced. Plain DOM writes only, so the clock's frame loop and the
+   * explore keys share it. Rows keep their nodes and only change place, so
+   * CSS can slide them (and `prefers-reduced-motion` makes them jump).
    */
-  setRace(race: Race): void;
-  /**
-   * Paints the race at one moment: every lane's value and position, the big
-   * label, the date, the playhead (`position` 0..1 along the axis) and the
-   * crossings so far. Instant DOM writes only, so the clock's frame loop and
-   * the explore pointer share it.
-   */
-  show(values: readonly number[], index: number, position: number): void;
+  show(values: readonly number[], index: number): void;
 };
 
-/** Throws when the view is missing a part, so a broken scene is dropped. */
-export function createReadout(root: HTMLElement, initial: Race): Readout {
-  let race = initial;
-  const list = findElement<HTMLElement>(root, '[data-role="lanes"]');
-  const items = race.lanes.map((_, lane) =>
-    findElement<HTMLElement>(root, `[data-lane="${lane}"]`),
-  );
-  const bars = race.lanes.map((_, lane) =>
-    findElement<HTMLElement>(root, `[data-lane-bar="${lane}"]`),
-  );
-  const texts = race.lanes.map((_, lane) =>
-    findElement<HTMLElement>(root, `[data-lane-value="${lane}"]`),
-  );
-  const year = findElement<HTMLElement>(root, '[data-role="year"]');
-  const date = findElement<HTMLElement>(root, '[data-role="date"]');
-  const playhead = findElement<HTMLElement>(root, '[data-role="playhead"]');
-  const marks = findElement<HTMLElement>(root, '[data-role="marks"]');
-  const subtitle = findElement<HTMLElement>(root, '[data-role="subtitle"]');
-  const count = findElement<HTMLElement>(root, '[data-role="crossing-count"]');
-  const none = findElement<HTMLElement>(root, '[data-role="crossing-none"]');
-  const chips = Array.from({ length: CROSSING_SLOTS }, (_, slot) => {
-    const chip = findElement<HTMLElement>(root, `[data-crossing="${slot}"]`);
+/**
+ * Throws when the view is missing a part, so a broken scene is dropped.
+ * `passDays` is how many days after a crossing it is still announced.
+ */
+export function createReadout(
+  root: HTMLElement,
+  race: Race,
+  passDays: number,
+): Readout {
+  const lanes = race.lanes.map((_, lane) => ({
+    row: findElement<HTMLElement>(root, `[data-lane="${lane}"]`),
+    bar: findElement<HTMLElement>(root, `[data-lane-bar="${lane}"]`),
+    value: findElement<HTMLElement>(root, `[data-lane-value="${lane}"]`),
+    tip: findElement<HTMLElement>(root, `[data-lane-tip-value="${lane}"]`),
+  }));
+  const ticks = Array.from({ length: MAX_TICKS }, (_, slot) => {
+    const tick = findElement<HTMLElement>(root, `[data-tick="${slot}"]`);
     return {
-      chip,
-      when: findElement<HTMLElement>(chip, '[data-part="when"]'),
-      dot: findElement<HTMLElement>(chip, '[data-part="dot"]'),
-      text: findElement<HTMLElement>(chip, '[data-part="text"]'),
+      tick,
+      label: findElement<HTMLElement>(tick, '[data-part="label"]'),
     };
   });
+  const year = findElement<HTMLElement>(root, '[data-role="year"]');
+  const passes = findElement<HTMLElement>(root, '[data-role="passes"]');
+  const chip = findElement<HTMLElement>(root, '[data-role="pass"]');
+  const chipDot = findElement<HTMLElement>(chip, '[data-part="dot"]');
+  const chipText = findElement<HTMLElement>(chip, '[data-part="text"]');
+  const cells = [
+    ...findElement<HTMLElement>(
+      root,
+      '[data-role="years"]',
+    ).querySelectorAll<HTMLElement>("[data-year]"),
+  ].map((cell) => ({
+    year: Number(cell.dataset.year),
+    bar: findElement<HTMLElement>(cell, '[data-part="bar"]'),
+    label: findElement<HTMLElement>(cell, '[data-part="label"]'),
+  }));
 
-  let lastValues: number[] = race.lanes.map(() => Number.NaN);
-  let lastIndex = -1;
-  let lastOrder = "";
-  let lastCrossings = "";
+  // A picture that fails to load gives way to the initial under it.
+  for (const image of root.querySelectorAll<HTMLImageElement>(
+    "img[data-avatar]",
+  )) {
+    const hide = () => {
+      image.hidden = true;
+    };
+    if (image.complete && image.naturalWidth === 0) hide();
+    else image.addEventListener("error", hide, { once: true });
+  }
+
+  const lastValues: number[] = race.lanes.map(() => Number.NaN);
+  let lastRanks = "";
+  let lastYear = -1;
+  let lastPasses = -1;
+  let lastPass = "";
 
   return {
-    setRace(next) {
-      race = next;
-      lastValues = race.lanes.map(() => Number.NaN);
-      lastIndex = -1;
-      lastOrder = "";
-      lastCrossings = "";
-      subtitle.textContent = SUBTITLES[race.mode];
-      marks.replaceChildren(
-        ...axisLabels(race).map((mark) => {
-          const label = document.createElement("span");
-          label.className = "absolute top-1";
-          label.style.left = `${mark.startProgress * 100}%`;
-          label.textContent = mark.label;
-          return label;
-        }),
-      );
-    },
-    show(values, index, position) {
-      race.lanes.forEach((lane, laneIndex) => {
-        const value = Math.round(values[laneIndex] ?? 0);
-        const waiting = notThereYet(lane, index, value);
-        // Encode both so a change of either repaints.
-        const key = waiting ? -1 : value;
-        if (key === lastValues[laneIndex]) return;
-        lastValues[laneIndex] = key;
-        const bar = bars[laneIndex];
-        const text = texts[laneIndex];
-        if (bar) bar.style.width = `${(value / race.peak) * 100}%`;
-        if (text)
-          text.textContent = waiting ? "Not there yet" : formatCount(value);
+    show(values, index) {
+      const scale = scaleFor(values);
+
+      lanes.forEach(({ row, value, tip }, lane) => {
+        const raw = values[lane] ?? 0;
+        row.style.setProperty("--x", (raw / scale).toFixed(4));
+        const rounded = Math.round(raw);
+        if (rounded === lastValues[lane]) return;
+        lastValues[lane] = rounded;
+        const text = formatCount(rounded);
+        value.textContent = text;
+        tip.textContent = text;
       });
 
       const order = laneOrder(values.map((value) => Math.round(value)));
-      const orderKey = order.join(",");
-      if (orderKey !== lastOrder) {
-        lastOrder = orderKey;
-        list.append(...order.flatMap((laneIndex) => items[laneIndex] ?? []));
+      const ranks = order.join(",");
+      if (ranks !== lastRanks) {
+        lastRanks = ranks;
+        order.forEach((lane, rank) => {
+          const row = lanes[lane]?.row;
+          if (!row) return;
+          row.style.transform = `translateY(${rank * 100}%)`;
+          row.dataset.rank = String(rank);
+        });
       }
 
-      if (index !== lastIndex) {
-        lastIndex = index;
-        year.textContent = yearLabel(race, index);
-        date.textContent = dateLabel(race, index);
+      const shown = niceTicks(scale);
+      ticks.forEach(({ tick, label }, slot) => {
+        const mark = shown[slot];
+        tick.hidden = !mark;
+        if (!mark) return;
+        tick.style.left = `${mark.x * 100}%`;
+        if (label.textContent !== mark.label) label.textContent = mark.label;
+      });
+
+      const currentYear = yearAtIndex(race, index);
+      if (currentYear !== lastYear) {
+        lastYear = currentYear;
+        year.textContent = String(currentYear);
+        for (const cell of cells) {
+          cell.bar.style.opacity = cell.year <= currentYear ? "1" : "0.18";
+          cell.label.style.fontWeight = cell.year === currentYear ? "700" : "";
+        }
       }
-      playhead.style.left = `${position * 100}%`;
 
       const crossed = crossingCount(race.crossings, index);
-      const crossKey = `${race.mode}:${crossed}`;
-      if (crossKey !== lastCrossings) {
-        lastCrossings = crossKey;
-        const latest = crossingsUpTo(race.crossings, index, CROSSING_SLOTS);
-        count.textContent = crossed > 0 ? ` · ${formatCount(crossed)}` : "";
-        none.hidden = latest.length > 0;
-        chips.forEach(({ chip, when, dot, text }, slot) => {
-          const crossing = latest[slot];
-          chip.hidden = !crossing;
-          if (!crossing) return;
-          const passer = race.lanes[crossing.passer]?.login ?? "";
-          const passed = race.lanes[crossing.passed]?.login ?? "";
-          when.textContent = whenLabel(race, crossing.index);
-          dot.className = `${DOT_BASE} ${swatchClass(crossing.passer)}`;
-          text.textContent = `@${passer} passes @${passed}`;
+      if (crossed !== lastPasses) {
+        lastPasses = crossed;
+        passes.textContent = passesLabel(crossed);
+      }
+
+      const pass = activePass(race, index, passDays);
+      const passKey = pass ? `${pass.passer}>${pass.passed}` : "";
+      if (passKey !== lastPass) {
+        lastPass = passKey;
+        chip.hidden = !pass;
+        lanes.forEach(({ bar }, lane) => {
+          bar.toggleAttribute("data-passing", pass?.passer === lane);
         });
+        if (pass) {
+          const passer = race.lanes[pass.passer]?.login ?? "";
+          const passed = race.lanes[pass.passed]?.login ?? "";
+          chipDot.className = `${DOT_BASE} ${swatchClass(pass.passer)}`;
+          chipText.textContent = `@${passer} passes @${passed}`;
+        }
       }
     },
   };
