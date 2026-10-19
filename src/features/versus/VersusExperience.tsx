@@ -16,6 +16,8 @@ import { VERSUS_FINALE, VERSUS_SCENES } from "@/features/scenes/registry";
 import { planFromHistory } from "@/features/sequencer/model/historyPlan";
 import { Sequencer } from "@/features/sequencer/Sequencer";
 import type { SceneData } from "@/features/sequencer/types";
+import { interaction } from "@/playback/sound/interaction";
+import { useExperienceInteraction } from "@/playback/sound/useExperienceInteraction";
 import { isAudioUnlocked, unlockAudio } from "@/playback/unlock";
 import { actionClass } from "@/ui/classes";
 import { ScreenMain } from "@/ui/ScreenMain";
@@ -37,6 +39,7 @@ type Phase =
  */
 export function VersusExperience({ logins }: { logins: string[] }) {
   const router = useRouter();
+  useExperienceInteraction();
   const [phase, setPhase] = useState<Phase>({ name: "init" });
   const mountedRef = useRef(true);
   const decidedRef = useRef(false);
@@ -96,6 +99,7 @@ export function VersusExperience({ logins }: { logins: string[] }) {
   }
 
   function start() {
+    interaction.click();
     void unlockAudio();
     void begin();
   }
@@ -152,7 +156,11 @@ export function VersusExperience({ logins }: { logins: string[] }) {
                   Try again
                 </button>
               )}
-              <Link href="/" className={actionClass}>
+              <Link
+                href="/"
+                className={actionClass}
+                onClick={() => interaction.click()}
+              >
                 Search again
               </Link>
             </div>

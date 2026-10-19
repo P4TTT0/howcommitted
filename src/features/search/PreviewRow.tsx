@@ -1,3 +1,4 @@
+import { interaction } from "@/playback/sound/interaction";
 import { focusRing, pressable } from "@/ui/classes";
 import { formatActiveSpan, type PreviewUser } from "./lookup";
 
@@ -13,6 +14,8 @@ export function PreviewRow({ user, disabled, onStart }: PreviewRowProps) {
     <button
       type="button"
       onClick={onStart}
+      onPointerEnter={() => interaction.hover(0.5, "result")}
+      onPointerLeave={() => interaction.leave()}
       aria-disabled={disabled}
       className={`flex min-h-14 w-full max-w-md items-center gap-3 border-2 border-ink px-3 py-2 text-left font-mono text-sm not-aria-disabled:hover:bg-ink not-aria-disabled:hover:text-paper aria-disabled:cursor-wait ${pressable} ${focusRing}`}
     >

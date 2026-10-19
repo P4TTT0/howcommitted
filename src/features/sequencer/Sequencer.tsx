@@ -11,6 +11,10 @@ import {
 import { type ClockStatus, PlaybackClock } from "@/playback/clock";
 import { SoundEngine } from "@/playback/sound/engine";
 import { interaction } from "@/playback/sound/interaction";
+import {
+  readSoundPreference,
+  writeSoundPreference,
+} from "@/playback/sound/preference";
 import { ScenePositionContext } from "@/ui/SceneFrame";
 import { ScreenMain } from "@/ui/ScreenMain";
 import { Controls, type ControlsView, STAGE_BOTTOM_CLASS } from "./Controls";
@@ -95,6 +99,12 @@ export function Sequencer({
   const [speed, setSpeed] = useState<Speed>(1);
   const [failed, setFailed] = useState(false);
   const [stopped, setStopped] = useState(false);
+
+  // The site-wide preference wins when the visitor has set one. Read after
+  // hydration; the sound starts on only after the Play gesture anyway.
+  useEffect(() => {
+    if (readSoundPreference() === "off") setMuted(true);
+  }, []);
 
   // The interaction channel follows the Sound button, from mount on.
   useEffect(() => {
@@ -243,6 +253,7 @@ export function Sequencer({
   const toggleMute = () => {
     const next = !muted;
     setMuted(next);
+    writeSoundPreference(!next);
     engineRef.current?.setMuted(next);
   };
 
