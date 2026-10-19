@@ -134,7 +134,7 @@ export function LoadingScreen({
 
           <ol
             aria-hidden="true"
-            className="flex min-h-0 flex-1 flex-col justify-between gap-1 md:grid md:flex-none md:grid-cols-11 md:gap-x-1"
+            className="flex min-h-0 flex-1 flex-col justify-between gap-[3px] md:grid md:flex-none md:grid-cols-11 md:gap-x-1"
           >
             {Array.from({ length: PROGRESS_CELLS }, (_, i) => {
               const fill = cellFill(percent, i);
@@ -142,7 +142,7 @@ export function LoadingScreen({
                 <li
                   // biome-ignore lint/suspicious/noArrayIndexKey: fixed cells
                   key={i}
-                  className="relative block max-h-[26px] min-h-3 flex-1 overflow-hidden bg-ink/10 md:h-10 md:max-h-none md:flex-none"
+                  className="relative block max-h-[26px] min-h-1.5 flex-1 overflow-hidden bg-ink/10 md:h-10 md:max-h-none md:flex-none"
                 >
                   <span
                     className={`absolute inset-y-0 left-0 ${CELL_COLORS[i % CELL_COLORS.length]}`}
@@ -177,8 +177,9 @@ const LINEUP_TEXT = "font-display font-black uppercase leading-[1.05]";
  * Every login in its own versus color, joined by "vs". Wide screens keep one
  * line and shrink it to the measured width; phones give each login its own
  * line, each shrunk to fit. FitText measures, so nothing counts characters.
- * The color blocks are inline-block: an inline box is as tall as the font's
- * ascent and descent, taller than this tight line, so it would poke out.
+ * No text sits in a plain inline box: one is as tall as the font's ascent and
+ * descent, taller than this tight line, so it would poke out. The color blocks
+ * are inline-block and each "vs" plus login is an inline-flex row.
  */
 function Lineup({ logins }: { logins: string[] }) {
   return (
@@ -186,7 +187,10 @@ function Lineup({ logins }: { logins: string[] }) {
       <span className="hidden md:block">
         <FitText className={`${LINEUP_TEXT} text-[min(7vw,16dvh)]`}>
           {logins.map((login, index) => (
-            <span key={login.toLowerCase()}>
+            <span
+              key={login.toLowerCase()}
+              className="inline-flex items-baseline"
+            >
               {index > 0 && <span className="px-[0.3em]">vs</span>}
               <span
                 className={`inline-block px-[0.15em] ${playerBlockClass(index)}`}
