@@ -8,6 +8,13 @@ import { userMetadata } from "@/og/metadata";
 
 type Props = { params: Promise<{ users: string[] }> };
 
+/**
+ * Profile and versus pages stay out of search results: there is one per
+ * GitHub account, and only the landing is meant to be found. Links are still
+ * followed, and link previews keep working.
+ */
+const NOT_INDEXED: Metadata["robots"] = { index: false, follow: true };
+
 async function loginsFor(params: Props["params"]): Promise<string[]> {
   const { users } = await params;
   const logins = routeLogins(users);
@@ -21,10 +28,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (logins.length > 1) {
     return {
       title: `${logins.map((name) => `@${name}`).join(" vs ")} | Committed`,
+      robots: NOT_INDEXED,
     };
   }
   // Cache only: link previews must never trigger a GitHub request or the quota.
-  return userMetadata(login as string, await loadCachedPoster(login as string));
+  return {
+    ...userMetadata(login as string, await loadCachedPoster(login as string)),
+    robots: NOT_INDEXED,
+  };
 }
 
 export default async function UserPage({ params }: Props) {
