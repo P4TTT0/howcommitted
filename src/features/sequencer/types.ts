@@ -30,8 +30,6 @@ import type { SoundEngine } from "@/playback/sound/engine";
 export type VersusEntry = {
   login: string;
   model: HistoryPlan;
-  /** ISO timestamp the account was created; absent when unknown. */
-  joinedAt?: string;
   /** The full payload (languages, reviews...); absent when only the plan is known. */
   history?: History | null;
 };

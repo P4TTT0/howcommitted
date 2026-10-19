@@ -7,6 +7,7 @@ import { swatchClass } from "@/features/versus/palette";
 import { swatchTextClass } from "@/features/versus/swatchText";
 import { FIXED_LINE } from "@/og/poster";
 import { actionClass } from "@/ui/classes";
+import { FitText } from "../finale/FitText";
 import {
   type ShareOutcome,
   shareMessage,
@@ -22,28 +23,41 @@ type Props = {
   onReplay: () => void;
 };
 
-/** Wide screens give every developer a column, up to the five a lineup holds. */
-const WIDE_COLUMNS: Record<number, string> = {
-  1: "md:grid-cols-1 lg:grid-cols-1",
-  2: "md:grid-cols-2 lg:grid-cols-2",
-  3: "md:grid-cols-3 lg:grid-cols-3",
-  4: "md:grid-cols-3 lg:grid-cols-4",
-  5: "md:grid-cols-3 lg:grid-cols-5",
-};
+/** Color header height: fixed so every card is the same size. */
+const HEADER =
+  "grid-rows-[auto] md:grid-rows-[clamp(7.5rem,22vh,12rem)_minmax(0,1fr)]";
 
-/**
- * Font size for a total so it always fits its block: about half an em per
- * character (digits and commas of Big Shoulders), as container-width units.
- */
-function totalSize(total: string): CSSProperties {
-  return {
-    "--total": `${(100 / (total.length * 0.5)).toFixed(1)}cqw`,
-  } as CSSProperties;
+/** The mono caption style used across the poster. */
+const MONO = "font-mono [font-stretch:87.5%]";
+
+/** The poster action: 44px+ tall, mono caps, two by two on a phone. */
+const ACTION = `${actionClass} min-h-12 md:px-5 max-md:w-full`;
+
+/** GitHub avatar in a paper circle; the initial shows if it cannot load. */
+function Avatar({ login }: { login: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-paper font-display text-xl font-black text-ink">
+      {login.charAt(0).toUpperCase()}
+      {!failed && (
+        // biome-ignore lint/performance/noImgElement: a 36px avatar, no optimizer needed
+        <img
+          src={`https://github.com/${encodeURIComponent(login)}.png?size=80`}
+          alt=""
+          width={36}
+          height={36}
+          className="absolute inset-0 size-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </span>
+  );
 }
 
-/** Four to a row on a phone: tighter padding, labels may take two lines. */
-const PHONE_ACTION =
-  "max-sm:px-1! max-sm:text-center max-sm:text-[11px] max-sm:leading-tight";
+/** "Together, 2016 to 2026" as the poster caption: "Together · 2016 — 2026". */
+function togetherLabel(together: string): string {
+  return together.replace(", ", " · ").replace(" to ", " — ");
+}
 
 const SAVE_FAILED = "The image could not be made. Try again.";
 
@@ -122,63 +136,63 @@ export function VersusEndCard({ summaries, poster, onReplay }: Props) {
     setMessage(shareMessage(outcome));
   }
 
+  const [lead, ...rest] = poster.sentence.split(" ");
   return (
     <section
       aria-label="Versus summary"
-      className="flex min-h-full flex-col gap-3 p-4 md:gap-4 md:px-16 md:pt-12 md:pb-6"
+      className="flex min-h-full flex-col gap-4 p-4 md:h-full md:gap-[clamp(0.75rem,2.4vh,1.25rem)] md:px-[clamp(1.5rem,4.5vw,4rem)] md:py-[clamp(1rem,5vh,3rem)]"
     >
       <h2 className="sr-only">Versus</h2>
-      <header className="flex flex-col gap-1">
-        <p className="font-mono text-xs uppercase tracking-[0.06em] [font-stretch:87.5%]">
-          {poster.together}
-        </p>
-        <p className="font-display text-[clamp(3.5rem,13vw,9.5rem)] font-black leading-[0.85] tabular-nums">
-          <span aria-hidden="true" className="block">
-            {formatCount(poster.total)}
-          </span>
-          <span className="sr-only">
-            {formatCount(poster.total)} contributions
-          </span>
-        </p>
-        <p className="font-display text-[clamp(1.25rem,3.4vw,2.75rem)] font-extrabold uppercase leading-none">
-          {poster.sentence}
-        </p>
+      <header className="flex flex-col gap-1 md:flex-row md:items-end md:gap-7">
+        <div className="font-display text-[clamp(4.5rem,24vw,5.5rem)] font-black leading-[0.8] tabular-nums md:w-[42%] md:shrink-0 md:text-[clamp(5rem,min(12.5vw,20vh),11.25rem)]">
+          <FitText>{formatCount(poster.total)}</FitText>
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5 md:pb-1.5">
+          <p className={`${MONO} text-xs uppercase tracking-[0.06em]`}>
+            {togetherLabel(poster.together)}
+          </p>
+          <p className="font-display text-[clamp(1.5rem,7vw,2rem)] font-black uppercase leading-[0.9] md:text-[clamp(1.5rem,min(3.4vw,5.6vh),3rem)]">
+            {lead}
+            <br className="max-md:hidden" /> {rest.join(" ")}
+          </p>
+        </div>
       </header>
 
       <ul
-        className={`grid min-h-0 flex-1 gap-2 md:gap-4 ${WIDE_COLUMNS[summaries.length] ?? "md:grid-cols-5"}`}
+        style={{ "--n": summaries.length } as CSSProperties}
+        className="grid min-h-0 gap-2 md:flex-1 md:grid-cols-[repeat(var(--n),minmax(0,1fr))] md:gap-4"
       >
         {summaries.map((summary, index) => {
           const person = poster.people[index];
           return (
             <li
               key={summary.login.toLowerCase()}
-              className="flex min-w-0 border-2 border-ink md:flex-col"
+              data-role="dev-card"
+              className={`grid min-h-0 min-w-0 border-2 border-ink ${HEADER}`}
             >
               <div
-                className={`@container flex w-[42%] min-w-0 shrink-0 flex-col items-start justify-between gap-1.5 p-2.5 md:w-auto md:flex-1 md:gap-4 md:p-4 ${swatchClass(index)} ${swatchTextClass(index)}`}
+                className={`flex min-w-0 items-center justify-between gap-3 p-3 md:flex-col md:items-stretch md:justify-between md:p-[clamp(0.625rem,1.4vw,1.25rem)] ${swatchClass(index)} ${swatchTextClass(index)}`}
               >
-                <span className="max-w-full min-w-0 [overflow-wrap:anywhere] bg-paper px-2 py-0.5 font-mono text-xs font-bold text-ink">
-                  @{summary.login}
-                </span>
-                <span
-                  aria-hidden="true"
-                  style={totalSize(formatCount(summary.total))}
-                  className="max-w-full font-display text-[min(var(--total),3rem)] font-black leading-[0.85] tabular-nums md:text-[min(var(--total),5rem)]"
-                >
-                  {formatCount(summary.total)}
-                </span>
+                <div className="flex min-w-0 items-center gap-2 md:flex-col md:items-start lg:flex-row lg:items-center">
+                  <Avatar login={summary.login} />
+                  <span className="min-w-0 [overflow-wrap:anywhere] bg-paper px-2 py-0.5 font-mono text-[11px] font-bold leading-tight text-ink lg:text-xs [font-stretch:87.5%]">
+                    @{summary.login}
+                  </span>
+                </div>
+                <div className="w-[45%] shrink-0 text-right font-display text-[2.25rem] font-black leading-[0.8] tabular-nums md:w-auto md:text-left md:text-[clamp(2.5rem,min(7vw,13vh),6rem)]">
+                  <FitText>{formatCount(summary.total)}</FitText>
+                </div>
               </div>
-              <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 bg-paper p-2.5 md:flex-none md:p-4">
-                <p className="font-mono text-xs">
-                  {summary.totalText}, {summary.span}
+              <div className="flex min-w-0 flex-col gap-2.5 bg-paper p-3 md:px-[clamp(0.625rem,1.4vw,1.25rem)] md:py-3.5">
+                <p className={`${MONO} text-xs [overflow-wrap:anywhere]`}>
+                  {summary.totalText} · {summary.span}
                 </p>
                 {person && person.awards.length > 0 && (
-                  <ul className="flex flex-col gap-0.5 md:border-t-2 md:border-ink md:pt-2.5">
+                  <ul className="flex flex-col gap-1 border-t-2 border-ink pt-2.5">
                     {person.awards.map((title) => (
                       <li
                         key={title}
-                        className="font-display text-lg font-extrabold uppercase leading-none [overflow-wrap:anywhere] md:text-[26px]"
+                        className="font-display text-xl font-black uppercase leading-none [overflow-wrap:anywhere] md:text-[clamp(1.125rem,3.6vh,1.875rem)]"
                       >
                         {title}
                       </li>
@@ -191,46 +205,43 @@ export function VersusEndCard({ summaries, poster, onReplay }: Props) {
         })}
       </ul>
 
-      <div className="flex flex-col gap-1">
-        <p className="font-mono text-xs">{FIXED_LINE}</p>
-        {poster.privateNote && (
-          <p className="font-mono text-xs [overflow-wrap:anywhere]">
-            {poster.privateNote}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
+        <div className={`${MONO} min-w-0 text-xs md:text-[13px]`}>
+          <p>
+            {FIXED_LINE}
+            {poster.privateTotal > 0 && (
+              <span className="opacity-60">
+                {" "}
+                Includes {formatCount(poster.privateTotal)} private.
+              </span>
+            )}
           </p>
-        )}
-      </div>
-      <div className="grid grid-cols-4 items-center gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
-        <button
-          ref={saveRef}
-          type="button"
-          onClick={onSave}
-          className={`${actionClass} ${PHONE_ACTION} bg-ink text-paper`}
-        >
-          Save image
-        </button>
-        <button
-          type="button"
-          onClick={onShare}
-          className={`${actionClass} ${PHONE_ACTION}`}
-        >
-          Share
-        </button>
-        <button
-          type="button"
-          onClick={onReplay}
-          className={`${actionClass} ${PHONE_ACTION}`}
-        >
-          Replay
-        </button>
-        <Link href="/" className={`${actionClass} ${PHONE_ACTION}`}>
-          Search again
-        </Link>
-        <p
-          role="status"
-          className="col-span-4 font-mono text-xs empty:hidden sm:col-auto"
-        >
-          {message}
-        </p>
+          <p role="status" className="empty:hidden">
+            {message}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0">
+          <button
+            ref={saveRef}
+            type="button"
+            onClick={onSave}
+            className={`${ACTION} bg-ink font-bold text-paper`}
+          >
+            Save image
+          </button>
+          <button type="button" onClick={onShare} className={ACTION}>
+            Share
+          </button>
+          <button type="button" onClick={onReplay} className={ACTION}>
+            Replay
+          </button>
+          <Link
+            href="/"
+            className={`${ACTION} bg-block-signal font-bold text-ink`}
+          >
+            Search again
+          </Link>
+        </div>
       </div>
     </section>
   );

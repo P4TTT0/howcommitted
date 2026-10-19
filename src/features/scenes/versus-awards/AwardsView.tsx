@@ -1,68 +1,102 @@
 import { swatchClass } from "@/features/versus/palette";
 import { SceneFrame } from "@/ui/SceneFrame";
-import type { AwardsPlan } from "./plan";
+import { FitText } from "../finale/FitText";
+import { Avatar } from "./Avatar";
+import type { AwardCard, AwardsPlan } from "./plan";
+
+/** Palette slots whose color is light enough to need dark text. */
+const INK_ON = new Set([2, 4]);
+
+const mono = "font-mono [font-stretch:87.5%]";
 
 /**
- * Versus scene 7, the markup: one card per award, grouped by developer in the
- * order they were added. A phone stacks slim rows (title and value on one
- * line, the developer under it); wider screens use cards, two or four across.
+ * Versus scene 7, the markup: one column per developer, all the same size. A
+ * colored header, then that developer's awards as cards of identical size; a
+ * developer with fewer awards ends in dashed empty cards. On a phone the
+ * columns become stacked sections with the cards two across.
  */
 export function AwardsView({ plan }: { plan: AwardsPlan }) {
+  const style = {
+    "--cols": plan.columns.length,
+    "--slots": plan.slots,
+  } as React.CSSProperties;
   return (
     <div className="absolute inset-0">
       <SceneFrame
         sceneLabel="Awards"
         title="Awards."
         note={
-          <span className="[overflow-wrap:anywhere]">
-            {plan.privateNote ? `${plan.note} ${plan.privateNote}` : plan.note}
+          <span className="uppercase tracking-[0.06em]">
+            Habits, not scores
           </span>
         }
       >
-        <section aria-label="Awards" className="h-full min-h-0">
-          <ul className="grid h-full min-h-0 auto-rows-[minmax(min-content,1fr)] grid-cols-1 gap-1.5 overflow-y-auto sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-            {plan.awards.map((award, position) => {
-              const slot = award.person;
-              return (
-                <li
-                  key={`${award.login}-${award.id}`}
-                  data-reveal={position}
-                  className="flex min-h-0 min-w-0 border-2 border-ink sm:flex-col"
+        <section
+          aria-label="Awards"
+          style={style}
+          className="h-full min-h-0 gap-x-4 gap-y-3 max-md:flex max-md:flex-col max-md:gap-5 max-md:overflow-y-auto md:grid md:grid-cols-[repeat(var(--cols),minmax(0,1fr))] md:grid-rows-[auto_repeat(var(--slots),minmax(0,1fr))]"
+        >
+          {plan.privateNote && <p className="sr-only">{plan.privateNote}</p>}
+          {plan.columns.map((column) => (
+            <div
+              key={column.login}
+              data-reveal={column.slot}
+              className="min-w-0 max-md:flex max-md:flex-col max-md:gap-2 md:row-span-full md:grid md:grid-rows-subgrid"
+            >
+              <div
+                className={`flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 lg:px-4 ${swatchClass(column.slot)} ${INK_ON.has(column.slot) ? "text-ink" : "text-paper"}`}
+              >
+                <Avatar login={column.login} />
+                <span
+                  className={`min-w-0 max-w-full flex-1 break-all text-xs font-bold lg:text-[15px] ${mono}`}
                 >
-                  <div
-                    aria-hidden="true"
-                    className={`w-2.5 shrink-0 sm:h-3.5 sm:w-auto ${swatchClass(slot)}`}
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-2.5 py-1 sm:justify-between sm:gap-3 sm:p-[18px]">
-                    <div className="flex items-baseline justify-between gap-3 sm:contents">
-                      <p className="min-w-0 font-display text-xl font-black uppercase leading-[0.95] sm:text-[clamp(1.75rem,2.6vw,2.5rem)]">
-                        {award.title}
-                      </p>
-                      <div className="shrink-0 sm:order-last sm:shrink">
-                        <p className="font-display text-xl font-black leading-[0.9] sm:text-[clamp(2.25rem,3.4vw,3.25rem)]">
-                          {award.value}
-                        </p>
-                        <p className="font-mono text-[11px] leading-[1.5] [font-stretch:87.5%] max-sm:sr-only sm:mt-1.5">
-                          {award.metric}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="flex min-w-0 items-center gap-2 font-mono text-xs font-bold [font-stretch:87.5%] sm:border-t sm:border-ink sm:pt-2.5 sm:text-[13px]">
-                      <span
-                        aria-hidden="true"
-                        className={`size-3 shrink-0 rounded-full ${swatchClass(slot)}`}
-                      />
-                      <span className="min-w-0 [overflow-wrap:anywhere]">
-                        @{award.login}
-                      </span>
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  @{column.login}
+                </span>
+              </div>
+              <ul className="grid grid-cols-2 gap-2 md:contents">
+                {Array.from({ length: plan.slots }, (_, index) => {
+                  const award = column.awards[index];
+                  return award ? (
+                    <Card key={award.id} award={award} />
+                  ) : (
+                    <li
+                      // biome-ignore lint/suspicious/noArrayIndexKey: fixed empty slots
+                      key={`empty-${index}`}
+                      aria-hidden="true"
+                      data-award-card
+                      className="min-h-0 border-2 border-dashed border-ink/40 max-md:hidden"
+                    />
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
         </section>
       </SceneFrame>
     </div>
+  );
+}
+
+function Card({ award }: { award: AwardCard }) {
+  return (
+    <li
+      data-award-card
+      className="flex h-32 min-h-0 min-w-0 flex-col justify-between border-2 border-ink p-2 [container-type:size] lg:p-3 md:h-auto lg:px-5 lg:py-4"
+    >
+      <p className="line-clamp-2 font-display text-[min(34px,10cqw,15cqh)] font-black uppercase leading-[1.2]">
+        {award.title}
+      </p>
+      <div className="min-w-0">
+        <FitText className="font-display text-[min(72px,34cqh)] font-black leading-none">
+          {award.big}
+          {award.unit && <span className="text-[0.39em]">{award.unit}</span>}
+        </FitText>
+        <p
+          className={`mt-1.5 text-[11px] leading-[1.25] [overflow-wrap:anywhere] ${mono}`}
+        >
+          {award.metric}
+        </p>
+      </div>
+    </li>
   );
 }
