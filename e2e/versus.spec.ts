@@ -132,8 +132,9 @@ test("Play loads each history in order, then plays the arrival, the race, the sh
     page.getByRole("region", { name: "Shared days, 2023 to 2024" }),
   ).toBeVisible();
 
-  // The same controls as solo: Next moves on to the finale.
-  await nextButton(page).click();
+  // The same controls as solo: Next moves on, scene by scene, to the finale.
+  const nextScene = page.getByRole("button", { name: /^Next/ });
+  while (await nextScene.isEnabled()) await nextScene.click();
   await expect(
     page.getByText(
       "Contributions are not productivity. This is rhythm, not value.",

@@ -178,7 +178,11 @@ export async function expectSceneFits(page: Page, options: Options = {}) {
         }
 
         // A child must stay inside its own parent.
-        const parent = element.parentElement;
+        // `display: contents` parents have no box: use the nearest one that does.
+        let parent = element.parentElement;
+        while (parent && getComputedStyle(parent).display === "contents") {
+          parent = parent.parentElement;
+        }
         if (
           !isFrame &&
           parent &&

@@ -180,6 +180,7 @@ function sceneFor(histories: readonly History[]): Phase {
   const entries = histories.map((history) => ({
     login: history.user.login,
     model: planFromHistory(history),
+    history,
     joinedAt: history.user.createdAt,
   }));
   const [first] = entries;

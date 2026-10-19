@@ -32,6 +32,8 @@ export type VersusEntry = {
   model: HistoryPlan;
   /** ISO timestamp the account was created; absent when unknown. */
   joinedAt?: string;
+  /** The full payload (languages, reviews...); absent when only the plan is known. */
+  history?: History | null;
 };
 
 /** Everything a scene may read. Scenes never fetch. */
