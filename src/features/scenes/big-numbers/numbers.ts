@@ -9,8 +9,8 @@ export const BPM = 120;
 export const GRID_SECONDS = 60 / BPM / 4;
 /** Silence before the first number starts counting. */
 const LEAD_SECONDS = 0.5;
-/** Time between one number starting and the next. */
-const STEP_SECONDS = 0.75;
+/** Time between one number starting and the next; counts never overlap. */
+const STEP_SECONDS = 1.5;
 /** Seconds one number takes to count up. */
 export const COUNT_SECONDS = 1.25;
 /** Hold after the last number lands before the scene ends. */
@@ -96,6 +96,37 @@ export function countAt(
   if (reducedMotion || seconds >= number.land) return number.total;
   const linear = (seconds - number.start) / (number.land - number.start);
   return Math.round(number.total * (1 - (1 - linear) ** 4));
+}
+
+export type CountSound = {
+  /** Seconds on the scene clock. */
+  time: number;
+  /** Displayed value as a share of the total, 0..1. */
+  progress: number;
+};
+
+/** Count ticks per number: enough to read as a climb, few enough to stay clean. */
+export const COUNT_TICKS = 10;
+
+/**
+ * The ticks of one count, evenly spaced in time, each carrying the share of
+ * the total the screen shows at that moment (same ease-out as `countAt`).
+ * With reduced motion the number does not count: no ticks.
+ */
+export function countSounds(
+  number: Pick<BigNumber, "start" | "land">,
+  reducedMotion: boolean,
+  steps: number = COUNT_TICKS,
+): CountSound[] {
+  if (reducedMotion || steps <= 0) return [];
+  const span = number.land - number.start;
+  return Array.from({ length: steps }, (_, index) => {
+    const linear = index / steps;
+    return {
+      time: number.start + span * linear,
+      progress: 1 - (1 - linear) ** 4,
+    };
+  });
 }
 
 /** The honest line under the numbers. */

@@ -6,6 +6,7 @@ import { formatCount } from "@/features/sequencer/model/format";
 import { swatchClass } from "@/features/versus/palette";
 import { swatchTextClass } from "@/features/versus/swatchText";
 import { FIXED_LINE } from "@/og/poster";
+import { interaction } from "@/playback/sound/interaction";
 import { actionClass } from "@/ui/classes";
 import { FitText } from "../finale/FitText";
 import {
@@ -224,19 +225,37 @@ export function VersusEndCard({ summaries, poster, onReplay }: Props) {
           <button
             ref={saveRef}
             type="button"
-            onClick={onSave}
+            onClick={() => {
+              interaction.click();
+              onSave();
+            }}
             className={`${ACTION} bg-ink font-bold text-paper`}
           >
             Save image
           </button>
-          <button type="button" onClick={onShare} className={ACTION}>
+          <button
+            type="button"
+            onClick={() => {
+              interaction.click();
+              onShare();
+            }}
+            className={ACTION}
+          >
             Share
           </button>
-          <button type="button" onClick={onReplay} className={ACTION}>
+          <button
+            type="button"
+            onClick={() => {
+              interaction.click();
+              onReplay();
+            }}
+            className={ACTION}
+          >
             Replay
           </button>
           <Link
             href="/"
+            onClick={() => interaction.click()}
             className={`${ACTION} bg-block-signal font-bold text-ink`}
           >
             Search again

@@ -1,6 +1,5 @@
 import { findElement } from "@/features/sequencer/explore";
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { semitonesForDegree } from "@/playback/pitch";
 import {
   activeBlockIndex,
   formatShare,
@@ -10,8 +9,8 @@ import {
 
 /**
  * Wires the mosaic to the sequencer's clock. Each block's rise is a pure
- * function of clock time, written per frame only when it changes; one tick per
- * language (at most six) is scheduled on the Transport. No timers of its own.
+ * function of clock time, written per frame only when it changes; one `stair`
+ * step per block, low to high in order of appearance, is scheduled on the clock. No timers of its own.
  */
 export function mountLanguageMosaic(
   root: HTMLElement,
@@ -26,16 +25,7 @@ export function mountLanguageMosaic(
   const valueText = findElement<HTMLElement>(readout, '[data-role="value"]');
 
   blocks.forEach((block, index) => {
-    const isLast = index === blocks.length - 1;
-    clock.at(block.time, (time) => {
-      const engine = sound();
-      engine?.playTick({
-        time,
-        semitones: semitonesForDegree(block.degree),
-        intensity: 0.4 + 0.6 * block.share,
-      });
-      if (isLast) engine?.playAccent(time);
-    });
+    clock.at(block.time, (time) => sound()?.stair(time, index));
   });
 
   const scales = blocks.map(() => Number.NaN);

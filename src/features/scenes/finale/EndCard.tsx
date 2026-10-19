@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { formatCount } from "@/features/sequencer/model/format";
+import { interaction } from "@/playback/sound/interaction";
 import { actionClass } from "@/ui/classes";
 import { posterFacts, type ShareCard } from "./cards";
 import { FitText } from "./FitText";
@@ -57,6 +58,7 @@ export function EndCard({
   useEffect(() => shareRef.current?.focus(), []);
 
   const onShare = async () => {
+    interaction.click();
     const url = `${window.location.origin}/${encodeURIComponent(login)}`;
     const outcome: ShareOutcome = await shareProfile(
       {
@@ -92,14 +94,29 @@ export function EndCard({
           Share
         </button>
         {versusEnabled && (
-          <Link href={challengeHref(login)} className={actionClass}>
+          <Link
+            href={challengeHref(login)}
+            onClick={() => interaction.click()}
+            className={actionClass}
+          >
             Challenge someone
           </Link>
         )}
-        <button type="button" onClick={onReplay} className={actionClass}>
+        <button
+          type="button"
+          onClick={() => {
+            interaction.click();
+            onReplay();
+          }}
+          className={actionClass}
+        >
           Replay
         </button>
-        <Link href="/" className={`${actionClass} bg-block-signal`}>
+        <Link
+          href="/"
+          onClick={() => interaction.click()}
+          className={`${actionClass} bg-block-signal`}
+        >
           Search again
         </Link>
       </div>
