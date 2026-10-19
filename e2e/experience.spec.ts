@@ -504,7 +504,9 @@ test("contributions not attributed to a day show as a labelled step with an hone
   for (let scene = 0; scene < scenes; scene += 1) {
     await nextButton(page).click();
   }
-  await expect(page.getByText("@ada: 1,000 contributions, 2023")).toBeVisible();
+  await expect(
+    page.getByText("@ada · 1,000 contributions · 2023"),
+  ).toBeVisible();
 });
 
 test("a profile with only private contributions plays the full calendar", async ({
@@ -530,10 +532,9 @@ test("a profile with only private contributions plays the full calendar", async 
 
   const formatted = total.toLocaleString("en-US");
   await expect(
-    page.getByText(`@ada: ${formatted} contributions, 2026`),
-  ).toBeVisible();
-  await expect(
-    page.getByText(`Includes ${formatted} private contributions.`),
+    page.getByText(
+      `@ada · ${formatted} contributions · 2026 · ${formatted} private`,
+    ),
   ).toBeVisible();
   await expect(
     page.getByText(

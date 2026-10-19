@@ -7,24 +7,37 @@ import {
 
 export { FIXED_LINE };
 
-/** "@login: 1,234 contributions, 2019 to 2024". Calendar totals, never commits. */
-export function summaryLine(
+/**
+ * The poster's one label: "@login · 1,234 contributions · 2019–2024 · 56
+ * private". Calendar totals, never commits; the private part only when there is
+ * one.
+ */
+export function posterLabel(
   login: string,
   total: number,
   firstYear: number,
   lastYear: number,
+  privateContributions: number,
 ): string {
   const span =
-    firstYear === lastYear ? `${firstYear}` : `${firstYear} to ${lastYear}`;
-  return `@${login}: ${formatCount(total)} ${contributionsLabel(total)}, ${span}`;
+    firstYear === lastYear ? `${firstYear}` : `${firstYear}–${lastYear}`;
+  const parts = [
+    `@${login}`,
+    `${formatCount(total)} ${contributionsLabel(total)}`,
+    span,
+  ];
+  if (privateContributions > 0) {
+    parts.push(`${formatCount(privateContributions)} private`);
+  }
+  return parts.join(" · ");
 }
 
-/** The honest private share, only when there is one. */
+/** The honest private share, only when there is one. Used by the share cards. */
 export function privateNote(privateContributions: number): string | null {
   return privateLine(privateContributions);
 }
 
-/** Per-year bars for the poster; ratio is relative to the tallest year. */
+/** Per-year bars for the share cards; ratio is relative to the tallest year. */
 export function yearBars(
   firstYear: number,
   lastYear: number,

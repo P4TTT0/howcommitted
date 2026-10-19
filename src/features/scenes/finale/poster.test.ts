@@ -2,34 +2,28 @@ import { describe, expect, it, vi } from "vitest";
 import {
   challengeHref,
   FIXED_LINE,
+  posterLabel,
   privateNote,
   shareMessage,
   shareProfile,
-  summaryLine,
   yearBars,
 } from "./poster";
 
 const data = { title: "t", text: "x", url: "https://e.test/ada" };
 
 describe("poster copy", () => {
-  it("states totals as contributions with the year span", () => {
-    expect(summaryLine("ada", 1234, 2019, 2024)).toBe(
-      "@ada: 1,234 contributions, 2019 to 2024",
+  it("folds totals, span and the private share into one label", () => {
+    expect(posterLabel("ada", 1029, 2022, 2026, 456)).toBe(
+      "@ada · 1,029 contributions · 2022–2026 · 456 private",
     );
-    expect(summaryLine("ada", 1, 2024, 2024)).toBe(
-      "@ada: 1 contribution, 2024",
+    expect(posterLabel("ada", 1, 2024, 2024, 0)).toBe(
+      "@ada · 1 contribution · 2024",
     );
   });
 
-  it("shows the private share only when above zero", () => {
+  it("shows the card private note only when above zero", () => {
     expect(privateNote(0)).toBeNull();
     expect(privateNote(1912)).toBe("Includes 1,912 private contributions.");
-  });
-
-  it("keeps the fixed line verbatim", () => {
-    expect(FIXED_LINE).toBe(
-      "Contributions are not productivity. This is rhythm, not value.",
-    );
   });
 
   it("scales bars to the tallest year and keeps empty years", () => {
@@ -42,6 +36,12 @@ describe("poster copy", () => {
       ]),
     );
     expect(bars.map((b) => b.ratio)).toEqual([0.5, 0, 1]);
+  });
+
+  it("keeps the fixed line verbatim", () => {
+    expect(FIXED_LINE).toBe(
+      "Contributions are not productivity. This is rhythm, not value.",
+    );
   });
 
   it("links the challenge to the landing with the login", () => {

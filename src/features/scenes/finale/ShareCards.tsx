@@ -109,18 +109,15 @@ export function ShareCards({ cards }: ShareCardsProps) {
   return (
     <section
       aria-labelledby="take-it-heading"
-      className="flex min-w-0 flex-col gap-3 lg:w-[26rem] lg:shrink-0 lg:overflow-y-auto"
+      className="flex min-w-0 shrink-0 flex-col gap-3 lg:w-[26rem] lg:overflow-y-auto"
     >
       <h2
         id="take-it-heading"
-        className="font-display text-5xl font-black uppercase leading-[0.9]"
+        className="font-mono text-xs font-bold uppercase [font-stretch:87.5%]"
       >
         Take it with you.
       </h2>
-      <p className="font-mono text-xs leading-[1.6] [font-stretch:87.5%]">
-        Pick a card. It saves as an image, sized for stories.
-      </p>
-      <ul className="grid grid-cols-3 gap-3">
+      <ul className="grid grid-cols-3 gap-3 md:max-w-[22rem] lg:max-w-none">
         {cards.map((item, index) => {
           const isSelected = index === selected;
           return (
