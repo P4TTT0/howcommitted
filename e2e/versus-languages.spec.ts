@@ -60,13 +60,14 @@ async function openLanguages(page: Page, logins: string[]) {
   });
   await page.goto(`/${logins.join("/")}`);
   await play(page).click();
-  await expect(
-    page.getByRole("region", { name: /^When each developer joined/ }),
-  ).toBeVisible();
-  for (let scene = 0; scene < 3; scene += 1) await next(page).click();
+  // Walk forward until the scene shows, so the lineup order can change.
   const region = page.getByRole("region", {
     name: "Favorite languages of each developer",
   });
+  for (let step = 0; step < 10; step += 1) {
+    if (await region.isVisible()) break;
+    await next(page).click();
+  }
   await expect(region).toBeVisible();
   return region;
 }
