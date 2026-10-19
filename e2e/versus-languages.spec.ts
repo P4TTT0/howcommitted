@@ -72,6 +72,17 @@ async function openLanguages(page: Page, logins: string[]) {
   return region;
 }
 
+/** Steps forward and back so the scene reopens finished, in explore. */
+async function toExplore(page: Page) {
+  await expect(next(page)).toBeEnabled();
+  await next(page).click();
+  await page.getByRole("button", { name: "Previous scene" }).click();
+}
+
+/** The slide on screen in the phone carousel. */
+const activeSlide = (page: Page) =>
+  page.locator("[data-carousel-track] > [data-reveal]:not([data-off])");
+
 const LINEUPS = [
   { name: "three developers", logins: ["ada", "lin", "mo"] },
   { name: "five developers", logins: ["ada", "lin", "mo", "jo", "ed"] },
@@ -85,10 +96,8 @@ for (const viewport of VIEWPORTS) {
     }) => {
       await page.setViewportSize(viewport);
       const region = await openLanguages(page, lineup.logins);
-      await expectSceneFits(page, {
-        tapTargets: true,
-        allowScroll: viewport.width < 768,
-      });
+      if (viewport.width < 768) await toExplore(page);
+      await expectSceneFits(page, { tapTargets: true, allowScroll: false });
 
       if (viewport.width >= 768) {
         const boxes = await region
@@ -104,6 +113,23 @@ for (const viewport of VIEWPORTS) {
       }
     });
   }
+}
+
+for (const viewport of VIEWPORTS.filter(({ width }) => width < 768)) {
+  test(`languages carousel at ${viewport.name}: the active card fits and the arrow moves on`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await openLanguages(page, ["ada", "lin", "mo"]);
+    await toExplore(page);
+    await expectSceneFits(page, { tapTargets: true, allowScroll: false });
+    await expect(activeSlide(page)).toHaveCount(1);
+    await page.getByRole("button", { name: "Show @ada" }).click();
+    await expect(activeSlide(page)).toContainText("@ada");
+    await page.getByRole("button", { name: "Show next developer" }).click();
+    await expect(activeSlide(page)).toContainText("@lin");
+    await expectSceneFits(page, { tapTargets: true, allowScroll: false });
+  });
 }
 
 test("a developer without public code gets the same card with an em dash", async ({
