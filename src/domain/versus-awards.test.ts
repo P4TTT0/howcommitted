@@ -159,6 +159,7 @@ describe("buildAwards", () => {
       .map((award) => `${award.title} ${award.metric}`)
       .join(" ");
     expect(copy).not.toMatch(/winner|best|top|leader|most productive|rank/i);
+    for (const award of awards) expect(award.title).not.toMatch(/^most /i);
   });
 
   it("knows how many awards exist", () => {
