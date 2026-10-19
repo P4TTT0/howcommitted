@@ -11,9 +11,6 @@ export const FADE_SECONDS = 0.25;
 const TAIL_SECONDS = 1.6;
 const MIN_SECONDS = 4;
 const TARGET_REVEAL_SECONDS = 5;
-/** One tick per this many week columns: aggregated, never one per day. */
-const WEEKS_PER_TICK = 4;
-const MAX_DEGREE = 10;
 
 /** Week columns per year row: a year touches up to 53 calendar weeks. */
 export const WEEKS = 53;
@@ -141,13 +138,12 @@ export function planRows(
   });
 }
 
-export type Tick = { time: number; degree: number; intensity: number };
-
 export type HeatmapPlan = {
   weeks: number;
   /** Seconds at which each week column starts to appear, by week index. */
   weekTimes: number[];
-  ticks: Tick[];
+  /** Clock time of one pop per drawn week column; empty columns stay silent. */
+  pops: number[];
   duration: number;
 };
 
@@ -162,7 +158,7 @@ export function weeklyTotals(rows: readonly YearRow[]): number[] {
   return totals;
 }
 
-/** Reveal timing: week columns appear left to right; a tick per few weeks. */
+/** Reveal timing: week columns appear left to right; a pop per drawn week. */
 export function planReveal(totals: readonly number[]): HeatmapPlan {
   const weeks = totals.length;
   const step =
@@ -172,28 +168,13 @@ export function planReveal(totals: readonly number[]): HeatmapPlan {
     quantizeUp(LEAD_SECONDS + week * step, GRID_SECONDS),
   );
 
-  const groups = Math.ceil(weeks / WEEKS_PER_TICK);
-  const sums = Array.from({ length: groups }, (_, group) =>
-    totals
-      .slice(group * WEEKS_PER_TICK, (group + 1) * WEEKS_PER_TICK)
-      .reduce((a, b) => a + b, 0),
-  );
-  const peak = Math.max(1, ...sums);
-  const ticks = sums
-    .map((sum, group) => ({
-      sum,
-      time: weekTimes[group * WEEKS_PER_TICK] ?? 0,
-      degree: Math.round((group * MAX_DEGREE) / Math.max(1, groups - 1)),
-      intensity: 0.4 + 0.6 * (sum / peak),
-    }))
-    .filter((tick) => tick.sum > 0)
-    .map(({ time, degree, intensity }) => ({ time, degree, intensity }));
+  const pops = weekTimes.filter((_, week) => (totals[week] ?? 0) > 0);
 
   const lastTime = weekTimes.at(-1) ?? 0;
   return {
     weeks,
     weekTimes,
-    ticks,
+    pops,
     duration: Math.max(MIN_SECONDS, lastTime + FADE_SECONDS + TAIL_SECONDS),
   };
 }
@@ -325,4 +306,9 @@ export function tipDetail(
 ): string {
   if (!cell.from || !cell.to) return String(row.year);
   return `${row.year} · ${shortDay(cell.from)} – ${shortDay(cell.to)}`;
+}
+
+/** A week's 0..1 intensity for the hover pitch (level 0..4 over 4). */
+export function hoverLevel(cell: Pick<WeekCell, "level">): number {
+  return cell.level / 4;
 }

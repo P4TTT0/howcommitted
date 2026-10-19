@@ -1,8 +1,10 @@
 import { daysBetween } from "@/domain/activity";
+import { REVEAL_BPM, revealTime } from "@/features/versus/reveal";
 import {
   privateNoteFor,
   type VersusProfile,
 } from "@/features/versus/versusProfiles";
+import { quantizeUp } from "@/playback/schedule";
 
 /** A stretch of days placed on the shared axis, as percentages of its width. */
 export type Span = {
@@ -173,4 +175,53 @@ export function planStreaks(
     callout,
     privateNote: privateNoteFor(profiles),
   };
+}
+
+export type BlockKind = "streak" | "quiet";
+
+/** One sound of the reveal: a row, or one of its two blocks, appearing. */
+export type StreakPop = {
+  time: number;
+  row: number;
+  kind: "row" | BlockKind;
+};
+
+export const GRID_SECONDS = 60 / REVEAL_BPM / 4;
+
+/**
+ * When each thing appears: the row on its reveal beat, then its quiet block one
+ * grid slot later and its streak block one more, so each block has its own pop
+ * and its own frame on screen. Rows without a block have no pop for it.
+ */
+export function streakPops(plan: Pick<StreaksPlan, "rows">): StreakPop[] {
+  return plan.rows.flatMap((row, position) => {
+    const base = quantizeUp(revealTime(row.index), GRID_SECONDS);
+    const pops: StreakPop[] = [{ time: base, row: position, kind: "row" }];
+    if (row.quiet) {
+      pops.push({ time: base + GRID_SECONDS, row: position, kind: "quiet" });
+    }
+    if (row.streak) {
+      pops.push({
+        time: base + 2 * GRID_SECONDS,
+        row: position,
+        kind: "streak",
+      });
+    }
+    return pops;
+  });
+}
+
+/** Hover pitch of a block: its length against the longest block shown, 0..1. */
+export function spanLevel(
+  plan: Pick<StreaksPlan, "rows">,
+  days: number,
+): number {
+  const longest = Math.max(
+    0,
+    ...plan.rows.flatMap((row) => [
+      row.streak?.days ?? 0,
+      row.quiet?.days ?? 0,
+    ]),
+  );
+  return longest === 0 ? 0 : Math.min(1, days / longest);
 }

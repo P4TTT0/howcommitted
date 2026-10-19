@@ -10,6 +10,7 @@ import {
 } from "react";
 import { type ClockStatus, PlaybackClock } from "@/playback/clock";
 import { SoundEngine } from "@/playback/sound/engine";
+import { interaction } from "@/playback/sound/interaction";
 import { ScenePositionContext } from "@/ui/SceneFrame";
 import { ScreenMain } from "@/ui/ScreenMain";
 import { Controls, type ControlsView, STAGE_BOTTOM_CLASS } from "./Controls";
@@ -94,6 +95,12 @@ export function Sequencer({
   const [speed, setSpeed] = useState<Speed>(1);
   const [failed, setFailed] = useState(false);
   const [stopped, setStopped] = useState(false);
+
+  // The interaction channel follows the Sound button, from mount on.
+  useEffect(() => {
+    interaction.setEnabled(!muted);
+    return () => interaction.setEnabled(false);
+  }, [muted]);
 
   useEffect(() => {
     mountedRef.current = true;

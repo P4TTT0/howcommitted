@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { swatchClass } from "@/features/versus/palette";
+import { interaction } from "@/playback/sound/interaction";
 import { SceneFrame } from "@/ui/SceneFrame";
 import {
   dayCount,
@@ -9,6 +10,7 @@ import {
   type Span,
   type StreakRow,
   type StreaksPlan,
+  spanLevel,
 } from "./plan";
 
 /** Most year labels the axis of a phone holds. */
@@ -127,8 +129,10 @@ function Row({ row, position, picked, dimmed, onPick }: RowProps) {
           <button
             type="button"
             data-streak-button
+            data-block="quiet"
             aria-label={labelOf(row.login, "quiet", row.quiet)}
             onMouseEnter={() => onPick("quiet")}
+            onMouseLeave={() => interaction.leave()}
             onFocus={() => onPick("quiet")}
             onClick={() => onPick("quiet")}
             className={`absolute inset-y-[14%] min-w-2 cursor-pointer border-2 border-dashed border-ink p-0 ${picked === "quiet" ? "bg-ink/10" : "bg-transparent"}`}
@@ -142,8 +146,10 @@ function Row({ row, position, picked, dimmed, onPick }: RowProps) {
           <button
             type="button"
             data-streak-button
+            data-block="streak"
             aria-label={labelOf(row.login, "streak", row.streak)}
             onMouseEnter={() => onPick("streak")}
+            onMouseLeave={() => interaction.leave()}
             onFocus={() => onPick("streak")}
             onClick={() => onPick("streak")}
             className={`absolute inset-y-[6%] min-w-2.5 cursor-pointer border-0 p-0 outline-offset-2 ${swatchClass(row.index)} ${picked === "streak" ? "outline outline-2 outline-ink" : ""}`}
@@ -241,7 +247,16 @@ export function StreaksView({ plan }: { plan: StreaksPlan }) {
                 position={position}
                 picked={pick?.row === position ? pick.kind : null}
                 dimmed={pick !== null && pick.row !== position}
-                onPick={(kind) => setPick({ row: position, kind })}
+                onPick={(kind) => {
+                  setPick({ row: position, kind });
+                  const span = kind === "streak" ? row.streak : row.quiet;
+                  if (span) {
+                    interaction.hover(
+                      spanLevel(plan, span.days),
+                      `${row.login}:${kind}`,
+                    );
+                  }
+                }}
               />
             ))}
           </ul>

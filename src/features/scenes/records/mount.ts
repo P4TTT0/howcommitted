@@ -1,12 +1,11 @@
 import { findElement } from "@/features/sequencer/explore";
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { semitonesForDegree } from "@/playback/pitch";
-import { popAt, type RecordsPlan, stripFillAt } from "./plan";
+import { popAt, type RecordsPlan, stripFillAt, stripPopTimes } from "./plan";
 
 /**
  * Wires the streak strip and the tiles to the sequencer's clock. The strip fill
- * and each tile's pop are pure functions of clock time; one chip lands with
- * each tile. No timers of its own.
+ * and each tile's pop are pure functions of clock time; a pop sounds per
+ * streak block as the strip draws and a stair step per tile. No timers of its own.
  */
 export function mountRecords(
   root: HTMLElement,
@@ -20,24 +19,11 @@ export function mountRecords(
     findElement<HTMLElement>(root, `[data-tile="${index}"]`),
   );
 
-  clock.at(plan.stripStart, (time) => {
-    sound()?.playTick({
-      time,
-      semitones: semitonesForDegree(0),
-      intensity: 0.7,
-    });
-  });
+  for (const time of stripPopTimes(plan)) {
+    clock.at(time, (at) => sound()?.pop(at));
+  }
   plan.tiles.forEach((tile, index) => {
-    const isLast = index === plan.tiles.length - 1;
-    clock.at(tile.start, (time) => {
-      const engine = sound();
-      engine?.playTick({
-        time,
-        semitones: semitonesForDegree(tile.degree),
-        intensity: 0.7,
-      });
-      if (isLast) engine?.playAccent(time);
-    });
+    clock.at(tile.start, (at) => sound()?.stair(at, index));
   });
 
   let shownFill = Number.NaN;

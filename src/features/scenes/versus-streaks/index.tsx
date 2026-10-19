@@ -1,10 +1,7 @@
 import type { SceneDefinition } from "@/features/sequencer/types";
-import {
-  mountReveal,
-  REVEAL_BPM,
-  REVEAL_SECONDS,
-} from "@/features/versus/reveal";
+import { REVEAL_BPM, REVEAL_SECONDS } from "@/features/versus/reveal";
 import { versusProfiles } from "@/features/versus/versusProfiles";
+import { mountStreaks } from "./mount";
 import { planStreaks } from "./plan";
 import { StreaksView } from "./StreaksView";
 
@@ -24,7 +21,7 @@ export const versusStreaksScene: SceneDefinition = {
       duration: REVEAL_SECONDS,
       bpm: REVEAL_BPM,
       view: <StreaksView plan={plan} />,
-      mount: (root, runtime) => mountReveal(root, runtime),
+      mount: (root, runtime) => mountStreaks(root, plan, runtime),
     };
   },
 };

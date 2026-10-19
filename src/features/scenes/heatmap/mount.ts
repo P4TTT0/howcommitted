@@ -1,10 +1,9 @@
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { semitonesForDegree } from "@/playback/pitch";
 import { type HeatmapPlan, weekProgress } from "./plan";
 
 /**
  * Wires the reveal to the sequencer's clock. Each week column's opacity is a
- * pure function of clock time; sound is one tick per few weeks, on the grid.
+ * pure function of clock time; sound is one pop per drawn week, on the grid.
  */
 export function mountHeatmap(
   root: HTMLElement,
@@ -16,18 +15,9 @@ export function mountHeatmap(
     columns[Number(element.dataset.week)]?.push(element);
   }
 
-  plan.ticks.forEach((tick, index) => {
-    const isLast = index === plan.ticks.length - 1;
-    clock.at(tick.time, (time) => {
-      const engine = sound();
-      engine?.playTick({
-        time,
-        semitones: semitonesForDegree(tick.degree),
-        intensity: tick.intensity,
-      });
-      if (isLast) engine?.playAccent(time);
-    });
-  });
+  for (const time of plan.pops) {
+    clock.at(time, (at) => sound()?.pop(at));
+  }
 
   const shown = plan.weekTimes.map(() => Number.NaN);
   const render = (seconds: number) => {

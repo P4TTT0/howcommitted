@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { HeatmapCell } from "@/domain/heatmap";
 import {
+  hoverLevel,
   planReveal,
   planRows,
   positionAfterKey,
@@ -108,16 +109,14 @@ describe("planReveal", () => {
     expect(plan.duration).toBeGreaterThan(plan.weekTimes.at(-1) ?? 0);
   });
 
-  it("aggregates sound: far fewer ticks than weeks", () => {
-    expect(plan.ticks.length).toBeLessThanOrEqual(14);
-    for (const tick of plan.ticks) {
-      expect(tick.intensity).toBeGreaterThan(0.4);
-      expect(tick.intensity).toBeLessThanOrEqual(1);
-    }
+  it("pops once per drawn week, on the reveal times", () => {
+    const drawn = totals.filter((total) => total > 0).length;
+    expect(plan.pops).toHaveLength(drawn);
+    for (const time of plan.pops) expect(plan.weekTimes).toContain(time);
   });
 
   it("stays silent without contributions", () => {
-    expect(planReveal(new Array<number>(WEEKS).fill(0)).ticks).toEqual([]);
+    expect(planReveal(new Array<number>(WEEKS).fill(0)).pops).toEqual([]);
   });
 
   it("sums every year into each week column", () => {
@@ -225,5 +224,13 @@ describe("tooltip text", () => {
 describe("tint", () => {
   it("turns a hex color into rgb with an alpha", () => {
     expect(tint("#1F3BFF", 0.55)).toBe("rgb(31 59 255 / 0.55)");
+  });
+});
+
+describe("hoverLevel", () => {
+  it("maps the cell level 0..4 onto 0..1", () => {
+    expect(hoverLevel({ level: 0 })).toBe(0);
+    expect(hoverLevel({ level: 2 })).toBe(0.5);
+    expect(hoverLevel({ level: 4 })).toBe(1);
   });
 });

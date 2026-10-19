@@ -8,6 +8,7 @@ import {
   sharedStats,
 } from "@/domain/shared-days";
 import type { VersusEntry } from "@/features/sequencer/types";
+import { quantizeUp } from "@/playback/schedule";
 
 /**
  * The shared days model: one calendar year at a time, every day split between
@@ -32,6 +33,7 @@ export const GRID_DESCRIPTION =
   "Each square is a day. It splits into the color of every developer who contributed that day.";
 
 export const BPM = 140;
+export const GRID_SECONDS = 60 / BPM / 4;
 
 export const MONTH_NAMES = [
   "Jan",
@@ -194,4 +196,21 @@ export function buildSharedDays(
 /** Which of `groups` equal groups are revealed at a progress (0..1). */
 export function groupsShown(progress: number, groups: number): number {
   return Math.min(groups, Math.max(0, Math.ceil(progress * groups - 1e-9)));
+}
+
+/**
+ * Clock times of one pop per group (a week column or a month block) as the
+ * grid draws, quantized up to the grid. Group `g` shows once the progress
+ * passes `g / groups`, the same rule as `groupsShown`.
+ */
+export function groupPopTimes(groups: number): number[] {
+  const times = Array.from({ length: groups }, (_, group) =>
+    quantizeUp((group / groups) * REVEAL_SECONDS, GRID_SECONDS),
+  );
+  return [...new Set(times)];
+}
+
+/** Share of the developers present on a day, 0..1: the hover pitch. */
+export function presenceLevel(day: Pick<SharedDay, "people">, people: number) {
+  return people <= 0 ? 0 : Math.min(1, day.people.length / people);
 }
