@@ -99,14 +99,14 @@ test("the sound toggle starts off, flips on click and survives a reload", async 
   await page.goto("/");
   const toggle = page
     .getByRole("navigation", { name: "About" })
-    .getByRole("button", { name: /^Sound/ });
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await expect(toggle).toHaveText("Sound off");
+    .getByRole("switch", { name: "Sound" });
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await expect(toggle).toHaveText("SoundOff");
   await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
-  await expect(toggle).toHaveText("Sound on");
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await expect(toggle).toHaveText("SoundOn");
   await page.reload();
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
 });
 
 test("the placeholder types example usernames", async ({ page }) => {
