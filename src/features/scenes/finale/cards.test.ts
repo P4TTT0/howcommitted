@@ -7,7 +7,7 @@ import {
   makeYear,
   steadyDays,
 } from "@/test-support/historyFixture";
-import { buildShareCards, CARD_SIZE } from "./cards";
+import { buildShareCards, CARD_SIZE, posterFacts } from "./cards";
 import { FIXED_LINE } from "./poster";
 
 function dataFor(overrides: Partial<History> = {}, withRepo = true) {
@@ -28,6 +28,28 @@ function dataFor(overrides: Partial<History> = {}, withRepo = true) {
   };
   return { login: "ada", model: planFromHistory(history), history };
 }
+
+describe("posterFacts", () => {
+  it("states the facts from the card data, in order", () => {
+    const labels = posterFacts(buildShareCards(dataFor())).map(
+      (fact) => fact.label,
+    );
+    expect(labels).toEqual([
+      "Longest streak",
+      "Rhythm",
+      "Kept coming back to",
+      "Built with",
+    ]);
+  });
+
+  it("leaves out a fact whose data is missing", () => {
+    const labels = posterFacts(buildShareCards(dataFor({}, false))).map(
+      (fact) => fact.label,
+    );
+    expect(labels).not.toContain("Kept coming back to");
+    expect(labels).toContain("Built with");
+  });
+});
 
 describe("buildShareCards", () => {
   it("builds the poster, rhythm and eras cards from a full history", () => {

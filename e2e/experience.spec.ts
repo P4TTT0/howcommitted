@@ -32,9 +32,6 @@ const okReply: Reply = {
   body: { source: "cache", reposTruncated: false, history },
 };
 
-/** Total as the end card prints it, derived from the fixture. */
-const TOTAL = history.totalContributions.toLocaleString("en-US");
-
 /** Mocks the two API routes; `ghost` does not exist, everything else is `ada`. */
 async function mockApi(
   page: Page,
@@ -311,11 +308,7 @@ test("going past the last scene shows the total and the principle", async ({
       "Contributions are not productivity. This is rhythm, not value.",
     ),
   ).toBeVisible();
-  await expect(
-    page.getByText(
-      new RegExp(`^@ada · ${TOTAL} contributions · 2022–2024( · .+ private)?$`),
-    ),
-  ).toBeVisible();
+  await expect(page.getByText(/^@ada · 2022 — 2024$/)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Replay" }).first(),
   ).toBeVisible();
@@ -506,9 +499,7 @@ test("contributions not attributed to a day show as a labelled step with an hone
   for (let scene = 0; scene < scenes; scene += 1) {
     await nextButton(page).click();
   }
-  await expect(
-    page.getByText("@ada · 1,000 contributions · 2023"),
-  ).toBeVisible();
+  await expect(page.getByText("@ada · 2023")).toBeVisible();
 });
 
 test("a profile with only private contributions plays the full calendar", async ({
@@ -533,11 +524,7 @@ test("a profile with only private contributions plays the full calendar", async 
   await skipAllScenes(page);
 
   const formatted = total.toLocaleString("en-US");
-  await expect(
-    page.getByText(
-      `@ada · ${formatted} contributions · 2026 · ${formatted} private`,
-    ),
-  ).toBeVisible();
+  await expect(page.getByText(`Includes ${formatted} private`)).toBeVisible();
   await expect(
     page.getByText(
       "Contributions are not productivity. This is rhythm, not value.",

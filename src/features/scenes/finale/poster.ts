@@ -1,35 +1,23 @@
-import {
-  contributionsLabel,
-  FIXED_LINE,
-  formatCount,
-  privateLine,
-} from "@/og/poster";
+import { FIXED_LINE, formatCount, privateLine } from "@/og/poster";
 
 export { FIXED_LINE };
 
-/**
- * The poster's one label: "@login · 1,234 contributions · 2019–2024 · 56
- * private". Calendar totals, never commits; the private part only when there is
- * one.
- */
-export function posterLabel(
+/** The top-left line of the poster block: "@login · 2019 — 2024". */
+export function posterTopLine(
   login: string,
-  total: number,
   firstYear: number,
   lastYear: number,
-  privateContributions: number,
 ): string {
   const span =
-    firstYear === lastYear ? `${firstYear}` : `${firstYear}–${lastYear}`;
-  const parts = [
-    `@${login}`,
-    `${formatCount(total)} ${contributionsLabel(total)}`,
-    span,
-  ];
-  if (privateContributions > 0) {
-    parts.push(`${formatCount(privateContributions)} private`);
-  }
-  return parts.join(" · ");
+    firstYear === lastYear ? `${firstYear}` : `${firstYear} — ${lastYear}`;
+  return `@${login} · ${span}`;
+}
+
+/** The top-right line: "Includes 456 private", or null when there is none. */
+export function privateTag(privateContributions: number): string | null {
+  return privateContributions > 0
+    ? `Includes ${formatCount(privateContributions)} private`
+    : null;
 }
 
 /** The honest private share, only when there is one. Used by the share cards. */

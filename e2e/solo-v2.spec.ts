@@ -94,7 +94,7 @@ const STRESS: { name: string; profile: Profile }[] = [
       official: 87_654_321,
       repos: [
         {
-          repo: "ada/an-extremely-long-repository-name-that-never-seems-to-end",
+          repo: `ada/portfolio-${"x".repeat(91)}`,
           commits: 4_000_000,
           days: 900,
         },
@@ -175,11 +175,11 @@ async function openFinale(page: Page) {
 
 /** The Save button once the chosen card's image is ready; says why when not. */
 async function readySave(page: Page) {
-  const save = page.getByRole("button", { name: "Save image" });
+  const save = page.getByRole("button", { name: /^Save .+ image$/ });
   const status = page.getByRole("status").filter({ hasText: /./ });
   await expect(
     save,
-    `Save image never became ready. Status line: "${(await status.allTextContents()).join(" / ")}"`,
+    `Save never became ready. Status line: "${(await status.allTextContents()).join(" / ")}"`,
   ).toBeEnabled({ timeout: 10_000 });
   return save;
 }
@@ -202,7 +202,11 @@ async function checkFinale(page: Page, profile: Profile) {
   await openFinale(page);
   await expect(page.getByRole("button", { name: "Poster card" })).toBeVisible();
   await readySave(page);
-  await expectSceneFits(page, { tapTargets: true });
+  // From tablet up the whole poster shows at once; phones may scroll.
+  await expectSceneFits(page, {
+    tapTargets: true,
+    allowScroll: (page.viewportSize()?.width ?? 0) < 768,
+  });
 }
 
 for (const viewport of VIEWPORTS) {

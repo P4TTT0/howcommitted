@@ -243,6 +243,32 @@ export function buildShareCards(data: SceneData): ShareCard[] {
   ].filter((card): card is ShareCard => card !== null);
 }
 
+/**
+ * The facts on the poster block, from the same data the cards use. A fact whose
+ * data is missing is left out, never filled in.
+ */
+export function posterFacts(cards: readonly ShareCard[]): CardFact[] {
+  const poster = cards.find((card) => card.kind === "poster");
+  const rhythm = cards.find((card) => card.kind === "rhythm");
+  const eras = cards.find((card) => card.kind === "eras");
+  const pick = (label: string) =>
+    poster?.kind === "poster"
+      ? poster.facts.find((fact) => fact.label === label)
+      : undefined;
+
+  const facts: (CardFact | undefined)[] = [
+    pick("Longest streak"),
+    rhythm?.kind === "rhythm"
+      ? { label: "Rhythm", value: rhythm.archetype }
+      : undefined,
+    eras?.kind === "eras"
+      ? { label: "Kept coming back to", value: eras.repo }
+      : undefined,
+    pick("Built with"),
+  ];
+  return facts.filter((fact): fact is CardFact => fact !== undefined);
+}
+
 const built = new WeakMap<object, ShareCard[]>();
 
 /**
