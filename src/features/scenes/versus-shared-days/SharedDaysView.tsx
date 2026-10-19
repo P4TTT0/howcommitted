@@ -4,6 +4,7 @@ import { focusRing, labelClass, pressable } from "@/ui/classes";
 import { SceneFrame } from "@/ui/SceneFrame";
 import {
   everyoneLabel,
+  GRID_DESCRIPTION,
   MONTH_BLOCK,
   MONTH_NAMES,
   type SharedDaysModel,
@@ -53,7 +54,7 @@ function Slot({
 }
 
 function stepClass(): string {
-  return `inline-flex min-h-11 min-w-11 items-center justify-center border-2 border-ink px-3 text-xs font-bold ${MONO} disabled:cursor-default data-[selected=true]:bg-ink data-[selected=true]:text-paper ${pressable} ${focusRing}`;
+  return `inline-flex size-11 shrink-0 items-center justify-center border-2 border-ink text-base font-bold ${MONO} disabled:cursor-default disabled:opacity-40 ${pressable} ${focusRing}`;
 }
 
 type SharedDaysViewProps = { model: SharedDaysModel };
@@ -64,13 +65,13 @@ type SharedDaysViewProps = { model: SharedDaysModel };
  * how many underneath. Wide screens show a strip of weeks; phones show one
  * small calendar per month so the splits stay readable. The static markup is
  * the finished state of the latest shared year; `mount.ts` reveals it and
- * `explore.ts` lets the viewer pick a year and a day. Calendar contributions
+ * `explore.ts` lets the viewer step through years and read a day in a tooltip. Calendar contributions
  * of every type, never commits.
  */
 export function SharedDaysView({ model }: SharedDaysViewProps) {
   const year = model.yearData(model.defaultYear);
   const people = model.logins.length;
-  const label = `Days with a contribution in ${year.year}, split by developer: ${model.logins
+  const label = `${GRID_DESCRIPTION} Days with a contribution in ${year.year}: ${model.logins
     .map(
       (login, person) =>
         `@${login} ${formatCount(year.stats.perPerson[person] ?? 0)}`,
@@ -84,87 +85,67 @@ export function SharedDaysView({ model }: SharedDaysViewProps) {
       <SceneFrame
         sceneLabel="Shared days"
         title="Who showed up, when."
-        note="Each square is a day. It splits into the color of every developer who contributed that day."
+        aside={
+          <div className="flex min-w-0 max-w-full flex-col gap-3.5 md:max-w-[38%] md:items-end">
+            <ul className="flex min-w-0 max-w-full flex-wrap gap-x-4 gap-y-1 md:justify-end">
+              {model.logins.map((login, person) => (
+                <li
+                  key={login.toLowerCase()}
+                  className={`flex min-w-0 max-w-full items-center gap-2 text-xs ${MONO}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`size-3.5 shrink-0 ${swatchClass(person)}`}
+                  />
+                  <span className="min-w-0 truncate font-bold">@{login}</span>
+                  <span className="shrink-0 tabular-nums opacity-60">
+                    <span data-role="legend-days" data-person={person}>
+                      {formatCount(year.stats.perPerson[person] ?? 0)}
+                    </span>
+                    d
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div
+              role="toolbar"
+              aria-label="Choose the year"
+              data-role="year-step"
+              className="flex items-center gap-1.5"
+            >
+              <button
+                type="button"
+                disabled
+                data-step="-1"
+                aria-label="Earlier year"
+                className={stepClass()}
+              >
+                ←
+              </button>
+              <p
+                data-role="year-current"
+                className="min-w-[104px] text-center font-display text-[44px] font-black leading-none tabular-nums"
+              >
+                {year.year}
+              </p>
+              <button
+                type="button"
+                disabled
+                data-step="1"
+                aria-label="Later year"
+                className={stepClass()}
+              >
+                →
+              </button>
+            </div>
+          </div>
+        }
       >
         <section
           aria-label={`Shared days, ${model.years[0]} to ${model.years.at(-1)}`}
-          className="absolute inset-0 flex flex-col gap-3 overflow-x-hidden overflow-y-auto md:gap-4"
+          className="absolute inset-0 flex flex-col justify-between gap-4 overflow-x-hidden overflow-y-auto md:overflow-y-hidden"
         >
-          <ul className="flex flex-wrap gap-2">
-            {model.logins.map((login, person) => (
-              <li
-                key={login.toLowerCase()}
-                className={`flex min-h-9 max-w-full items-center gap-2 rounded-full border-2 border-ink px-3 text-xs ${MONO}`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`size-3 shrink-0 rounded-full ${swatchClass(person)}`}
-                />
-                <span className="min-w-0 truncate font-bold">@{login}</span>
-                <span className="shrink-0 tabular-nums">
-                  <span data-role="legend-days" data-person={person}>
-                    {formatCount(year.stats.perPerson[person] ?? 0)}
-                  </span>{" "}
-                  days
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          {/* The year: chips from md up, a stepper on a phone. */}
-          <div
-            role="toolbar"
-            aria-label="Choose the year"
-            data-role="years"
-            className="hidden flex-wrap gap-1.5 md:flex"
-          >
-            {model.years.map((value) => (
-              <button
-                key={value}
-                type="button"
-                disabled
-                data-year={value}
-                data-selected={value === year.year}
-                aria-pressed={value === year.year}
-                className={stepClass()}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
-          <div
-            role="toolbar"
-            aria-label="Choose the year"
-            data-role="year-step"
-            className="flex items-center justify-between gap-2 md:hidden"
-          >
-            <button
-              type="button"
-              disabled
-              data-step="-1"
-              aria-label="Earlier year"
-              className={stepClass()}
-            >
-              ←
-            </button>
-            <p
-              data-role="year-current"
-              className="font-display text-4xl font-black leading-none tabular-nums"
-            >
-              {year.year}
-            </p>
-            <button
-              type="button"
-              disabled
-              data-step="1"
-              aria-label="Later year"
-              className={stepClass()}
-            >
-              →
-            </button>
-          </div>
-
-          <div className="shrink-0">
+          <div className="relative shrink-0">
             {/* Wide: the year as a strip of weeks, Monday on top. */}
             <div className="hidden md:block">
               <div
@@ -244,47 +225,51 @@ export function SharedDaysView({ model }: SharedDaysViewProps) {
                 </div>
               ))}
             </div>
+
+            <div
+              hidden
+              role="tooltip"
+              data-role="tip"
+              className="pointer-events-none absolute left-0 top-0 z-20 w-max max-w-full bg-ink px-3.5 py-2.5 text-paper"
+            >
+              <p
+                data-role="tip-title"
+                className="font-display text-2xl font-black uppercase leading-none"
+              />
+              <ul
+                data-role="tip-who"
+                className={`mt-1.5 flex flex-wrap gap-x-2.5 gap-y-1 text-[11px] [overflow-wrap:anywhere] ${MONO}`}
+              />
+              <span
+                aria-hidden="true"
+                data-role="tip-arrow"
+                className="absolute size-3 rotate-45 bg-ink"
+              />
+            </div>
           </div>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-4">
-            <div
-              aria-live="polite"
-              className="bg-ink px-[18px] py-3.5 text-paper lg:min-w-[300px] lg:flex-none"
-            >
-              <p
-                data-role="readout-title"
-                className="font-display text-[30px] font-black uppercase leading-none"
-              >
-                {year.year}
-              </p>
-              <p
-                data-role="readout-detail"
-                className={`mt-1 text-xs [overflow-wrap:anywhere] ${MONO}`}
-              >
-                Select a day to see who showed up.
-              </p>
-            </div>
-            <dl
-              data-role="stats"
-              className="grid grid-cols-3 gap-2 md:gap-4 lg:flex-1"
-            >
-              <Stat
-                name="everyone"
-                label={everyoneLabel(people)}
-                value={year.stats.everyone}
-              />
-              <Stat
-                name="anyone"
-                label={people === 2 ? "At least one of you" : "At least one"}
-                value={year.stats.anyone}
-              />
-              <Stat
-                name="run"
-                label="Longest run together"
-                value={year.stats.longestRun}
-              />
-            </dl>
-          </div>
+          <dl
+            data-role="stats"
+            className="grid shrink-0 grid-cols-3 gap-2 md:gap-4"
+          >
+            <Stat
+              name="everyone"
+              label={everyoneLabel(people)}
+              value={year.stats.everyone}
+              filled
+            />
+            <Stat
+              name="anyone"
+              label={people === 2 ? "At least one of you" : "At least one"}
+              value={year.stats.anyone}
+            />
+            <Stat
+              name="run"
+              label="Longest run together"
+              value={year.stats.longestRun}
+              unit="d"
+            />
+          </dl>
         </section>
       </SceneFrame>
     </div>
@@ -295,26 +280,28 @@ function Stat({
   name,
   label,
   value,
+  unit,
+  filled = false,
 }: {
   name: string;
   label: string;
   value: number;
+  unit?: string;
+  filled?: boolean;
 }) {
   return (
-    <div className="min-w-0 border-2 border-ink px-2.5 py-2 md:px-4 md:py-3">
+    <div
+      className={`flex min-w-0 flex-col gap-1 border-2 border-ink px-2.5 py-2 lg:flex-row lg:items-baseline lg:justify-between lg:gap-4 lg:px-[18px] lg:py-3 ${filled ? "bg-ink text-paper" : ""}`}
+    >
       <dt
         data-stat-label={name}
-        className={`${labelClass} text-[11px] leading-tight`}
+        className={`${labelClass} min-w-0 text-[11px] leading-tight`}
       >
         {label}
       </dt>
-      <dd className="font-display text-[28px] font-black leading-none tabular-nums md:text-5xl">
+      <dd className="font-display text-[28px] font-black leading-[1.2] tabular-nums lg:text-5xl">
         <span data-stat={name}>{formatCount(value)}</span>
-        <span
-          className={`ml-1 text-[11px] font-normal uppercase ${MONO} md:text-xs`}
-        >
-          days
-        </span>
+        {unit}
       </dd>
     </div>
   );

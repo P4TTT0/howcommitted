@@ -13,9 +13,20 @@ export type Span = {
   width: number;
 };
 
+/** One calendar month of a developer's activity, on the shared axis. */
+export type MonthBar = {
+  month: string;
+  left: number;
+  width: number;
+  /** Share of this developer's busiest month, 0 to 1 (never 0 when drawn). */
+  level: number;
+};
+
 export type StreakRow = {
   login: string;
   index: number;
+  /** Months with any activity, scaled to this developer's own busiest month. */
+  months: MonthBar[];
   streak: Span | null;
   quiet: Span | null;
 };
@@ -55,6 +66,46 @@ export function rangeText(start: string, end: string): string {
   return `${dayYearFormat.format(at(start))} to ${dayYearFormat.format(at(end))}`;
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Faintest bar drawn for a month that had any activity. */
+const MIN_LEVEL = 0.08;
+
+/** Activity per calendar month, normalized per person and placed on the axis. */
+function monthBars(
+  days: readonly { date: string; count: number }[],
+  from: string,
+  to: string,
+  length: number,
+): MonthBar[] {
+  const totals = new Map<string, number>();
+  for (const day of days) {
+    const key = day.date.slice(0, 7);
+    totals.set(key, (totals.get(key) ?? 0) + day.count);
+  }
+  const busiest = Math.max(0, ...totals.values());
+  if (busiest === 0) return [];
+  const bars: MonthBar[] = [];
+  for (const [month, total] of [...totals].sort(([a], [b]) =>
+    a < b ? -1 : 1,
+  )) {
+    const year = Number(month.slice(0, 4));
+    const index = Number(month.slice(5, 7));
+    const lastDay = new Date(Date.UTC(year, index, 0)).getUTCDate();
+    const first = `${month}-01` < from ? from : `${month}-01`;
+    const endOfMonth = `${month}-${pad(lastDay)}`;
+    const last = endOfMonth > to ? to : endOfMonth;
+    if (last < first) continue;
+    bars.push({
+      month,
+      left: (daysBetween(from, first) / length) * 100,
+      width: ((daysBetween(first, last) + 1) / length) * 100,
+      level: Math.max(MIN_LEVEL, total / busiest),
+    });
+  }
+  return bars;
+}
+
 export function dayCount(n: number): string {
   return `${n.toLocaleString("en-US")} ${n === 1 ? "day" : "days"}`;
 }
@@ -87,6 +138,7 @@ export function planStreaks(
     return {
       login: profile.login,
       index: profile.index,
+      months: monthBars(profile.days, from, to, length),
       streak:
         longestStreak.length > 0 && longestStreak.start && longestStreak.end
           ? place(longestStreak.length, longestStreak.start, longestStreak.end)

@@ -1,4 +1,5 @@
 import { findElement } from "@/features/sequencer/explore";
+import { swatchClass } from "@/features/versus/palette";
 import {
   daySlots,
   findYearElements,
@@ -9,6 +10,7 @@ import {
 import {
   dateTitle,
   dayDetail,
+  GRID_DESCRIPTION,
   type SharedDaysModel,
   type YearData,
 } from "./plan";
@@ -16,13 +18,18 @@ import {
 const DEFAULT_DETAIL = "Select a day to see who showed up.";
 /** Page Up/Down move about a month. */
 const BIG_STEP_DAYS = 30;
+/** Gap between a day and its tooltip, which includes the arrow. */
+const TIP_GAP = 10;
+const TIP_EDGE = 6;
+const EMPTY_SWATCH = "bg-[#E4E1D8]";
 
 /**
- * Explore phase: the year buttons come alive (chips on wide screens, a
- * stepper on phones) and so does the grid. Press, drag or hover a square, or
- * focus the grid and use the arrows (Left/Right a day, Up/Down a week, Page
- * Up/Down about a month, Home/End the ends), to read who contributed that
- * day in the black box. Instant DOM updates: no timers, no sound, no clock of
+ * Explore phase: the year stepper comes alive and so does the grid. Hover,
+ * press or drag over a square (a tap on touch), or focus the grid and use the
+ * arrows (Left/Right a day, Up/Down a week, Page Up/Down about a month,
+ * Home/End the ends), to read who contributed that day in a black tooltip with
+ * an arrow. The tooltip is clamped inside the grid and flips below a day near
+ * the top of the scene. Instant DOM updates: no timers, no sound, no clock of
  * its own. The arrows stay with the grid while it is focused. The cleanup puts
  * the opening year back and the controls to sleep.
  */
@@ -31,12 +38,14 @@ export function exploreSharedDays(
   model: SharedDaysModel,
 ): () => void {
   const elements = findYearElements(root, model);
-  const chips = findElement<HTMLElement>(root, '[data-role="years"]');
   const stepper = findElement<HTMLElement>(root, '[data-role="year-step"]');
-  const chipButtons = [...chips.querySelectorAll<HTMLButtonElement>("button")];
   const stepButtons = [
     ...stepper.querySelectorAll<HTMLButtonElement>("button"),
   ];
+  const tip = findElement<HTMLElement>(root, '[data-role="tip"]');
+  const tipTitle = findElement<HTMLElement>(root, '[data-role="tip-title"]');
+  const tipWho = findElement<HTMLElement>(root, '[data-role="tip-who"]');
+  const tipArrow = findElement<HTMLElement>(root, '[data-role="tip-arrow"]');
   const people = model.logins.length;
 
   let year: YearData = model.yearData(model.defaultYear);
@@ -65,9 +74,58 @@ export function exploreSharedDays(
     }
   };
 
+  /** The grid the viewer is on: the one that is on screen. */
+  const visibleGrid = () =>
+    elements.grids.find((grid) => grid.container.offsetParent !== null);
+
+  const hideTip = () => {
+    tip.hidden = true;
+  };
+
+  const placeTip = () => {
+    const grid = visibleGrid();
+    const picked = day === null ? undefined : year.days[day];
+    const slot =
+      grid && day !== null ? grid.slots[slotOfDay(grid, year, day)] : undefined;
+    if (!grid || !picked || !slot) {
+      hideTip();
+      return;
+    }
+    tipTitle.textContent = readTitle();
+    tipWho.replaceChildren(
+      ...(picked.people.length === 0
+        ? [tipRow("Nobody that day", EMPTY_SWATCH)]
+        : picked.people.map((person) =>
+            tipRow(`@${model.logins[person]}`, swatchClass(person)),
+          )),
+    );
+    tip.hidden = false;
+
+    const host = tip.offsetParent as HTMLElement | null;
+    if (!host) return;
+    const hostBox = host.getBoundingClientRect();
+    const slotBox = slot.getBoundingClientRect();
+    const width = tip.offsetWidth;
+    const height = tip.offsetHeight;
+    const center = slotBox.left + slotBox.width / 2 - hostBox.left;
+    const left = Math.min(
+      Math.max(center - width / 2, 0),
+      hostBox.width - width,
+    );
+    const rootTop = root.getBoundingClientRect().top;
+    const above = slotBox.top - height - TIP_GAP >= rootTop + TIP_EDGE;
+    const top = above
+      ? slotBox.top - hostBox.top - height - TIP_GAP
+      : slotBox.bottom - hostBox.top + TIP_GAP;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+    const arrow = Math.min(Math.max(center - left, 14), width - 14);
+    tipArrow.style.left = `${arrow - 6}px`;
+    tipArrow.style.top = above ? "" : "-6px";
+    tipArrow.style.bottom = above ? "-6px" : "";
+  };
+
   const showDay = () => {
-    elements.title.textContent = readTitle();
-    elements.detail.textContent = readDetail();
     for (const grid of elements.grids) {
       for (const slot of grid.slots) slot.removeAttribute("data-selected");
       if (day === null) continue;
@@ -75,17 +133,13 @@ export function exploreSharedDays(
       if (slot) slot.dataset.selected = "true";
     }
     updateAria();
+    placeTip();
   };
 
   const showYear = (value: number) => {
     year = model.yearData(value);
     day = null;
     paintYear(elements, year, people);
-    for (const button of chipButtons) {
-      const selected = Number(button.dataset.year) === value;
-      button.dataset.selected = String(selected);
-      button.setAttribute("aria-pressed", String(selected));
-    }
     const at = model.years.indexOf(value);
     stepButtons.forEach((button) => {
       const direction = Number(button.dataset.step);
@@ -128,6 +182,9 @@ export function exploreSharedDays(
       const picked = dayAt(grid, event.clientX, event.clientY);
       if (picked !== null) select(picked);
     };
+    const onLeave = (event: PointerEvent) => {
+      if (event.pointerType === "mouse") select(null);
+    };
     const onKeyDown = (event: KeyboardEvent) => {
       const last = year.days.length - 1;
       const base = day ?? 0;
@@ -168,13 +225,16 @@ export function exploreSharedDays(
     container.setAttribute("aria-label", "Days of the year, who contributed");
     container.setAttribute("aria-orientation", "horizontal");
     container.setAttribute("aria-valuemin", "0");
+    container.setAttribute("aria-description", GRID_DESCRIPTION);
     container.tabIndex = 0;
     container.addEventListener("pointerdown", onPointer);
     container.addEventListener("pointermove", onPointer);
+    container.addEventListener("pointerleave", onLeave);
     container.addEventListener("keydown", onKeyDown);
     cleanups.push(() => {
       container.removeEventListener("pointerdown", onPointer);
       container.removeEventListener("pointermove", onPointer);
+      container.removeEventListener("pointerleave", onLeave);
       container.removeEventListener("keydown", onKeyDown);
       container.setAttribute("role", "img");
       if (originalLabel) container.setAttribute("aria-label", originalLabel);
@@ -184,6 +244,7 @@ export function exploreSharedDays(
         "aria-valuemax",
         "aria-valuenow",
         "aria-valuetext",
+        "aria-description",
       ]) {
         container.removeAttribute(name);
       }
@@ -191,31 +252,6 @@ export function exploreSharedDays(
     });
   }
 
-  const onChipClick = (event: MouseEvent) => {
-    const button = (event.target as Element).closest<HTMLButtonElement>(
-      "button[data-year]",
-    );
-    if (button) showYear(Number(button.dataset.year));
-  };
-  const onChipKeyDown = (event: KeyboardEvent) => {
-    const at = chipButtons.indexOf(document.activeElement as HTMLButtonElement);
-    if (at < 0) return;
-    const keys: Record<string, number> = {
-      ArrowLeft: at - 1,
-      ArrowRight: at + 1,
-      Home: 0,
-      End: chipButtons.length - 1,
-    };
-    const target = keys[event.key];
-    if (target === undefined) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const button =
-      chipButtons[Math.min(chipButtons.length - 1, Math.max(0, target))];
-    if (!button) return;
-    button.focus();
-    showYear(Number(button.dataset.year));
-  };
   const onStepClick = (event: MouseEvent) => {
     const button = (event.target as Element).closest<HTMLButtonElement>(
       "button[data-step]",
@@ -226,19 +262,25 @@ export function exploreSharedDays(
     if (next !== undefined) showYear(next);
   };
 
-  for (const button of chipButtons) button.disabled = false;
-  chips.addEventListener("click", onChipClick);
-  chips.addEventListener("keydown", onChipKeyDown);
   stepper.addEventListener("click", onStepClick);
   showYear(year.year);
 
   return () => {
-    chips.removeEventListener("click", onChipClick);
-    chips.removeEventListener("keydown", onChipKeyDown);
     stepper.removeEventListener("click", onStepClick);
     for (const cleanup of cleanups) cleanup();
     showYear(model.defaultYear);
-    for (const button of chipButtons) button.disabled = true;
+    hideTip();
     for (const button of stepButtons) button.disabled = true;
   };
+}
+
+/** One line of the tooltip: a color square and a name. */
+function tipRow(name: string, swatch: string): HTMLElement {
+  const row = document.createElement("li");
+  row.className = "flex min-w-0 items-center gap-1.5";
+  const square = document.createElement("span");
+  square.className = `size-2.5 shrink-0 ${swatch}`;
+  square.setAttribute("aria-hidden", "true");
+  row.append(square, name);
+  return row;
 }

@@ -27,6 +27,10 @@ export const MONTH_SLOTS = 12 * MONTH_BLOCK;
 export const REVEAL_SECONDS = 6;
 export const STATS_FADE_SECONDS = 0.6;
 export const TOTAL_SECONDS = REVEAL_SECONDS + STATS_FADE_SECONDS + 2.5;
+/** Said by the grid to assistive tech; the sentence is not shown on screen. */
+export const GRID_DESCRIPTION =
+  "Each square is a day. It splits into the color of every developer who contributed that day.";
+
 export const BPM = 140;
 
 export const MONTH_NAMES = [
@@ -114,15 +118,15 @@ export function monthColumns(year: number): number[] {
   );
 }
 
-/** "Sun, Mar 15, 2024" */
+/** "Sun, Mar 15" (the year is the stepper's) */
 export function dateTitle(date: string): string {
   const parsed = new Date(`${date}T00:00:00Z`);
-  return `${WEEKDAY_NAMES[parsed.getUTCDay()]}, ${MONTH_NAMES[parsed.getUTCMonth()]} ${parsed.getUTCDate()}, ${parsed.getUTCFullYear()}`;
+  return `${WEEKDAY_NAMES[parsed.getUTCDay()]}, ${MONTH_NAMES[parsed.getUTCMonth()]} ${parsed.getUTCDate()}`;
 }
 
 /** What a day reads as: who contributed, in the order they were added. */
 export function dayDetail(day: SharedDay, logins: readonly string[]): string {
-  if (day.people.length === 0) return "Nobody contributed";
+  if (day.people.length === 0) return "Nobody that day";
   return day.people.map((person) => `@${logins[person]}`).join(" · ");
 }
 
