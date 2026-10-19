@@ -202,7 +202,7 @@ function screen(
     case "loading":
       return (
         <ScreenMain>
-          <LoadingScreen login={login} onCancel={cancel} />
+          <LoadingScreen logins={[login]} onCancel={cancel} />
         </ScreenMain>
       );
 
