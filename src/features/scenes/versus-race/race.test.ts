@@ -6,20 +6,22 @@ import {
   steadyDays,
 } from "@/test-support/historyFixture";
 import {
-  axisLabels,
+  activePass,
   buildRace,
-  buildRaces,
   dateAtIndex,
-  dateLabel,
   dayReading,
   growthSlots,
   indexAtProgress,
+  LEADER_SHARE,
   laneOrder,
-  notThereYet,
+  MAX_TICKS,
+  niceTicks,
+  passesLabel,
+  scaleFor,
+  tickLabel,
   valuesAtIndex,
-  whenLabel,
-  yearLabel,
   yearMarks,
+  yearStartIndex,
 } from "./race";
 
 const today = new Date("2030-01-01T00:00:00Z");
@@ -56,9 +58,10 @@ describe("buildRace", () => {
     const [ada, grace] = race.lanes;
     // Grace has not started in 2022: zero, then she joins in 2023.
     expect(grace?.series[100]).toBe(0);
+    expect(grace?.firstIndex).toBeGreaterThan(300);
     expect(grace?.series.at(-1)).toBe(grace?.total);
     expect(ada?.series.at(-1)).toBe(ada?.total);
-    expect(race.peak).toBe(Math.max(ada?.total ?? 0, grace?.total ?? 0));
+    expect([race.firstYear, race.lastYear]).toEqual([2022, 2023]);
   });
 
   it("holds a lane's total after its last day", () => {
@@ -98,95 +101,92 @@ describe("laneOrder", () => {
   });
 });
 
-describe("buildRaces", () => {
-  const races = buildRaces([
+describe("the scale", () => {
+  it("follows the leader, who sits at about two thirds of the width", () => {
+    const scale = scaleFor([100, 4000, 250]);
+    expect(4000 / scale).toBeCloseTo(LEADER_SHARE, 5);
+    expect(scaleFor([8000, 100])).toBeGreaterThan(scale);
+  });
+
+  it("grows smoothly with the leader and never reaches zero", () => {
+    expect(scaleFor([0, 0])).toBeGreaterThan(0);
+    let previous = scaleFor([0]);
+    for (let total = 0; total <= 5000; total += 50) {
+      const next = scaleFor([total, total / 2]);
+      expect(next).toBeGreaterThanOrEqual(previous);
+      previous = next;
+    }
+  });
+
+  it("draws round gridlines that rescale with it", () => {
+    expect(niceTicks(6250).map((tick) => tick.label)).toEqual([
+      "0",
+      "2k",
+      "4k",
+    ]);
+    expect(niceTicks(1000).map((tick) => tick.label)).toEqual([
+      "0",
+      "250",
+      "500",
+      "750",
+    ]);
+    for (const scale of [20, 333, 1500, 62_000, 31_000_000]) {
+      const ticks = niceTicks(scale);
+      expect(ticks.length).toBeLessThanOrEqual(MAX_TICKS);
+      expect(ticks[0]?.value).toBe(0);
+      for (const tick of ticks) {
+        expect(tick.x).toBeGreaterThanOrEqual(0);
+        expect(tick.x).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("labels big numbers compactly", () => {
+    expect(tickLabel(0)).toBe("0");
+    expect(tickLabel(2500)).toBe("2.5k");
+    expect(tickLabel(12_000_000)).toBe("12M");
+  });
+});
+
+describe("passes", () => {
+  // Ada leads through 2022, then grace (3 a day) passes her in 2023.
+  const race = buildRace([
     entry("ada", [
-      [2021, 1],
       [2022, 1],
       [2023, 1],
     ]),
-    entry("grace", [[2023, 2]]),
+    entry("grace", [
+      [2022, 0],
+      [2023, 3],
+    ]),
   ]);
 
-  it("returns both axes with the same lanes, totals and peak", () => {
-    if (!races) throw new Error("races expected");
-    const { calendar, age } = races;
-    expect(calendar.mode).toBe("calendar");
-    expect(age.mode).toBe("age");
-    expect(age.lanes.map((lane) => lane.login)).toEqual(["ada", "grace"]);
-    expect(age.lanes.map((lane) => lane.total)).toEqual(
-      calendar.lanes.map((lane) => lane.total),
-    );
-    expect(age.peak).toBe(calendar.peak);
+  it("finds the crossing and names who passed whom", () => {
+    const crossing = race?.crossings[0];
+    expect(crossing).toMatchObject({ passer: 1, passed: 0 });
+    expect(crossing?.index).toBeGreaterThan(365);
   });
 
-  it("starts both people at their own first year in same-age", () => {
-    if (!races) throw new Error("races expected");
-    const { calendar, age } = races;
-    // Calendar: grace joins two years in. Same age: both start at index 0.
-    expect(calendar.lanes[1]?.firstIndex).toBeGreaterThan(700);
-    expect(age.lanes[1]?.firstIndex).toBe(0);
-    expect(age.lanes[0]?.firstIndex).toBe(0);
-    // Grace has a full first year of her own at the same age as ada's first.
-    expect(age.lanes[1]?.series[0]).toBeGreaterThan(0);
-    expect(age.lanes[0]?.series[0]).toBeGreaterThan(0);
-    expect(age.length).toBe(calendar.length);
+  it("announces a pass only around the moment it happens", () => {
+    if (!race) throw new Error("race expected");
+    const at = race.crossings[0]?.index ?? 0;
+    expect(activePass(race, at - 1, 14)).toBeNull();
+    expect(activePass(race, at, 14)).toEqual(race.crossings[0]);
+    expect(activePass(race, at + 13, 14)).toEqual(race.crossings[0]);
+    expect(activePass(race, at + 14, 14)).toBeNull();
   });
 
-  it("labels moments by calendar date or by year of life", () => {
-    if (!races) throw new Error("races expected");
-    expect(yearLabel(races.calendar, 0)).toBe("2021");
-    expect(yearLabel(races.age, 0)).toBe("Year 1");
-    expect(yearLabel(races.age, 400)).toBe("Year 2");
-    expect(dateLabel(races.calendar, 0)).toBe("2021-01-01");
-    expect(dateLabel(races.age, 0)).toBe("Day 1");
-    expect(whenLabel(races.calendar, 31)).toBe("Feb 2021");
-    expect(whenLabel(races.age, 400)).toBe("Year 2");
+  it("swaps the places exactly when the lines cross", () => {
+    if (!race) throw new Error("race expected");
+    const at = race.crossings[0]?.index ?? 0;
+    expect(laneOrder(valuesAtIndex(race, at - 1))).toEqual([0, 1]);
+    expect(laneOrder(valuesAtIndex(race, at))).toEqual([1, 0]);
   });
 
-  it("says a lane is not there yet before its first contribution", () => {
-    if (!races) throw new Error("races expected");
-    const grace = races.calendar.lanes[1];
-    if (!grace) throw new Error("lane expected");
-    expect(notThereYet(grace, 10, 0)).toBe(true);
-    expect(notThereYet(grace, 10, 4)).toBe(false);
-    expect(notThereYet(grace, races.calendar.length - 1, 0)).toBe(false);
-    expect(notThereYet({ ...grace, firstIndex: null }, 10, 0)).toBe(false);
-  });
-
-  it("thins the axis labels and keeps the last one on the page", () => {
-    if (!races) throw new Error("races expected");
-    const labels = axisLabels(races.calendar);
-    expect(labels.length).toBeGreaterThan(0);
-    expect(labels.length).toBeLessThanOrEqual(8);
-    for (const mark of labels)
-      expect(mark.startProgress).toBeLessThanOrEqual(0.9);
-  });
-
-  it("marks same-age years as Y1, Y2...", () => {
-    if (!races) throw new Error("races expected");
-    const marks = yearMarks(races.age);
-    expect(marks[0]).toEqual({ label: "Y1", startProgress: 0 });
-    expect(marks.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("finds crossings when two lines swap", () => {
-    // Ada leads in 2022, then grace (3 a day) passes her in 2023.
-    const swap = buildRaces([
-      entry("ada", [
-        [2022, 1],
-        [2023, 1],
-      ]),
-      entry("grace", [
-        [2022, 0],
-        [2023, 9],
-      ]),
-    ]);
-    expect(swap?.calendar.crossings.length).toBeGreaterThanOrEqual(1);
-    expect(swap?.calendar.crossings[0]).toMatchObject({
-      passer: 1,
-      passed: 0,
-    });
+  it("counts them in the singular and plural", () => {
+    expect(passesLabel(0)).toBe("0 passes");
+    expect(passesLabel(1)).toBe("1 pass");
+    expect(passesLabel(1200)).toBe("1,200 passes");
   });
 });
 
@@ -206,9 +206,11 @@ describe("race readings", () => {
     expect(dayReading(race, 0)).toContain("@ada 1, @grace 2");
   });
 
-  it("marks each year once", () => {
+  it("marks each year once and finds where a year starts", () => {
     if (!race) throw new Error("race expected");
     expect(yearMarks(race)).toEqual([{ label: "2023", startProgress: 0 }]);
+    expect(yearStartIndex(race, 2023)).toBe(0);
+    expect(yearStartIndex(race, 2030)).toBe(race.length - 1);
   });
 
   it("grows lanes on the tick grid, only where they gained", () => {

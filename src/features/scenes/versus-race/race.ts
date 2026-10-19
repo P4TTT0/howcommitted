@@ -1,5 +1,4 @@
 import { type Crossing, findCrossings } from "@/domain/crossings";
-import { ageYear, alignSameAge } from "@/domain/same-age";
 import {
   BPM,
   DRAW_SECONDS,
@@ -9,11 +8,11 @@ import {
 import { dayNumber } from "@/playback/aggregate";
 
 /**
- * The race model: every developer's running total on ONE shared daily axis,
- * either by calendar date or by years since each one's first contribution
- * year ("same age"). Lanes keep the order the developers were added in; the
- * view orders the bars by the running total at each moment (`laneOrder`) and
- * never numbers them. Pure, so the layout and the sound grid can be tested.
+ * The race model: every developer's running total on ONE shared daily axis by
+ * calendar date. Lanes keep the order the developers were added in; the view
+ * ranks the bars by the running total at each moment (`laneOrder`) and never
+ * numbers them. The scale follows whoever is ahead at that moment
+ * (`scaleFor`). Pure, so the layout and the sound grid can be tested.
  */
 
 export { BPM, DRAW_SECONDS };
@@ -22,36 +21,28 @@ const MS_PER_DAY = 86_400_000;
 
 export type RaceEntry = { login: string; plan: Plan };
 
-export type RaceMode = "calendar" | "age";
-
 export type RaceLane = {
   login: string;
   /** Running total per shared day. 0 before the first day, held after the last. */
   series: number[];
   total: number;
-  /** Index of the first contribution on this axis; null without any. */
+  /** Index of the first contribution on the axis; null without any. */
   firstIndex: number | null;
 };
 
 export type Race = {
-  mode: RaceMode;
-  /** Calendar mode: day number (days since the epoch) of the first shared day. */
+  /** Day number (days since the epoch) of the first shared day. */
   startDay: number;
   /** Number of shared days. */
   length: number;
   /** In the order the developers were added. */
   lanes: RaceLane[];
-  /** Highest total of any lane: the one fixed scale of every bar. */
-  peak: number;
-  /** The calendar years the data covers, in both modes. */
+  /** The calendar years the data covers. */
   firstYear: number;
   lastYear: number;
   /** Every time one line moved past another, oldest first. */
   crossings: Crossing[];
 };
-
-/** The same data on both axes; the toggle in the view picks one. */
-export type Races = { calendar: Race; age: Race };
 
 function laneSeries(
   plan: Plan,
@@ -80,7 +71,7 @@ function firstActiveDay(plan: Plan): number | null {
   return first ? dayNumber(first.date) : null;
 }
 
-/** ISO date of a shared day (calendar mode). */
+/** ISO date of a shared day. */
 export function dateAtIndex(
   race: Pick<Race, "startDay">,
   index: number,
@@ -97,47 +88,11 @@ export function yearAtIndex(
   return Number(dateAtIndex(race, index).slice(0, 4));
 }
 
-/** The big label of a moment: the calendar year, or "Year N" in same-age. */
-export function yearLabel(race: Race, index: number): string {
-  return race.mode === "age"
-    ? `Year ${ageYear(index)}`
-    : String(yearAtIndex(race, index));
-}
-
-/** The small label of a moment: the date, or the day count in same-age. */
-export function dateLabel(race: Race, index: number): string {
-  return race.mode === "age"
-    ? `Day ${(index + 1).toLocaleString("en-US")}`
-    : dateAtIndex(race, index);
-}
-
-/** A crossing's moment for the "Lines crossed" readout. */
-export function whenLabel(race: Race, index: number): string {
-  if (race.mode === "age") return `Year ${ageYear(index)}`;
-  const [year, month] = dateAtIndex(race, index).split("-");
-  return `${MONTHS[Number(month) - 1]} ${year}`;
-}
-
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
-
 /**
- * Both axes of the data, or null when nobody has a single day or nobody
- * contributed at all. They share lanes, peak and years.
+ * The race, or null when nobody has a single day or nobody contributed at
+ * all.
  */
-export function buildRaces(entries: readonly RaceEntry[]): Races | null {
+export function buildRace(entries: readonly RaceEntry[]): Race | null {
   const firsts: number[] = [];
   const lasts: number[] = [];
   for (const { plan } of entries) {
@@ -150,66 +105,24 @@ export function buildRaces(entries: readonly RaceEntry[]): Races | null {
   if (firsts.length === 0) return null;
   const startDay = Math.min(...firsts);
   const length = Math.max(...lasts) - startDay + 1;
-  const base = entries.map(({ login, plan }) => ({
-    login,
-    ...laneSeries(plan, startDay, length),
-    firstDay: firstActiveDay(plan),
-  }));
-  const peak = Math.max(...base.map((lane) => lane.total));
-  if (peak <= 0) return null;
+  const lanes: RaceLane[] = entries.map(({ login, plan }) => {
+    const first = firstActiveDay(plan);
+    return {
+      login,
+      ...laneSeries(plan, startDay, length),
+      firstIndex: first === null ? null : first - startDay,
+    };
+  });
+  if (Math.max(...lanes.map((lane) => lane.total)) <= 0) return null;
 
-  const firstYear = Number(new Date(startDay * MS_PER_DAY).getUTCFullYear());
-  const lastYear = Number(
-    new Date((startDay + length - 1) * MS_PER_DAY).getUTCFullYear(),
-  );
-
-  const calendarLanes: RaceLane[] = base.map((lane) => ({
-    login: lane.login,
-    series: lane.series,
-    total: lane.total,
-    firstIndex: lane.firstDay === null ? null : lane.firstDay - startDay,
-  }));
-  const calendar: Race = {
-    mode: "calendar",
+  return {
     startDay,
     length,
-    lanes: calendarLanes,
-    peak,
-    firstYear,
-    lastYear,
-    crossings: findCrossings(calendarLanes.map((lane) => lane.series)),
+    lanes,
+    firstYear: new Date(startDay * MS_PER_DAY).getUTCFullYear(),
+    lastYear: new Date((startDay + length - 1) * MS_PER_DAY).getUTCFullYear(),
+    crossings: findCrossings(lanes.map((lane) => lane.series)),
   };
-
-  const aligned = alignSameAge(
-    base.map((lane) => ({
-      series: lane.series,
-      startDay,
-      firstDay: lane.firstDay,
-    })),
-  );
-  const ageLanes: RaceLane[] = base.map((lane, index) => ({
-    login: lane.login,
-    series: aligned.series[index] ?? [],
-    total: lane.total,
-    firstIndex: aligned.firstIndex[index] ?? null,
-  }));
-  const age: Race = {
-    mode: "age",
-    startDay,
-    length: aligned.length,
-    lanes: ageLanes,
-    peak,
-    firstYear,
-    lastYear,
-    crossings: findCrossings(ageLanes.map((lane) => lane.series)),
-  };
-
-  return { calendar, age };
-}
-
-/** The calendar race alone, for callers that do not need the toggle. */
-export function buildRace(entries: readonly RaceEntry[]): Race | null {
-  return buildRaces(entries)?.calendar ?? null;
 }
 
 /** The shared day under a progress through the race (0..1). */
@@ -235,47 +148,11 @@ export function laneOrder(values: readonly number[]): number[] {
     .map(({ lane }) => lane);
 }
 
-/**
- * True while this lane has not made its first contribution on the axis and
- * has nothing counted yet. A developer with no contribution at all is simply 0.
- */
-export function notThereYet(
-  lane: RaceLane,
-  index: number,
-  value: number,
-): boolean {
-  return value === 0 && lane.firstIndex !== null && index < lane.firstIndex;
-}
-
-/** The most year labels the axis shows; the rest is skipped evenly. */
-const MAX_AXIS_LABELS = 8;
-/** Labels starting past this point would run off the right edge. */
-const LAST_LABEL_START = 0.9;
-
-/** The labels the axis really draws, thinned so they never collide or overflow. */
-export function axisLabels(
-  race: Race,
-): { label: string; startProgress: number }[] {
-  const marks = yearMarks(race);
-  const every = Math.ceil(marks.length / MAX_AXIS_LABELS);
-  return marks.filter(
-    (mark, index) =>
-      index % every === 0 && mark.startProgress <= LAST_LABEL_START,
-  );
-}
-
 /** First day of each calendar year on the axis, with where it falls (0..1). */
 export function yearMarks(
   race: Race,
 ): { label: string; startProgress: number }[] {
   const marks: { label: string; startProgress: number }[] = [];
-  if (race.mode === "age") {
-    for (let year = 1; year <= ageYear(race.length - 1); year++) {
-      const index = Math.round((year - 1) * 365.25);
-      marks.push({ label: `Y${year}`, startProgress: index / race.length });
-    }
-    return marks;
-  }
   let previous: number | null = null;
   for (let index = 0; index < race.length; index++) {
     const year = yearAtIndex(race, index);
@@ -285,6 +162,85 @@ export function yearMarks(
     }
   }
   return marks;
+}
+
+/** Index of the first day of `year` on the axis (0 for the first year). */
+export function yearStartIndex(race: Race, year: number): number {
+  const day = Date.UTC(year, 0, 1) / MS_PER_DAY - race.startDay;
+  return Math.min(race.length - 1, Math.max(0, day));
+}
+
+/** The leader sits at about this share of the plot width. */
+export const LEADER_SHARE = 0.64;
+/** The scale never gets smaller than this, so an empty race has no 0/0. */
+const MIN_SCALE = 20;
+/** The most gridlines `niceTicks` ever returns (0 included). */
+export const MAX_TICKS = 5;
+
+/**
+ * Contributions that fill the whole plot width. It follows the current
+ * leader, so it grows smoothly as the totals grow, and the leader stays near
+ * `LEADER_SHARE` of the width.
+ */
+export function scaleFor(values: readonly number[]): number {
+  return Math.max(MIN_SCALE, Math.max(0, ...values) / LEADER_SHARE);
+}
+
+/** Gridlines stop short of the right edge so their labels stay inside it. */
+const TICK_REACH = 0.94;
+
+export type Tick = { value: number; x: number; label: string };
+
+/** Gridlines at round numbers (0, 1k, 2.5k...) that fit inside `scale`. */
+export function niceTicks(scale: number): Tick[] {
+  const raw = scale / 4;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const step =
+    [1, 2, 2.5, 5, 10].map((m) => m * magnitude).find((s) => s >= raw) ??
+    10 * magnitude;
+  const ticks: Tick[] = [];
+  for (let k = 0; k * step <= scale * TICK_REACH; k++) {
+    const value = Math.round(k * step * 1000) / 1000;
+    ticks.push({ value, x: value / scale, label: tickLabel(value) });
+  }
+  return ticks;
+}
+
+/** 0, 500, 2.5k, 12k, 1.5M: compact, because a gridline label has little room. */
+export function tickLabel(value: number): string {
+  if (value >= 1_000_000) return `${+(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1000) return `${+(value / 1000).toFixed(2)}k`;
+  return String(value);
+}
+
+/**
+ * The pass to announce at a moment: the latest crossing at or before `index`
+ * that happened within the last `windowDays` days; null when none did.
+ */
+export function activePass(
+  race: Race,
+  index: number,
+  windowDays: number,
+): Crossing | null {
+  let found: Crossing | null = null;
+  for (const crossing of race.crossings) {
+    if (crossing.index > index) break;
+    if (crossing.index > index - windowDays) found = crossing;
+  }
+  return found;
+}
+
+/**
+ * How long a pass stays announced while playing: about a second and a half of
+ * clock time, whatever the length of the history.
+ */
+export function playbackPassDays(race: Race): number {
+  return Math.max(21, Math.round((race.length * 1.6) / DRAW_SECONDS));
+}
+
+/** "0 passes", "1 pass", "12 passes". */
+export function passesLabel(count: number): string {
+  return `${count.toLocaleString("en-US")} ${count === 1 ? "pass" : "passes"}`;
 }
 
 /** Seconds between ticks: a quarter note, so the sound stays aggregated. */
@@ -318,9 +274,5 @@ export function dayReading(race: Race, index: number): string {
     (lane, laneIndex) =>
       `@${lane.login} ${(values[laneIndex] ?? 0).toLocaleString("en-US")}`,
   );
-  const moment =
-    race.mode === "age"
-      ? `${yearLabel(race, index)}, ${dateLabel(race, index)}`
-      : dateAtIndex(race, index);
-  return `${moment}: ${parts.join(", ")} contributions so far`;
+  return `${dateAtIndex(race, index)}: ${parts.join(", ")} contributions so far`;
 }

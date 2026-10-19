@@ -6,7 +6,6 @@ import { mainRepoScene } from "@/features/scenes/main-repo";
 import { recordsScene } from "@/features/scenes/records";
 import { thenNowScene } from "@/features/scenes/then-now";
 import { timelineScene } from "@/features/scenes/timeline";
-import { versusArrivalScene } from "@/features/scenes/versus-arrival";
 import { versusAwardsScene } from "@/features/scenes/versus-awards";
 import { versusFinale } from "@/features/scenes/versus-finale";
 import { versusLanguagesScene } from "@/features/scenes/versus-languages";
@@ -44,7 +43,6 @@ export const FINALE: FinaleDefinition = endCardFinale;
 
 /** The versus run: its own list and finale, played by the same sequencer. */
 export const VERSUS_SCENES: readonly SceneDefinition[] = [
-  versusArrivalScene,
   versusRaceScene,
   versusSharedDaysScene,
   versusLanguagesScene,
