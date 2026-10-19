@@ -65,6 +65,16 @@ const RHYTHM_HEADLINES: Record<RhythmLabel, string> = {
   bursty: "Bursts and pauses.",
 };
 
+const compactFormat = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+/** A short count for a narrow bar label: 1.2K, 52M. */
+export function compactCount(value: number): string {
+  return compactFormat.format(value);
+}
+
 const percent = (share: number) => Math.round(share * 100);
 
 /** The week folded onto seven bars, plus the rhythm; null without activity. */

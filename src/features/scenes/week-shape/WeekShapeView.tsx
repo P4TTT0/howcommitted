@@ -1,46 +1,84 @@
-import { formatCount } from "@/features/sequencer/model/format";
-import { focusRing, labelClass } from "@/ui/classes";
+import { focusRing } from "@/ui/classes";
 import { ReadoutBox, SceneFrame } from "@/ui/SceneFrame";
-import { barReading, rhythmLine, type WeekPlan } from "./plan";
+import { barReading, compactCount, rhythmLine, type WeekPlan } from "./plan";
 
 type WeekShapeViewProps = { plan: WeekPlan };
 
 /**
  * Scene 4, the markup: seven bars Monday first (weekdays forest, weekend
- * signal), the archetype block with the steady/bursty bar, and a readout for
- * the picked day. The static markup is the finished state; `mount.ts` grows it
- * and `explore.ts` makes the bars readable one by one.
+ * signal) with their values, the archetype headline, and the steady/bursty
+ * bar. On a phone the order is bars, archetype, rhythm; on desktop the title
+ * and archetype sit on the left and the bars and rhythm on the right. The
+ * removed sentences stay as screen reader text. The picked day's readout takes
+ * the place of the rhythm strip while exploring. The static markup is the
+ * finished state; `mount.ts` grows it and `explore.ts` reads the bars.
  */
 export function WeekShapeView({ plan }: WeekShapeViewProps) {
   const place = plan.position * 100;
   return (
     <div className="absolute inset-0">
       <SceneFrame sceneLabel="Week shape">
-        <div className="flex h-full min-h-0 flex-col gap-4 md:flex-row md:gap-14">
-          <div className="flex shrink-0 flex-col justify-between gap-4 md:w-[440px]">
-            <div className="flex flex-col gap-3 md:gap-4">
-              <h2 className="font-display text-[clamp(2.5rem,7vw,6rem)] font-black uppercase leading-[0.86]">
-                The shape of your week.
-              </h2>
-              <p className="font-mono text-[13px] leading-[1.6] [font-stretch:87.5%]">
-                Every contribution since {plan.firstYear}, folded onto seven
-                days.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2.5 bg-block-forest px-5 py-4 text-paper md:px-7 md:py-6">
-              <p className={labelClass}>Your rhythm</p>
-              <p className="font-display text-[clamp(2.25rem,6vw,4rem)] font-black uppercase leading-[0.9]">
+        <div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row lg:gap-14">
+          <div className="order-2 flex shrink-0 flex-col justify-between gap-3 lg:order-1 lg:w-[400px] lg:gap-4">
+            <h2 className="font-display text-[clamp(2.5rem,7vw,6rem)] font-black uppercase leading-[0.86] sr-only lg:not-sr-only">
+              The shape of your week.
+            </h2>
+            <div className="bg-block-forest px-4 py-3 text-paper lg:px-7 lg:py-6">
+              <p className="font-display text-[clamp(2rem,6vw,4rem)] font-black uppercase leading-[0.9]">
                 {plan.archetype}
               </p>
-              <p className="font-mono text-[13px] leading-[1.6] [font-stretch:87.5%]">
-                {plan.monThuPercent}% land Monday to Thursday. Weekends hold{" "}
-                {plan.weekendPercent}%.
-              </p>
-              <div className="mt-1 flex flex-col gap-2 border-t border-paper pt-3.5">
-                <p className="font-display text-[26px] font-extrabold uppercase leading-none md:text-[30px]">
+            </div>
+            <p className="sr-only">
+              Every contribution since {plan.firstYear}, folded onto seven days.{" "}
+              {plan.monThuPercent}% land Monday to Thursday. Weekends hold{" "}
+              {plan.weekendPercent}%.
+            </p>
+          </div>
+          <div className="order-1 flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:order-2 lg:gap-4">
+            <div
+              data-role="bars"
+              className={`grid min-h-0 flex-1 grid-cols-7 grid-rows-1 items-end gap-1.5 border-b-2 border-ink lg:gap-3.5 ${focusRing}`}
+            >
+              {plan.bars.map((bar) => (
+                <div
+                  key={bar.index}
+                  data-bar-slot={bar.index}
+                  role="img"
+                  aria-label={barReading(bar)}
+                  className="flex h-full items-end pt-7 outline-offset-[3px] lg:pt-9"
+                >
+                  <div
+                    data-bar={bar.index}
+                    aria-hidden="true"
+                    className={`relative w-full ${
+                      bar.weekend ? "bg-block-signal" : "bg-block-forest"
+                    }`}
+                    style={{ height: `${bar.ratio * 100}%` }}
+                  >
+                    <span className="absolute inset-x-0 bottom-full whitespace-nowrap pb-1 text-center font-display text-[clamp(15px,2.4vw,28px)] font-black tabular-nums leading-none">
+                      {compactCount(bar.value)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div
+              aria-hidden="true"
+              className="grid grid-cols-7 gap-1.5 text-center font-mono text-[13px] uppercase [font-stretch:87.5%] lg:gap-3.5"
+            >
+              {plan.bars.map((bar) => (
+                <span key={bar.index}>
+                  <span className="lg:hidden">{bar.name.slice(0, 1)}</span>
+                  <span className="hidden lg:inline">{bar.short}</span>
+                </span>
+              ))}
+            </div>
+            <div className="relative">
+              <div className="flex flex-col gap-1.5 bg-ink px-4 py-2.5 text-paper lg:gap-2 lg:px-6 lg:py-4">
+                <p className="font-display text-[22px] font-extrabold uppercase leading-none lg:text-[30px]">
                   {plan.rhythmHeadline}
                 </p>
-                <div aria-hidden="true" className="relative h-3 bg-[#2E7D5B]">
+                <div aria-hidden="true" className="relative h-3 bg-[#4A4A4A]">
                   <div
                     data-role="rhythm-fill"
                     className="absolute inset-y-0 left-0 bg-paper"
@@ -59,53 +97,27 @@ export function WeekShapeView({ plan }: WeekShapeViewProps) {
                   <span>Steady</span>
                   <span>Bursty</span>
                 </div>
-                <p className="font-mono text-[11px] leading-[1.5] [font-stretch:87.5%]">
-                  {rhythmLine(plan)}
-                </p>
+                <p className="sr-only">{rhythmLine(plan)}</p>
               </div>
-            </div>
-          </div>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-            <div
-              data-role="bars"
-              className={`grid min-h-0 flex-1 grid-cols-7 grid-rows-1 items-end gap-2 border-b-2 border-ink md:gap-3.5 ${focusRing}`}
-            >
-              {plan.bars.map((bar) => (
-                <div
-                  key={bar.index}
-                  data-bar-slot={bar.index}
-                  role="img"
-                  aria-label={barReading(bar)}
-                  className="flex h-full items-end outline-offset-[3px]"
-                >
-                  <div
-                    data-bar={bar.index}
-                    aria-hidden="true"
-                    className={`flex w-full justify-center overflow-hidden pt-2.5 font-display text-[clamp(18px,2.4vw,28px)] font-black tabular-nums ${
-                      bar.weekend
-                        ? "bg-block-signal text-ink"
-                        : "bg-block-forest text-paper"
-                    }`}
-                    style={{ height: `${bar.ratio * 100}%` }}
-                  >
-                    {formatCount(bar.value)}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div
-              aria-hidden="true"
-              className="grid grid-cols-7 gap-2 text-center font-mono text-[13px] uppercase [font-stretch:87.5%] md:gap-3.5"
-            >
-              {plan.bars.map((bar) => (
-                <span key={bar.index}>{bar.short}</span>
-              ))}
-            </div>
-            <div data-role="readout" aria-hidden="true" className="invisible">
-              <ReadoutBox
-                title={<span data-role="readout-title">&nbsp;</span>}
-                detail={<span data-role="readout-detail">&nbsp;</span>}
-              />
+              <div
+                data-role="readout"
+                aria-hidden="true"
+                className="invisible absolute inset-0"
+              >
+                <ReadoutBox
+                  className="flex h-full flex-col justify-center !py-1.5"
+                  title={
+                    <span data-role="readout-title" className="block">
+                      &nbsp;
+                    </span>
+                  }
+                  detail={
+                    <span data-role="readout-detail" className="block">
+                      &nbsp;
+                    </span>
+                  }
+                />
+              </div>
             </div>
           </div>
         </div>
