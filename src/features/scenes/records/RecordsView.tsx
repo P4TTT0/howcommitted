@@ -26,32 +26,22 @@ const TONES: Record<TileTone, string> = {
 export function RecordsView({ plan }: RecordsViewProps) {
   return (
     <div className="absolute inset-0">
-      <SceneFrame
-        sceneLabel="Records"
-        title="Records."
-        note={
-          <>
-            Your own marks, from the contribution calendar.
-            <br />
-            {plan.yearsNote}
-          </>
-        }
-      >
-        <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto">
+      <SceneFrame sceneLabel="Records" title="Records.">
+        <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto md:gap-4 md:overflow-visible">
           <section
             aria-label={streakReading(plan)}
-            className="flex shrink-0 flex-col gap-3.5 bg-block-ultramarine px-5 py-4 text-paper md:px-7 md:py-[22px]"
+            className="flex shrink-0 flex-col gap-2.5 bg-block-ultramarine px-4 py-3 text-paper md:px-6 md:py-3.5"
           >
             <div
               aria-hidden="true"
               className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1"
             >
-              <div className="flex flex-wrap items-baseline gap-x-5">
-                <p className="font-display text-[clamp(3.5rem,9vw,7rem)] font-black leading-[0.82]">
+              <div className="flex flex-wrap items-baseline gap-x-4">
+                <p className="font-display text-[clamp(3rem,13vw,4rem)] font-black leading-[1.05] md:text-[clamp(3rem,5vw,5rem)]">
                   {formatCount(plan.streakDays)}{" "}
                   {plan.streakDays === 1 ? "day" : "days"}
                 </p>
-                <p className="font-display text-[clamp(1.5rem,3vw,2.25rem)] font-extrabold uppercase">
+                <p className="font-display text-[clamp(1.25rem,5vw,1.75rem)] font-extrabold uppercase leading-none">
                   Longest streak
                 </p>
               </div>
@@ -65,7 +55,7 @@ export function RecordsView({ plan }: RecordsViewProps) {
                   // biome-ignore lint/suspicious/noArrayIndexKey: ticks are positional and never reorder
                   key={index}
                   data-tick={index}
-                  className="h-[22px] min-w-0 flex-1 bg-paper"
+                  className="h-4 min-w-0 flex-1 bg-paper"
                   style={{ opacity }}
                 />
               ))}
@@ -73,14 +63,14 @@ export function RecordsView({ plan }: RecordsViewProps) {
           </section>
           <ul
             aria-label="Records"
-            className="grid min-h-0 flex-1 grid-cols-2 gap-3 md:grid-cols-4 md:gap-4"
+            className="grid grid-cols-2 gap-3 md:min-h-0 md:flex-1 md:grid-cols-4 md:grid-rows-2 md:gap-4"
           >
             {plan.tiles.map((tile, index) => (
               <li
                 key={tile.key}
                 data-tile={index}
                 aria-label={tileReading(tile)}
-                className={`flex min-h-[116px] min-w-0 flex-col justify-between gap-2 border-2 border-ink px-3.5 py-3 data-[picked]:bg-ink data-[picked]:text-paper md:px-5 md:py-4 ${TONES[tile.tone]} ${focusRing}`}
+                className={`flex min-h-[104px] min-w-0 flex-col justify-between gap-2 border-2 border-ink px-3 py-3 data-[picked]:bg-ink data-[picked]:text-paper md:px-4 md:py-3 ${TONES[tile.tone]} ${focusRing}`}
               >
                 <p
                   aria-hidden="true"
@@ -90,16 +80,23 @@ export function RecordsView({ plan }: RecordsViewProps) {
                 </p>
                 <p
                   aria-hidden="true"
-                  className="font-display text-[clamp(2.25rem,5.5vw,4.5rem)] font-black leading-[0.9]"
+                  className="font-display text-[clamp(1.75rem,8vw,2.75rem)] font-black leading-[1] [overflow-wrap:anywhere] md:text-[clamp(1.75rem,3.4vw,4.5rem)]"
                 >
                   {tile.value}
+                  {tile.unit ? (
+                    <span className="ml-1.5 font-mono text-xs font-normal [font-stretch:87.5%]">
+                      {tile.unit}
+                    </span>
+                  ) : null}
                 </p>
-                <p
-                  aria-hidden="true"
-                  className="font-mono text-xs [font-stretch:87.5%]"
-                >
-                  {tile.note}
-                </p>
+                {tile.caption ? (
+                  <p
+                    aria-hidden="true"
+                    className="font-mono text-xs [font-stretch:87.5%] [overflow-wrap:anywhere]"
+                  >
+                    {tile.caption}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>

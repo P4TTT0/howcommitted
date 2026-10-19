@@ -21,7 +21,12 @@ export type RecordTile = {
   key: string;
   label: string;
   value: string;
+  /** Unit shown small after the value, e.g. "days". */
+  unit?: string;
+  /** The full reading, for screen readers only. */
   note: string;
+  /** The short visible line under the value; empty when the value says it all. */
+  caption: string;
   tone: TileTone;
   /** Seconds at which the tile starts to pop in (on the grid). */
   start: number;
@@ -97,6 +102,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
       label: "Busiest day",
       value: formatCount(day.count),
       note: FULL.format(utc(day.date)),
+      caption: MONTH_DAY_YEAR.format(utc(day.date)),
       tone: "signal",
     });
   }
@@ -105,6 +111,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
     label: "Average per active day",
     value: found.averagePerActiveDay.toFixed(1),
     note: `${formatCount(total)} contributions over ${formatCount(found.activeDays)} days`,
+    caption: "",
     tone: "plain",
   });
   push({
@@ -114,15 +121,18 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
     note: found.firstDate
       ? `Since your first, on ${MONTH_DAY_YEAR.format(utc(found.firstDate))}`
       : "",
+    caption: "",
     tone: "plain",
   });
   push({
     key: "quiet",
     label: "Longest quiet stretch",
-    value: plural(quiet?.length ?? 0, "day", "days"),
+    value: formatCount(quiet?.length ?? 0),
+    unit: quiet?.length === 1 ? "day" : "days",
     note: quiet
       ? `Then you came back on ${MONTH_DAY_YEAR.format(utc(quiet.comeback))}`
       : "No gap between two active days",
+    caption: quiet ? MONTH_DAY_YEAR.format(utc(quiet.comeback)) : "",
     tone: "ink",
   });
   if (week) {
@@ -131,6 +141,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
       label: "Busiest week",
       value: formatCount(week.count),
       note: formatWeek(week.start, week.end),
+      caption: formatWeek(week.start, week.end),
       tone: "plain",
     });
   }
@@ -140,6 +151,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
       label: "Busiest month",
       value: formatCount(month.count),
       note: MONTH_YEAR.format(utc(`${month.month}-01`)),
+      caption: MONTH_YEAR.format(utc(`${month.month}-01`)),
       tone: "plain",
     });
   }
@@ -149,6 +161,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
       label: "Your date",
       value: formatMonthDay(date.monthDay),
       note: `A contribution on it in ${date.years} of ${date.totalYears} years`,
+      caption: `${date.years} of ${date.totalYears} years`,
       tone: "safety",
     });
   }
@@ -158,6 +171,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
       label: "Busiest year",
       value: formatCount(year.count),
       note: String(year.year),
+      caption: String(year.year),
       tone: "plain",
     });
   }
@@ -238,7 +252,8 @@ export function popAt(
 
 /** Spoken and visible reading of one tile. */
 export function tileReading(tile: RecordTile): string {
-  return `${tile.label}: ${tile.value}. ${tile.note}`;
+  const value = tile.unit ? `${tile.value} ${tile.unit}` : tile.value;
+  return `${tile.label}: ${value}. ${tile.note}`;
 }
 
 export function streakReading(plan: RecordsPlan): string {
