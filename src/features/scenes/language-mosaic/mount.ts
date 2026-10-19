@@ -24,7 +24,9 @@ export function mountLanguageMosaic(
   const nameText = findElement<HTMLElement>(readout, '[data-role="name"]');
   const valueText = findElement<HTMLElement>(readout, '[data-role="value"]');
 
+  // Under reduced motion the blocks show at once: only the first step sounds.
   blocks.forEach((block, index) => {
+    if (reducedMotion && index > 0) return;
     clock.at(block.time, (time) => sound()?.stair(time, index));
   });
 
