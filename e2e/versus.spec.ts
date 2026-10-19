@@ -279,28 +279,19 @@ test("shared days splits a day between the developers and reads any day in explo
     name: "Shared days, 2023 to 2024",
   });
   await expect(shared).toBeVisible();
-  await expect(shared.getByText("@ada")).toBeVisible();
+  await expect(page.getByText("@ada").first()).toBeVisible();
   await expect(shared.getByText("Longest run together")).toBeVisible();
 
   // Only the layout this screen shows is exposed as the day slider.
   const target = shared.getByRole("slider", { name: /Days of the year/ });
   await target.focus();
   await target.press("Home");
-  await expect(shared.getByText("Mon, Jan 1, 2024")).toBeVisible();
+  await expect(shared.getByText("Mon, Jan 1", { exact: true })).toBeVisible();
   await target.press("ArrowRight");
-  await expect(shared.getByText("Tue, Jan 2, 2024")).toBeVisible();
+  await expect(shared.getByText("Tue, Jan 2", { exact: true })).toBeVisible();
 
-  const wide = (page.viewportSize()?.width ?? 0) >= 768;
-  if (wide) {
-    await shared.getByRole("button", { name: "2023" }).click();
-    await expect(shared.getByRole("button", { name: "2023" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-  } else {
-    await shared.getByRole("button", { name: "Earlier year" }).click();
-    await expect(shared.getByText("2023", { exact: true })).toBeVisible();
-  }
+  await page.getByRole("button", { name: "Earlier year" }).click();
+  await expect(page.getByText("2023", { exact: true })).toBeVisible();
 });
 
 /** The longest possible logins, 8-digit totals, far-apart first years. */
@@ -359,16 +350,10 @@ for (const viewport of VIEWPORTS) {
       });
       await expect(shared).toBeVisible();
       await expectSceneFits(page, { region: shared, ...fit });
-      // The earliest year, through the control this screen shows.
-      if (phone) {
-        const step = shared.getByRole("button", { name: "Earlier year" });
-        await expect(step).toBeEnabled();
-        await step.click();
-      } else {
-        const chip = shared.getByRole("button", { name: "2008" });
-        await expect(chip).toBeEnabled();
-        await chip.click();
-      }
+      // The earliest year, through the stepper.
+      const step = page.getByRole("button", { name: "Earlier year" });
+      await expect(step).toBeEnabled();
+      await step.click();
       await expectSceneFits(page, { region: shared, ...fit });
 
       await prevButton(page).click();

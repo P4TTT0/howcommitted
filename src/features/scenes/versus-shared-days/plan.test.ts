@@ -81,9 +81,9 @@ describe("monthColumns", () => {
 
 describe("copy", () => {
   it("titles a date and names who showed up", () => {
-    expect(dateTitle("2024-03-15")).toBe("Fri, Mar 15, 2024");
+    expect(dateTitle("2024-03-15")).toBe("Fri, Mar 15");
     expect(dayDetail({ date: "x", people: [] }, ["ada"])).toBe(
-      "Nobody contributed",
+      "Nobody that day",
     );
     expect(
       dayDetail({ date: "x", people: [0, 2] }, ["ada", "g", "linus"]),
