@@ -1,4 +1,5 @@
 import type { FinaleDefinition } from "@/features/sequencer/types";
+import { shareCardsFor } from "./cards";
 import { EndCard } from "./EndCard";
 
 /**
@@ -8,7 +9,8 @@ import { EndCard } from "./EndCard";
 const versusEnabled = process.env.NEXT_PUBLIC_VERSUS === "1";
 
 export const endCardFinale: FinaleDefinition = {
-  render({ login, model }, { replay }) {
+  render(data, { replay }) {
+    const { login, model } = data;
     const { firstYear, lastYear } = model;
     if (firstYear === null || lastYear === null) return null;
     return (
@@ -19,6 +21,7 @@ export const endCardFinale: FinaleDefinition = {
         lastYear={lastYear}
         yearBlocks={model.yearBlocks}
         note={model.note}
+        cards={shareCardsFor(data)}
         privateContributions={model.privateContributions}
         versusEnabled={versusEnabled}
         onReplay={replay}

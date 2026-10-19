@@ -20,7 +20,7 @@ export function AwardsView({ plan }: { plan: AwardsPlan }) {
         }
       >
         <section aria-label="Awards" className="h-full min-h-0">
-          <ul className="grid h-full min-h-0 auto-rows-fr grid-cols-1 gap-1.5 overflow-y-auto sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+          <ul className="grid h-full min-h-0 auto-rows-[minmax(min-content,1fr)] grid-cols-1 gap-1.5 overflow-y-auto sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
             {plan.awards.map((award, position) => {
               const slot = award.person;
               return (

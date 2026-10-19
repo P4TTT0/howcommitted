@@ -2,6 +2,7 @@ import type { History } from "@/domain/history";
 import type { YearTotals } from "@/domain/types";
 import { formatCount } from "@/features/sequencer/model/format";
 import { quantizeUp } from "@/playback/schedule";
+import { type MixPlan, planMix } from "./mix";
 
 export const BPM = 120;
 /** One sixteenth note at the tempo. */
@@ -52,6 +53,8 @@ export type BigNumbersPlan = {
   duration: number;
   /** Shared private contributions: a count only, not part of the four numbers. */
   privateContributions: number;
+  /** First year vs latest year; null with a single active year. */
+  mix: MixPlan | null;
 };
 
 /** The four totals from the history; null when there is nothing to show. */
@@ -79,6 +82,7 @@ export function planBigNumbers(history: History): BigNumbersPlan | null {
     numbers,
     duration: Math.max(MIN_SECONDS, lastLand + TAIL_SECONDS),
     privateContributions: Math.max(0, history.totals.privateContributions),
+    mix: planMix(history),
   };
 }
 

@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import type { DailyContributions } from "../src/domain/types";
 import {
   makeHistory,
   makeYear,
   steadyDays,
 } from "../src/test-support/historyFixture";
-import { expectSceneFits, VIEWPORTS } from "./versus-fit";
+import { expectSceneFits, VIEWPORTS } from "./support/fit";
 
 const play = (page: Page) => page.getByRole("button", { name: "Play" });
 const next = (page: Page) => page.getByRole("button", { name: /^Next/ });
@@ -167,12 +167,6 @@ async function mockHistories(page: Page) {
   });
 }
 
-/** The scene's own root: the nearest `absolute inset-0` above its region. */
-const sceneRoot = (region: Locator) =>
-  region.locator(
-    "xpath=ancestor::div[contains(@class,'absolute') and contains(@class,'inset-0')][1]",
-  );
-
 const SCENES = [
   { name: "Favorite languages of each developer", next: /Longest streaks/ },
   { name: "Longest streaks of each developer", next: /Rhythm sync/ },
@@ -186,8 +180,17 @@ async function start(page: Page, logins: string[]) {
   await mockHistories(page);
   await page.goto(`/${logins.join("/")}`);
   await play(page).click();
+  // Scenes 1 to 3 (arrival, race, shared days) come first; stop on the last.
+  await expect(
+    page.getByRole("region", { name: /^When each developer joined/ }),
+  ).toBeVisible();
+  await next(page).click();
   await expect(
     page.getByRole("region", { name: /^Cumulative contributions/ }),
+  ).toBeVisible();
+  await next(page).click();
+  await expect(
+    page.getByRole("region", { name: /^Shared days/ }),
   ).toBeVisible();
 }
 
@@ -204,13 +207,13 @@ for (const viewport of VIEWPORTS) {
       await expect(region).toBeVisible();
       await expect(next(page)).toHaveAccessibleName(scene.next);
       // Content waits for its beat; the layout is the same hidden or shown.
-      await expectSceneFits(page, sceneRoot(region));
+      await expectSceneFits(page, { tapTargets: true });
     }
 
     await next(page).click();
     const poster = page.getByRole("region", { name: "Versus summary" });
     await expect(poster).toBeVisible();
-    await expectSceneFits(page, poster);
+    await expectSceneFits(page, { tapTargets: true });
   });
 }
 
@@ -231,15 +234,13 @@ for (const viewport of VIEWPORTS) {
       await next(page).click();
       const region = page.getByRole("region", { name: scene.name });
       await expect(region).toBeVisible();
-      await expectSceneFits(page, sceneRoot(region), {
-        allowVerticalScroll: true,
-      });
+      await expectSceneFits(page, { tapTargets: true });
     }
 
     await next(page).click();
     const poster = page.getByRole("region", { name: "Versus summary" });
     await expect(poster).toBeVisible();
-    await expectSceneFits(page, poster, { allowVerticalScroll: true });
+    await expectSceneFits(page, { tapTargets: true });
   });
 }
 
@@ -255,14 +256,12 @@ for (const viewport of VIEWPORTS) {
       const region = page.getByRole("region", { name: scene.name });
       // Without public code for one of them the languages scene still plays.
       await expect(region).toBeVisible();
-      await expectSceneFits(page, sceneRoot(region), {
-        allowVerticalScroll: true,
-      });
+      await expectSceneFits(page, { tapTargets: true });
     }
     await next(page).click();
     const poster = page.getByRole("region", { name: "Versus summary" });
     await expect(poster).toContainText("Includes shared private contributions");
-    await expectSceneFits(page, poster, { allowVerticalScroll: true });
+    await expectSceneFits(page, { tapTargets: true });
   });
 }
 
@@ -391,7 +390,8 @@ test("a lineup without public code skips the languages scene", async ({
   });
   await page.goto("/ada/grace");
   await play(page).click();
-  await next(page).click();
+  // Arrival, race, shared days, then languages is skipped: streaks come next.
+  for (let i = 0; i < 3; i++) await next(page).click();
   await expect(
     page.getByRole("region", { name: "Longest streaks of each developer" }),
   ).toBeVisible();

@@ -124,7 +124,7 @@ export function LanguagesView({ plan }: { plan: LanguagesPlan }) {
           className="flex h-full min-h-0 flex-col gap-2 sm:gap-4"
         >
           <ul
-            className={`grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto sm:auto-rows-fr sm:grid-cols-2 sm:gap-4 ${WIDE_COLUMNS[count] ?? "lg:grid-cols-5"}`}
+            className={`grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto sm:auto-rows-[minmax(min-content,1fr)] sm:grid-cols-2 sm:gap-4 ${WIDE_COLUMNS[count] ?? "lg:grid-cols-5"}`}
           >
             {plan.people.map((person) => (
               <Card key={person.login.toLowerCase()} person={person} />

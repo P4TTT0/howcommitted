@@ -15,7 +15,8 @@ import { createReadout } from "./readout";
 /**
  * Wires the race to the sequencer's clock: bars, year and date are a pure
  * function of clock time, repainted per frame; sound is scheduled on the
- * Transport. Returns the cleanup.
+ * Transport. The race always plays on calendar years; the same-age axis is an
+ * explore-phase choice. Returns the cleanup.
  */
 export function mountVersusRace(
   root: HTMLElement,

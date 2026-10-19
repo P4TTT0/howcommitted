@@ -67,8 +67,10 @@ describe("readSessionToken", () => {
 
   it("is anonymous for a tampered cookie", () => {
     const value = cookieFor();
+    // Replace the second-to-last character with one that always differs from it.
     const flipped =
-      value.slice(0, -2) + (value.endsWith("A") ? "B" : "A") + value.slice(-1);
+      value.slice(0, -2) + (value.at(-2) === "A" ? "B" : "A") + value.slice(-1);
+    expect(flipped).not.toBe(value);
     expect(read(flipped)).toBeNull();
     expect(read(`${SESSION_COOKIE}=v1.AAAA`)).toBeNull();
     expect(read(`${SESSION_COOKIE}=${TOKEN}`)).toBeNull();

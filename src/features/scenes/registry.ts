@@ -6,11 +6,13 @@ import { mainRepoScene } from "@/features/scenes/main-repo";
 import { recordsScene } from "@/features/scenes/records";
 import { thenNowScene } from "@/features/scenes/then-now";
 import { timelineScene } from "@/features/scenes/timeline";
+import { versusArrivalScene } from "@/features/scenes/versus-arrival";
 import { versusAwardsScene } from "@/features/scenes/versus-awards";
 import { versusFinale } from "@/features/scenes/versus-finale";
 import { versusLanguagesScene } from "@/features/scenes/versus-languages";
 import { versusRaceScene } from "@/features/scenes/versus-race";
 import { versusRhythmSyncScene } from "@/features/scenes/versus-rhythm-sync";
+import { versusSharedDaysScene } from "@/features/scenes/versus-shared-days";
 import { versusStreaksScene } from "@/features/scenes/versus-streaks";
 import { weekShapeScene } from "@/features/scenes/week-shape";
 import type {
@@ -42,7 +44,9 @@ export const FINALE: FinaleDefinition = endCardFinale;
 
 /** The versus run: its own list and finale, played by the same sequencer. */
 export const VERSUS_SCENES: readonly SceneDefinition[] = [
+  versusArrivalScene,
   versusRaceScene,
+  versusSharedDaysScene,
   versusLanguagesScene,
   versusStreaksScene,
   versusRhythmSyncScene,

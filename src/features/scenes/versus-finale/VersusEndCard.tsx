@@ -133,7 +133,9 @@ export function VersusEndCard({ summaries, poster, onReplay }: Props) {
           {poster.together}
         </p>
         <p className="font-display text-[clamp(3.5rem,13vw,9.5rem)] font-black leading-[0.85] tabular-nums">
-          <span aria-hidden="true">{formatCount(poster.total)}</span>
+          <span aria-hidden="true" className="block">
+            {formatCount(poster.total)}
+          </span>
           <span className="sr-only">
             {formatCount(poster.total)} contributions
           </span>

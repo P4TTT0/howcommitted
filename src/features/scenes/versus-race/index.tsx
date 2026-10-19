@@ -3,28 +3,30 @@ import type { SceneDefinition } from "@/features/sequencer/types";
 import { exploreVersusRace } from "./explore";
 import { mountVersusRace } from "./mount";
 import { RaceView } from "./RaceView";
-import { BPM, buildRace } from "./race";
+import { BPM, buildRaces } from "./race";
 
 /**
- * Versus scene 1: the cumulative contributions of every developer as bars in
- * fixed lanes, on one shared timeline. Lanes keep the order the developers
- * were added in; there is no ranking, no leader and no rank number.
+ * Versus scene 2: the cumulative contributions of every developer as bars on
+ * one shared timeline, ordered by the running total at each moment so places
+ * swap as the years go by, with the lines crossed so far. There is no ranking
+ * number, no leader and no verdict. Explore adds a toggle between calendar
+ * years and same age (years since each one's first contribution year).
  */
 export const versusRaceScene: SceneDefinition = {
   id: "versus-race",
   label: "Contribution race",
   create({ versus }) {
     if (!versus || versus.length < 2) return null;
-    const race = buildRace(
+    const races = buildRaces(
       versus.map(({ login, model }) => ({ login, plan: model.plan })),
     );
-    if (!race) return null;
+    if (!races) return null;
     return {
       duration: TOTAL_SECONDS,
       bpm: BPM,
-      view: <RaceView race={race} />,
-      mount: (root, runtime) => mountVersusRace(root, race, runtime),
-      explore: (root) => exploreVersusRace(root, race),
+      view: <RaceView race={races.calendar} />,
+      mount: (root, runtime) => mountVersusRace(root, races.calendar, runtime),
+      explore: (root) => exploreVersusRace(root, races),
     };
   },
 };
