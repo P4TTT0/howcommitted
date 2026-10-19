@@ -17,7 +17,7 @@ The landing is the question, "How committed is @[username]?", set as a Signal ye
 - Every button and link has a pointer, a hover (flip to Ultramarine or Ink), a pressed state and the shared focus ring, from `src/ui/classes.ts`.
 - Two layouts. On landscape screens at least 1024px wide, the landing is two columns: the question, "Play" and the description on the left, and the found developer on the right as a large card (square avatar, name in Big Shoulders, `@login` and active years in Martian Mono). The whole card is a button that starts like "Play", and it wipes in from the left. The right column is the home of the player(s): the versus rivals will join it. It stays empty until someone is found. On phones, portrait tablets and short landscape screens the layout stays stacked, with the compact preview row under the question.
 - The landing never scrolls, at any size: type is sized from width and height, and the bottom line gives way first.
-- Rivals: a "+ vs" control under the found developer (right column on wide screens, under the preview row elsewhere) adds up to four rivals after the same exact-username lookup, as removable pills with a P2..P5 swatch. Pills are compact on phones so the landing still never scrolls with five developers. Until versus playback exists, the control and the `/{p1}/{p2}/...` route are open only outside production (same gate as `/lab`).
+- Rivals: a "+ vs" control under the found developer (right column on wide screens, under the preview row elsewhere) adds up to four rivals after the same exact-username lookup, as removable pills with a P2..P5 swatch. Pills are compact on phones so the landing still never scrolls with five developers.
 
 ## Typography
 

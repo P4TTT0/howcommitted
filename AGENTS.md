@@ -8,7 +8,7 @@ CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value. C
 
 ## Project state
 
-The solo slice exists: landing search, `/{login}` playing the timeline scene with real data, the user and history APIs, and `/lab` for playback work. Versus, the other scenes, share/OG and sign-in are not built. Do not scaffold beyond what a task asks for.
+Solo and versus both play in production: landing search, `/{login}` and `/{p1}/{p2}/...` through the scene sequencer with real data, share cards, OG images and GitHub sign-in. `/lab` stays outside production for playback work. Do not scaffold beyond what a task asks for.
 
 ## Commands
 
