@@ -10,8 +10,8 @@ import {
   buildSharedDays,
   dateTitle,
   dayDetail,
+  drawnGroupPopTimes,
   everyoneLabel,
-  groupPopTimes,
   groupsShown,
   MONTH_BLOCK,
   monthColumns,
@@ -147,19 +147,27 @@ describe("groupsShown", () => {
   });
 });
 
-describe("groupPopTimes", () => {
-  it("pops once per group, ordered and inside the reveal", () => {
-    const times = groupPopTimes(54);
+describe("drawnGroupPopTimes", () => {
+  it("pops once per drawn group, ordered and inside the reveal", () => {
+    const times = drawnGroupPopTimes(weekSlots(2024, 366), 7);
     expect(times.length).toBeGreaterThan(0);
-    expect(times.length).toBeLessThanOrEqual(54);
     expect(times).toEqual([...times].sort((a, b) => a - b));
     expect(new Set(times).size).toBe(times.length);
-    expect(times[0]).toBe(0);
     expect(times.at(-1) ?? 0).toBeLessThan(REVEAL_SECONDS);
   });
 
-  it("has no pops without groups", () => {
-    expect(groupPopTimes(0)).toEqual([]);
+  it("stays silent for groups past the last day with data", () => {
+    // A year in progress: only the first 70 days exist (10 weeks of 7 slots).
+    const full = drawnGroupPopTimes(weekSlots(2026, 365), 7);
+    const partial = drawnGroupPopTimes(weekSlots(2026, 70), 7);
+    expect(partial.length).toBeLessThan(full.length);
+    // 70 days from a Monday start span at most 11 week columns.
+    expect(partial.length).toBeLessThanOrEqual(11);
+    expect(Math.max(...partial)).toBeLessThan(Math.min(...full.slice(12)));
+  });
+
+  it("has no pops without slots", () => {
+    expect(drawnGroupPopTimes([], 7)).toEqual([]);
   });
 });
 

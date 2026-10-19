@@ -9,11 +9,13 @@ import {
 } from "@/test-support/historyFixture";
 import { bigNumbersScene } from "./index";
 import {
+  COUNT_TICKS,
   countAt,
   countSounds,
   GRID_SECONDS,
   planBigNumbers,
   scopeNote,
+  tickCount,
   totalReading,
   yearReading,
 } from "./numbers";
@@ -160,32 +162,47 @@ describe("bigNumbersScene.create", () => {
   });
 });
 
-describe("countSounds", () => {
-  const number = { start: 1, land: 2 };
+describe("tickCount", () => {
+  it("follows the value for small numbers and caps big ones", () => {
+    expect(tickCount(0)).toBe(0);
+    expect(tickCount(1)).toBe(1);
+    expect(tickCount(2)).toBe(2);
+    expect(tickCount(COUNT_TICKS)).toBe(COUNT_TICKS);
+    expect(tickCount(5_000_000)).toBe(COUNT_TICKS);
+  });
+});
 
-  it("rises with the displayed value, from 0 and never past 1", () => {
-    const ticks = countSounds(number, false, 5);
-    expect(ticks).toHaveLength(5);
-    expect(ticks[0]).toEqual({ time: 1, progress: 0 });
+describe("countSounds", () => {
+  const span = { start: 1, land: 2 };
+
+  it("makes exactly 2 ticks for a value of 2 and none for 0", () => {
+    expect(countSounds({ ...span, total: 2 }, false)).toHaveLength(2);
+    expect(countSounds({ ...span, total: 0 }, false)).toEqual([]);
+  });
+
+  it("rises with the value inside the count, never past 1", () => {
+    const ticks = countSounds({ ...span, total: 1000 }, false);
+    expect(ticks).toHaveLength(COUNT_TICKS);
     for (const [i, tick] of ticks.entries()) {
       expect(tick.time).toBeGreaterThanOrEqual(1);
       expect(tick.time).toBeLessThan(2);
+      expect(tick.progress).toBeGreaterThan(0);
       expect(tick.progress).toBeLessThan(1);
-      if (i > 0)
+      if (i > 0) {
         expect(tick.progress).toBeGreaterThan(ticks[i - 1]?.progress ?? 0);
+        expect(tick.time).toBeGreaterThan(ticks[i - 1]?.time ?? 0);
+      }
     }
   });
 
-  it("matches countAt at each tick", () => {
-    const full = { ...number, total: 1000 };
-    for (const tick of countSounds(number, false)) {
-      expect(Math.round(tick.progress * 1000)).toBe(
-        countAt(full, tick.time, false),
-      );
+  it("ticks as the displayed count steps up, one per unit", () => {
+    const full = { ...span, total: 5 };
+    for (const [i, tick] of countSounds(full, false).entries()) {
+      expect(countAt(full, tick.time + 1e-6, false)).toBe(i + 1);
     }
   });
 
   it("is silent when the number does not count", () => {
-    expect(countSounds(number, true)).toEqual([]);
+    expect(countSounds({ ...span, total: 50 }, true)).toEqual([]);
   });
 });

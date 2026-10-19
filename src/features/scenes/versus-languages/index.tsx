@@ -24,7 +24,7 @@ export const versusLanguagesScene: SceneDefinition = {
       duration: REVEAL_SECONDS,
       bpm: REVEAL_BPM,
       view: <LanguagesView plan={plan} />,
-      mount: (root, runtime) => mountReveal(root, runtime, stairReveal),
+      mount: (root, runtime) => mountReveal(root, runtime, stairReveal(0)),
     };
   },
 };

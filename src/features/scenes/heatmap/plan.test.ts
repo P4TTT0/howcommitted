@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { HeatmapCell } from "@/domain/heatmap";
 import {
+  EMPTY_WEEK_DB,
+  FADE_SECONDS,
   hoverLevel,
   planReveal,
   planRows,
@@ -109,14 +111,22 @@ describe("planReveal", () => {
     expect(plan.duration).toBeGreaterThan(plan.weekTimes.at(-1) ?? 0);
   });
 
-  it("pops once per drawn week, on the reveal times", () => {
-    const drawn = totals.filter((total) => total > 0).length;
-    expect(plan.pops).toHaveLength(drawn);
-    for (const time of plan.pops) expect(plan.weekTimes).toContain(time);
+  it("pops once per column, as it lands and not as it starts", () => {
+    expect(plan.pops).toHaveLength(plan.weeks);
+    plan.pops.forEach(({ time }, week) => {
+      const start = plan.weekTimes[week] ?? 0;
+      expect(time).toBeGreaterThan(start);
+      expect(time).toBeLessThanOrEqual(start + FADE_SECONDS);
+    });
   });
 
-  it("stays silent without contributions", () => {
-    expect(planReveal(new Array<number>(WEEKS).fill(0)).pops).toEqual([]);
+  it("softens the pop of weeks without contributions", () => {
+    plan.pops.forEach(({ db }, week) => {
+      expect(db).toBe((totals[week] ?? 0) > 0 ? 0 : EMPTY_WEEK_DB);
+    });
+    const silent = planReveal(new Array<number>(WEEKS).fill(0));
+    expect(silent.pops).toHaveLength(WEEKS);
+    for (const { db } of silent.pops) expect(db).toBeLessThan(0);
   });
 
   it("sums every year into each week column", () => {

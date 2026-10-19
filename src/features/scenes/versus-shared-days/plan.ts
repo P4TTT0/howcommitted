@@ -199,14 +199,26 @@ export function groupsShown(progress: number, groups: number): number {
 }
 
 /**
- * Clock times of one pop per group (a week column or a month block) as the
- * grid draws, quantized up to the grid. Group `g` shows once the progress
- * passes `g / groups`, the same rule as `groupsShown`.
+ * Clock times of one pop per group (a week column or a month block) that draws
+ * at least one day, quantized up to the grid. Group `g` shows once the
+ * progress passes `g / groups`, the same rule as `groupsShown`. Groups with
+ * only empty slots (the days after the last date with data, in a year in
+ * progress) draw nothing and stay silent.
  */
-export function groupPopTimes(groups: number): number[] {
-  const times = Array.from({ length: groups }, (_, group) =>
-    quantizeUp((group / groups) * REVEAL_SECONDS, GRID_SECONDS),
-  );
+export function drawnGroupPopTimes(
+  slots: readonly (number | null)[],
+  groupSize: number,
+): number[] {
+  const groups = Math.ceil(slots.length / groupSize);
+  const times: number[] = [];
+  for (let group = 0; group < groups; group++) {
+    const drawn = slots
+      .slice(group * groupSize, (group + 1) * groupSize)
+      .some((day) => day !== null);
+    if (drawn) {
+      times.push(quantizeUp((group / groups) * REVEAL_SECONDS, GRID_SECONDS));
+    }
+  }
   return [...new Set(times)];
 }
 

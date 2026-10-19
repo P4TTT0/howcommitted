@@ -105,27 +105,34 @@ export type CountSound = {
   progress: number;
 };
 
-/** Count ticks per number: enough to read as a climb, few enough to stay clean. */
-export const COUNT_TICKS = 10;
+/** Most ticks one count makes: enough to read as a climb, few enough to stay clean. */
+export const COUNT_TICKS = 12;
+
+/** Ticks of a count: one per unit for small values, capped for big ones. 0 gets none. */
+export function tickCount(total: number, cap: number = COUNT_TICKS): number {
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  return Math.min(Math.floor(total), cap);
+}
 
 /**
- * The ticks of one count, evenly spaced in time, each carrying the share of
- * the total the screen shows at that moment (same ease-out as `countAt`).
- * With reduced motion the number does not count: no ticks.
+ * The ticks of one count. Tick `i` lands when the screen reaches its share
+ * `(i + 0.5) / ticks` of the total, so it follows the same ease-out as
+ * `countAt`: a value of 2 ticks twice, as the display goes 1 then 2. With
+ * reduced motion the number does not count: no ticks.
  */
 export function countSounds(
-  number: Pick<BigNumber, "start" | "land">,
+  number: Pick<BigNumber, "start" | "land" | "total">,
   reducedMotion: boolean,
-  steps: number = COUNT_TICKS,
+  cap: number = COUNT_TICKS,
 ): CountSound[] {
-  if (reducedMotion || steps <= 0) return [];
+  const ticks = tickCount(number.total, cap);
+  if (reducedMotion || ticks === 0) return [];
   const span = number.land - number.start;
-  return Array.from({ length: steps }, (_, index) => {
-    const linear = index / steps;
-    return {
-      time: number.start + span * linear,
-      progress: 1 - (1 - linear) ** 4,
-    };
+  return Array.from({ length: ticks }, (_, index) => {
+    const progress = (index + 0.5) / ticks;
+    // Invert the ease-out (1 - (1 - t) ** 4) to find when that share shows.
+    const linear = 1 - (1 - progress) ** 0.25;
+    return { time: number.start + span * linear, progress };
   });
 }
 

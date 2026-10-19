@@ -15,8 +15,8 @@ export function mountHeatmap(
     columns[Number(element.dataset.week)]?.push(element);
   }
 
-  for (const time of plan.pops) {
-    clock.at(time, (at) => sound()?.pop(at));
+  for (const { time, db } of plan.pops) {
+    clock.at(time, (at) => sound()?.pop(at, { db }));
   }
 
   const shown = plan.weekTimes.map(() => Number.NaN);

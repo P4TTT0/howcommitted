@@ -44,8 +44,15 @@ export function mountReveal(
   }
   const ordered = [...groups].sort(([a], [b]) => a - b);
 
-  ordered.forEach(([group], position) => {
-    const isLast = position === ordered.length - 1;
+  // Everything is already on screen: one sound, not a staircase of nothing.
+  const first = ordered[0];
+  if (reducedMotion && first) {
+    clock.at(revealTime(first[0]), (time) => sound()?.playAccent(time));
+  }
+
+  const steps = reducedMotion ? [] : ordered;
+  steps.forEach(([group], position) => {
+    const isLast = position === steps.length - 1;
     clock.at(revealTime(group), (time) => {
       const engine = sound();
       if (engine && onReveal) {
@@ -84,7 +91,13 @@ export function mountReveal(
   };
 }
 
-/** The common versus reveal sound: one `stair` step per group, low to high. */
-export const stairReveal: RevealOptions = {
-  onReveal: (engine, position, time) => engine.stair(time, position),
-};
+/**
+ * The common versus reveal sound: one `stair` step per group, low to high.
+ * `base` starts the stair that many steps up the pentatonic scale, so the
+ * info scenes that follow each other do not open on the same notes.
+ */
+export function stairReveal(base = 0): RevealOptions {
+  return {
+    onReveal: (engine, position, time) => engine.stair(time, base + position),
+  };
+}

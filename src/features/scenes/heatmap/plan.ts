@@ -138,12 +138,21 @@ export function planRows(
   });
 }
 
+export type WeekPop = {
+  time: number;
+  /** Offset from the base pop level: softer for weeks without contributions. */
+  db: number;
+};
+
+/** How much softer a pop is for a week with no contributions. */
+export const EMPTY_WEEK_DB = -9;
+
 export type HeatmapPlan = {
   weeks: number;
   /** Seconds at which each week column starts to appear, by week index. */
   weekTimes: number[];
-  /** Clock time of one pop per drawn week column; empty columns stay silent. */
-  pops: number[];
+  /** One pop per drawn week column, landing as the column does. */
+  pops: WeekPop[];
   duration: number;
 };
 
@@ -158,7 +167,7 @@ export function weeklyTotals(rows: readonly YearRow[]): number[] {
   return totals;
 }
 
-/** Reveal timing: week columns appear left to right; a pop per drawn week. */
+/** Reveal timing: week columns appear left to right; a pop per week column as it lands. */
 export function planReveal(totals: readonly number[]): HeatmapPlan {
   const weeks = totals.length;
   const step =
@@ -168,7 +177,13 @@ export function planReveal(totals: readonly number[]): HeatmapPlan {
     quantizeUp(LEAD_SECONDS + week * step, GRID_SECONDS),
   );
 
-  const pops = weekTimes.filter((_, week) => (totals[week] ?? 0) > 0);
+  // The pop lands when the column visibly does (ease-out: most of it is there
+  // by half the fade), not when the fade starts. Every column gets one, softer
+  // when the week is empty, so the rhythm never skips a step.
+  const pops = weekTimes.map((time, week) => ({
+    time: quantizeUp(time + FADE_SECONDS / 2, GRID_SECONDS),
+    db: (totals[week] ?? 0) > 0 ? 0 : EMPTY_WEEK_DB,
+  }));
 
   const lastTime = weekTimes.at(-1) ?? 0;
   return {
