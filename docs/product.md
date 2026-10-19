@@ -27,28 +27,47 @@ CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
 
 ## Scenes
 
+Playback order lives in `features/scenes/registry.ts`. A scene with nothing to show is skipped.
+
+### Solo
+
 | # | Scene | Content |
 |---|-------|---------|
 | 1 | Timeline | Yearly blocks (height = calendar contributions of the year; color = year identity; the year in progress is dashed) under the running total line, with repo-creation flags and the big counter |
-| 2 | Versus race (versus only) | A race of horizontal bars that grow on one shared timeline, each with the avatar at its tip; rows slide when one passes another, with no rank numbers or "winner" |
-| 3 | Heatmap | Every year as a row of 53 week squares tinted in the year color, yearly totals on the right, plus a month strip (average per calendar month; "<Month> is your month." only when the history covers every calendar month). Same calendar data as the line; label it "contributions", never commits |
-| 4 | Language mosaic | Proportional blocks, top 5 plus "other". Label: languages of owned repos, not per-commit |
-| 5 | Big numbers | Four giant numbers: commits, PRs, reviews, issues |
-| - | Final poster | Summary, fixed line "Contributions are not productivity. This is rhythm, not value.", actions |
+| 2 | Heatmap | Every year as a row of 53 week squares tinted in the year color, yearly totals on the right, plus a month strip (average per calendar month; "<Month> is your month." only when the history covers every calendar month). Same calendar data as the line; label it "contributions", never commits |
+| 3 | Main repo | The public repo with the most commits in large type, the top five repos as bars, and one era tile per year (repo, language, commits). Commit data, labeled as commits |
+| 4 | Week shape | Contributions folded onto the seven weekdays, plus a steady or bursty rhythm label |
+| 5 | Records | Longest streak as a tick strip, plus habit tiles (busiest day, week, month and year, active days, longest quiet stretch) |
+| 6 | Then vs now | Weekday shares of a past year against the last full year; the past year can be changed in explore. Needs at least two full years |
+| 7 | Language mosaic | Proportional blocks, top 5 plus "other". Label: languages of owned repos, not per-commit |
+| 8 | Big numbers | Four giant numbers: commits, PRs, reviews, issues |
+| - | Final poster | Summary, fixed line "Contributions are not productivity. This is rhythm, not value.", actions, and three 9:16 share cards (poster, rhythm, eras) |
+
+### Versus
+
+| # | Scene | Content |
+|---|-------|---------|
+| 1 | Contribution race | Horizontal bars that grow on one shared timeline, each with the avatar at its tip; rows slide when one passes another, with no rank numbers or "winner" |
+| 2 | Shared days | A calendar year split by who contributed each day: days everyone showed up, days at least one did, and the longest run together |
+| 3 | Favorite languages | One card per developer with the languages of their own public repos, in the order added |
+| 4 | Longest streaks | Each developer's longest streak and longest quiet stretch on one shared timeline, in the order added |
+| 5 | Rhythm sync | Each developer's week shape side by side, plus the overlap for each pair |
+| 6 | Awards | Habit titles per developer ("Longest streak", "Weekend regular", "Earliest start"), never a verdict |
+| - | Final poster | The combined total, a block per developer (total, years, awards) and the fixed line, never ordered or compared |
 
 ## Controls
 
 - Pause, previous and next scene, speed (0.5×, 1×, 1.5×, 2×, kept for the whole run), mute, and cancel (back to the landing).
 - Scenes never advance on their own. A finished scene stays on screen to explore: its chart is interactive (pointer and keyboard show exact values) and a clear "Next" moves on. Going back or jumping to a scene already played lands in explore; it can be replayed.
 - Progress bar with clickable scene ticks.
-- Versus uses the same controls and explore phase. Its scene is the contribution race; its final poster shows each developer side by side (total, years) with the fixed line, Replay and Search again.
+- Versus uses the same controls and explore phase, with its own scenes (see above); its final poster offers Replay and Search again.
 - Keyboard: Space pause/resume, ← → previous/next scene, M mute, Esc cancel. Never while typing.
 - Shared links never autoplay.
 
 ## MVP scope
 
 - Solo and versus (up to 5) for any public GitHub user.
-- The five scenes and final poster above.
+- The solo and versus scenes and final posters above.
 - Sound and motion as described in [design.md](design.md).
 - Share card and Open Graph image.
 - Caching, quota handling, and optional GitHub sign-in as described in [architecture.md](architecture.md).
