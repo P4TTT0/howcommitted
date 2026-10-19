@@ -4,6 +4,8 @@
 
 **[Try it at howcommitted.com](https://www.howcommitted.com/)**
 
+<img width="960" alt="A contribution history playing back in Committed" src="docs/assets/readme.gif" />
+
 ## What you get
 
 - **Your history, played.** Every contribution adds up on one timeline, and the sound climbs with it.
