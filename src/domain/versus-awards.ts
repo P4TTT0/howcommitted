@@ -100,7 +100,7 @@ const CANDIDATES: readonly Candidate[] = [
   },
   {
     id: "reviews",
-    title: "Most reviews",
+    title: "Reviewer",
     metric: "Code reviews on GitHub",
     direction: "max",
     read: (m) => (m.reviews === null ? null : positive(m.reviews)),
@@ -124,7 +124,7 @@ const CANDIDATES: readonly Candidate[] = [
   },
   {
     id: "pull-requests",
-    title: "Most pull requests",
+    title: "PR opener",
     metric: "Pull requests opened on GitHub",
     direction: "max",
     read: (m) => (m.pullRequests === null ? null : positive(m.pullRequests)),
@@ -132,7 +132,7 @@ const CANDIDATES: readonly Candidate[] = [
   },
   {
     id: "active-days",
-    title: "Most active days",
+    title: "Active days",
     metric: "Days with at least one contribution",
     direction: "max",
     read: (m) => positive(m.activeDays),
@@ -148,7 +148,7 @@ const CANDIDATES: readonly Candidate[] = [
   },
   {
     id: "active-years",
-    title: "Most active years",
+    title: "Active years",
     metric: "Years with at least one contribution",
     direction: "max",
     read: (m) => positive(m.activeYears),
@@ -156,7 +156,7 @@ const CANDIDATES: readonly Candidate[] = [
   },
   {
     id: "heavy-days",
-    title: "Heaviest active days",
+    title: "Big days",
     metric: "Contributions on an average active day",
     direction: "max",
     read: (m) => positive(m.averagePerActiveDay),
