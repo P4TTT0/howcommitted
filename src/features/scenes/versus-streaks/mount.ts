@@ -22,12 +22,17 @@ export function mountStreaks(
     hidden.push({ element, time: revealTime(group) });
   }
   plan.rows.forEach((row, position) => {
-    const li = root.querySelector<HTMLElement>(`[data-reveal="${row.index}"]`);
-    if (!li) return;
-    for (const pop of pops) {
-      if (pop.row !== position || pop.kind === "row") continue;
-      const block = li.querySelector<HTMLElement>(`[data-block="${pop.kind}"]`);
-      if (block) hidden.push({ element: block, time: pop.time });
+    // A row exists twice: the desktop timeline and the phone list.
+    for (const li of root.querySelectorAll<HTMLElement>(
+      `[data-reveal="${row.index}"]`,
+    )) {
+      for (const pop of pops) {
+        if (pop.row !== position || pop.kind === "row") continue;
+        const block = li.querySelector<HTMLElement>(
+          `[data-block="${pop.kind}"]`,
+        );
+        if (block) hidden.push({ element: block, time: pop.time });
+      }
     }
   });
 

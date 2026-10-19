@@ -111,7 +111,10 @@ for (const viewport of VIEWPORTS) {
   }) => {
     await page.setViewportSize(viewport);
     await open(page, ["ada", "grace", "linus", "margaret", "edge"]);
-    await expectSceneFits(page, { allowScroll: true });
+    // Five phone rows fit without scrolling at 390x844; 360x740 may scroll.
+    await expectSceneFits(page, {
+      allowScroll: viewport.width < 390 || viewport.width >= 768,
+    });
   });
 
   test(`streaks fit at ${viewport.name} with 39-character logins`, async ({
@@ -170,11 +173,14 @@ test("the tooltip of a streak at the far right stays inside the frame", async ({
   expect(box.y).toBeGreaterThanOrEqual(frame.y - 1);
 });
 
-test("a phone shows the tooltip on tap", async ({ page }) => {
+test("a phone row toggles both date ranges on tap", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   const region = await open(page, ["ada", "grace", "edge"]);
-  await region
-    .getByRole("button", { name: /^@edge: .* in a row,/ })
-    .dispatchEvent("click");
-  await expect(region.getByRole("tooltip")).toContainText(/in a row/i);
+  const row = region.getByRole("button", { name: /^@edge: .* in a row: /i });
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+  await row.click();
+  await expect(row).toHaveAttribute("aria-expanded", "true");
+  await expect(row).toContainText(/in a row: .*quiet: /);
+  await row.click();
+  await expect(row).toHaveAttribute("aria-expanded", "false");
 });

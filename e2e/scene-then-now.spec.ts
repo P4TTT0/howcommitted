@@ -99,6 +99,7 @@ for (const viewport of VIEWPORTS) {
     // Seven weekday groups share a phone-width chart, so each is about 40px
     // wide there; the 44px rule applies from tablet width up.
     const tapTargets = viewport.width >= 768;
+    const phone = viewport.width < 768;
 
     for (const profile of PROFILES) {
       test(`fits and stays tappable with ${profile.name}`, async ({ page }) => {
@@ -111,6 +112,29 @@ for (const viewport of VIEWPORTS) {
         const picker = page.getByRole("toolbar", {
           name: "Choose the year to compare with",
         });
+        const earlier = page.getByRole("button", { name: "Earlier year" });
+        const later = page.getByRole("button", { name: "Later year" });
+        if (phone) {
+          // The stepper replaces the picker below the md breakpoint.
+          await expect(picker).toBeHidden();
+          await expectSceneFits(page, { tapTargets, allowScroll: false });
+          // Step back to the first year, then forward once.
+          for (let step = 0; step < 4 && (await earlier.isEnabled()); step++) {
+            await earlier.click();
+            await expectSceneFits(page, { tapTargets, allowScroll: false });
+          }
+          await expect(earlier).toBeDisabled();
+          await expect(
+            page.getByRole("img", { name: new RegExp(`^Then ${YEARS[0]}:`) }),
+          ).toBeVisible();
+          await later.click();
+          await expect(
+            page.getByRole("img", { name: new RegExp(`^Then ${YEARS[1]}:`) }),
+          ).toBeVisible();
+          await expectSceneFits(page, { tapTargets, allowScroll: false });
+          return;
+        }
+        await expect(later).toBeHidden();
         await expect(picker.getByRole("button")).toHaveCount(3);
         await expectSceneFits(page, { tapTargets, allowScroll: false });
 
@@ -135,9 +159,11 @@ for (const viewport of VIEWPORTS) {
       await openSceneInExplore(page, "Then vs now");
 
       // The groups come alive with the explore phase, like the picker.
-      await expect(
-        page.getByRole("button", { name: String(YEARS[0]), exact: true }),
-      ).toBeEnabled();
+      if (!phone) {
+        await expect(
+          page.getByRole("button", { name: String(YEARS[0]), exact: true }),
+        ).toBeEnabled();
+      }
       const readout = page.locator('[data-role="readout"]');
       await expect(readout).toContainText("Pick a day");
 
