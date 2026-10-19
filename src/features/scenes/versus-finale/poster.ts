@@ -29,6 +29,8 @@ export type PosterModel = {
   sentence: string;
   /** Set when shared private contributions are part of the totals. */
   privateNote: string | null;
+  /** Shared private contributions inside the totals; 0 when nobody shared. */
+  privateTotal: number;
 };
 
 const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five"] as const;
@@ -69,5 +71,9 @@ export function buildPoster(entries: readonly VersusEntry[]): PosterModel {
     together,
     sentence: `Contributions between ${count} of you.`,
     privateNote: privateNoteFor(profiles),
+    privateTotal: profiles.reduce(
+      (sum, profile) => sum + profile.privateContributions,
+      0,
+    ),
   };
 }

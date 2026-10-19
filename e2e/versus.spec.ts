@@ -134,7 +134,7 @@ test("Play loads each history in order, then plays the race, the shared days and
     finale.getByRole("link", { name: "Search again" }),
   ).toBeVisible();
   await expect(
-    page.getByText("contributions, 2023 to 2024").first(),
+    page.getByText("contributions · 2023 to 2024").first(),
   ).toBeVisible();
 
   await expect(
