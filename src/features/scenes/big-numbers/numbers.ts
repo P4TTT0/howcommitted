@@ -151,10 +151,13 @@ export function totalReading(
   return `${number.label}: ${formatCount(number.total)} in total`;
 }
 
+/** The idle line over each tile's year chart. */
+export const BY_YEAR = "By year";
+
 /** Spoken and visible reading of one year of a number. */
 export function yearReading(
   number: Pick<BigNumber, "label">,
   entry: YearValue,
 ): string {
-  return `${number.label} in ${entry.year}: ${formatCount(entry.value)}`;
+  return `${entry.year}: ${formatCount(entry.value)} ${number.label.toLowerCase()}`;
 }

@@ -70,7 +70,7 @@ export function RecordsView({ plan }: RecordsViewProps) {
                 key={tile.key}
                 data-tile={index}
                 aria-label={tileReading(tile)}
-                className={`flex min-h-[104px] min-w-0 flex-col items-start justify-between gap-2 border-2 text-left border-ink px-3 py-3 data-[picked]:bg-ink data-[picked]:text-paper md:px-4 md:py-3 ${TONES[tile.tone]} ${focusRing}`}
+                className={`flex min-h-[104px] min-w-0 flex-col items-start justify-between gap-2 border-2 text-left border-ink px-3 py-3 data-[picked]:outline-[3px] data-[picked]:outline-offset-2 data-[picked]:outline-ink md:px-4 md:py-3 ${TONES[tile.tone]} ${focusRing}`}
               >
                 <p
                   aria-hidden="true"
@@ -84,7 +84,7 @@ export function RecordsView({ plan }: RecordsViewProps) {
                 >
                   {tile.value}
                   {tile.unit ? (
-                    <span className="ml-1.5 font-mono text-xs font-normal [font-stretch:87.5%]">
+                    <span className="ml-2 inline-block text-[clamp(0.875rem,4vw,1.125rem)] font-extrabold uppercase leading-none md:text-[clamp(0.875rem,min(1.8vw,3.2dvh),1.625rem)]">
                       {tile.unit}
                     </span>
                   ) : null}
