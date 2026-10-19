@@ -2,6 +2,9 @@
 
 import { type ReactNode, useLayoutEffect, useRef } from "react";
 
+/** Enough measure-and-shrink rounds to absorb rounding; the first one does most. */
+const MAX_STEPS = 6;
+
 type FitTextProps = {
   children: ReactNode;
   className?: string;
@@ -22,13 +25,19 @@ export function FitText({ children, className = "" }: FitTextProps) {
     const text = inner.current;
     if (!box || !text) return;
 
+    // Glyph widths do not scale exactly with the font size (hinting, rounding),
+    // so one proportional step can still leave a few pixels over: measure
+    // again after each step until it fits.
     const shrinkToFit = () => {
       text.style.fontSize = "";
       const available = box.clientWidth;
-      const natural = text.getBoundingClientRect().width;
-      if (available <= 0 || natural <= available) return;
-      const size = Number.parseFloat(getComputedStyle(text).fontSize);
-      text.style.fontSize = `${(size * available * 0.98) / natural}px`;
+      if (available <= 0) return;
+      for (let step = 0; step < MAX_STEPS; step += 1) {
+        const natural = text.getBoundingClientRect().width;
+        if (natural <= available) return;
+        const size = Number.parseFloat(getComputedStyle(text).fontSize);
+        text.style.fontSize = `${Math.floor(((size * available) / natural) * 0.98 * 10) / 10}px`;
+      }
     };
 
     shrinkToFit();
