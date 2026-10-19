@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { formatCount } from "@/features/sequencer/model/format";
 import { swatchClass } from "@/features/versus/palette";
 import { swatchTextClass } from "@/features/versus/swatchText";
@@ -15,8 +15,9 @@ import {
   shareProfile,
 } from "../finale/poster";
 import type { PosterModel } from "./poster";
-import { renderPosterImage, savePosterImage } from "./posterImage";
 import type { VersusSummary } from "./summary";
+import { VersusShareCards } from "./VersusShareCards";
+import { buildVersusCards } from "./versusCards";
 
 type Props = {
   summaries: readonly VersusSummary[];
@@ -24,29 +25,25 @@ type Props = {
   onReplay: () => void;
 };
 
-/** Color header height: fixed so every card is the same size. */
-const HEADER =
-  "grid-rows-[auto] md:grid-rows-[clamp(7.5rem,22vh,12rem)_minmax(0,1fr)]";
-
 /** The mono caption style used across the poster. */
 const MONO = "font-mono [font-stretch:87.5%]";
 
-/** The poster action: 44px+ tall, mono caps, two by two on a phone. */
-const ACTION = `${actionClass} min-h-12 md:px-5 max-md:w-full`;
+/** The poster action: 48px tall, mono caps. */
+const ACTION = `${actionClass} min-h-12 px-2 md:px-3`;
 
 /** GitHub avatar in a paper circle; the initial shows if it cannot load. */
 function Avatar({ login }: { login: string }) {
   const [failed, setFailed] = useState(false);
   return (
-    <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-paper font-display text-xl font-black text-ink">
+    <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-paper font-display text-lg font-black text-ink md:size-10 md:text-[22px]">
       {login.charAt(0).toUpperCase()}
       {!failed && (
-        // biome-ignore lint/performance/noImgElement: a 36px avatar, no optimizer needed
+        // biome-ignore lint/performance/noImgElement: a 40px avatar, no optimizer needed
         <img
           src={`https://github.com/${encodeURIComponent(login)}.png?size=80`}
           alt=""
-          width={36}
-          height={36}
+          width={40}
+          height={40}
           className="absolute inset-0 size-full object-cover"
           onError={() => setFailed(true)}
         />
@@ -55,64 +52,24 @@ function Avatar({ login }: { login: string }) {
   );
 }
 
-/** "Together, 2016 to 2026" as the poster caption: "Together · 2016 — 2026". */
-function togetherLabel(together: string): string {
-  return together.replace(", ", " · ").replace(" to ", " — ");
+/** "@ada vs @lin · 2013 — 2026" */
+function lineupLabel(poster: PosterModel): string {
+  const lineup = poster.people.map((person) => `@${person.login}`).join(" vs ");
+  if (!poster.years) return lineup;
+  const { first, last } = poster.years;
+  return `${lineup} · ${first === last ? first : `${first} — ${last}`}`;
 }
 
-const SAVE_FAILED = "The image could not be made. Try again.";
-
 /**
- * The versus poster: the sum of everyone, then one block per developer in the
- * order they were added with their calendar total, years and awards. Same
- * size, same weight: nothing here orders or compares them. Rows on a phone,
- * columns from tablet width. Small type always sits on Paper (a chip or the
- * strip under the block), never on a swatch.
+ * The versus poster: an ink block with the sum of everyone and one band per
+ * developer, then the share cards. A band's width (its height on a phone) is
+ * its share of the combined total, never below a readable minimum. That only
+ * shows how the total splits: nothing here orders or compares anyone.
  */
 export function VersusEndCard({ summaries, poster, onReplay }: Props) {
-  const saveRef = useRef<HTMLButtonElement>(null);
   const [message, setMessage] = useState("");
-  // The image is drawn ahead of the click, so saving never awaits before it
-  // reaches the share sheet or the download (the browser needs the gesture).
-  const [image, setImage] = useState<Blob | null>(null);
-  const [failed, setFailed] = useState(false);
-  // The scenes just ended: move focus to the obvious next action.
-  useEffect(() => saveRef.current?.focus(), []);
-  useEffect(() => {
-    let current = true;
-    setImage(null);
-    setFailed(false);
-    renderPosterImage(poster).then(
-      (blob) => current && setImage(blob),
-      () => current && setFailed(true),
-    );
-    return () => {
-      current = false;
-    };
-  }, [poster]);
-
-  function onSave() {
-    setMessage("");
-    if (failed) {
-      setMessage(SAVE_FAILED);
-      return;
-    }
-    if (!image) {
-      setMessage("The image is still being drawn. Try again in a moment.");
-      return;
-    }
-    savePosterImage(image).then(
-      (outcome) =>
-        setMessage(
-          outcome === "downloaded"
-            ? "Download started."
-            : outcome === "shared"
-              ? "Image shared."
-              : "",
-        ),
-      () => setMessage(SAVE_FAILED),
-    );
-  }
+  const cards = useMemo(() => buildVersusCards(poster), [poster]);
+  const sum = Math.max(1, poster.total);
 
   async function onShare() {
     setMessage("");
@@ -137,102 +94,81 @@ export function VersusEndCard({ summaries, poster, onReplay }: Props) {
     setMessage(shareMessage(outcome));
   }
 
-  const [lead, ...rest] = poster.sentence.split(" ");
   return (
     <section
       aria-label="Versus summary"
-      className="flex min-h-full flex-col gap-4 p-4 md:h-full md:gap-[clamp(0.75rem,2.4vh,1.25rem)] md:px-[clamp(1.5rem,4.5vw,4rem)] md:py-[clamp(1rem,5vh,3rem)]"
+      className="flex min-h-full flex-col gap-3 p-4 md:h-full md:gap-5 md:px-[clamp(1.5rem,4.5vw,4rem)] md:py-[clamp(1rem,4vh,2.5rem)] lg:grid lg:grid-cols-[minmax(0,1fr)_460px] lg:grid-rows-[minmax(0,1fr)] lg:gap-10"
     >
       <h2 className="sr-only">Versus</h2>
-      <header className="flex flex-col gap-1 md:flex-row md:items-end md:gap-7">
-        <div className="font-display text-[clamp(4.5rem,24vw,5.5rem)] font-black leading-[0.8] tabular-nums md:w-[42%] md:shrink-0 md:text-[clamp(5rem,min(12.5vw,20vh),11.25rem)]">
-          <FitText>{formatCount(poster.total)}</FitText>
-        </div>
-        <div className="flex min-w-0 flex-col gap-1.5 md:pb-1.5">
-          <p className={`${MONO} text-xs uppercase tracking-[0.06em]`}>
-            {togetherLabel(poster.together)}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 bg-ink p-4 text-paper md:gap-[clamp(0.5rem,2vh,1.125rem)] md:px-8 md:py-[clamp(1rem,3.5vh,1.875rem)]">
+        <div
+          className={`${MONO} flex flex-wrap justify-between gap-x-6 gap-y-1 text-[11px] uppercase tracking-[0.06em] md:text-[13px]`}
+        >
+          <p className="min-w-0 [overflow-wrap:anywhere]">
+            {lineupLabel(poster)}
           </p>
-          <p className="font-display text-[clamp(1.5rem,7vw,2rem)] font-black uppercase leading-[0.9] md:text-[clamp(1.5rem,min(3.4vw,5.6vh),3rem)]">
-            {lead}
-            <br className="max-md:hidden" /> {rest.join(" ")}
+          {poster.privateTotal > 0 && (
+            <p>Includes {formatCount(poster.privateTotal)} private</p>
+          )}
+        </div>
+        <div>
+          <div className="font-display text-[clamp(4.5rem,24vw,6rem)] font-black leading-[0.78] tabular-nums md:text-[clamp(5rem,min(12.5vw,20vh),12.5rem)]">
+            <FitText>{formatCount(poster.total)}</FitText>
+          </div>
+          <p className="mt-1 font-display text-[clamp(1.5rem,7vw,1.875rem)] font-black uppercase leading-none text-block-signal md:mt-2 md:text-[clamp(1.5rem,min(3.6vw,6vh),3.5rem)]">
+            Contributions, together.
           </p>
         </div>
-      </header>
 
-      <ul
-        style={{ "--n": summaries.length } as CSSProperties}
-        className="grid min-h-0 gap-2 md:flex-1 md:grid-cols-[repeat(var(--n),minmax(0,1fr))] md:gap-4"
-      >
-        {summaries.map((summary, index) => {
-          const person = poster.people[index];
-          return (
-            <li
-              key={summary.login.toLowerCase()}
-              data-role="dev-card"
-              className={`grid min-h-0 min-w-0 border-2 border-ink ${HEADER}`}
-            >
-              <div
-                className={`flex min-w-0 items-center justify-between gap-3 p-3 md:flex-col md:items-stretch md:justify-between md:p-[clamp(0.625rem,1.4vw,1.25rem)] ${swatchClass(index)} ${swatchTextClass(index)}`}
+        <ul className="flex min-h-[22rem] flex-1 flex-col gap-1 md:min-h-0 md:flex-row">
+          {summaries.map((summary, index) => {
+            const person = poster.people[index];
+            return (
+              <li
+                key={summary.login.toLowerCase()}
+                data-role="dev-band"
+                // The share sets how much extra room a band takes. On a phone
+                // a band starts at its content height, so a small share never
+                // squeezes the login and awards out of it.
+                style={{ flexGrow: summary.total / sum }}
+                className={`grid min-w-0 grid-cols-[minmax(0,1fr)_45%] items-center gap-x-2 gap-y-1 p-3 max-md:min-h-16 max-md:basis-auto md:min-w-[6.5rem] md:basis-0 md:grid-cols-1 md:content-between md:items-start md:p-4 ${swatchClass(index)} ${swatchTextClass(index)}`}
               >
-                <div className="flex min-w-0 items-center gap-2 md:flex-col md:items-start lg:flex-row lg:items-center">
+                <div className="col-start-1 flex min-w-0 items-center gap-2">
                   <Avatar login={summary.login} />
-                  <span className="min-w-0 [overflow-wrap:anywhere] bg-paper px-2 py-0.5 font-mono text-[11px] font-bold leading-tight text-ink lg:text-xs [font-stretch:87.5%]">
+                  <span
+                    className={`${MONO} min-w-0 text-xs font-bold leading-tight [overflow-wrap:anywhere] md:truncate`}
+                    title={`@${summary.login}`}
+                  >
                     @{summary.login}
                   </span>
                 </div>
-                <div className="w-[45%] shrink-0 text-right font-display text-[2.25rem] font-black leading-[0.8] tabular-nums md:w-auto md:text-left md:text-[clamp(2.5rem,min(7vw,13vh),6rem)]">
+                <div className="col-start-2 row-span-2 row-start-1 text-right font-display text-[2.125rem] font-black leading-[0.9] tabular-nums md:order-2 md:col-start-1 md:row-span-1 md:row-start-auto md:text-left md:text-[clamp(2rem,min(4vw,7vh),3.5rem)]">
                   <FitText>{formatCount(summary.total)}</FitText>
                 </div>
-              </div>
-              <div className="flex min-w-0 flex-col gap-2.5 bg-paper p-3 md:px-[clamp(0.625rem,1.4vw,1.25rem)] md:py-3.5">
-                <p className={`${MONO} text-xs [overflow-wrap:anywhere]`}>
-                  {summary.totalText} · {summary.span}
-                </p>
-                {person && person.awards.length > 0 && (
-                  <ul className="flex flex-col gap-1 border-t-2 border-ink pt-2.5">
-                    {person.awards.map((title) => (
-                      <li
-                        key={title}
-                        className="font-display text-xl font-black uppercase leading-none [overflow-wrap:anywhere] md:text-[clamp(1.125rem,3.6vh,1.875rem)]"
-                      >
-                        {title}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                <div className="col-start-1 min-w-0 md:order-3">
+                  <p className="sr-only">
+                    {summary.totalText} · {summary.span}
+                  </p>
+                  {person && person.awards.length > 0 && (
+                    <ul
+                      className={`${MONO} flex flex-col text-[11px] uppercase [overflow-wrap:anywhere]`}
+                    >
+                      {person.awards.map((title) => (
+                        <li key={title}>{title}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
-        <div className={`${MONO} min-w-0 text-xs md:text-[13px]`}>
-          <p>
-            {FIXED_LINE}
-            {poster.privateTotal > 0 && (
-              <span className="opacity-60">
-                {" "}
-                Includes {formatCount(poster.privateTotal)} private.
-              </span>
-            )}
-          </p>
-          <p role="status" className="empty:hidden">
-            {message}
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0">
-          <button
-            ref={saveRef}
-            type="button"
-            onClick={() => {
-              interaction.click();
-              onSave();
-            }}
-            className={`${ACTION} bg-ink font-bold text-paper`}
-          >
-            Save image
-          </button>
+        <p className={`${MONO} text-[11px] md:text-[13px]`}>{FIXED_LINE}</p>
+      </div>
+
+      <VersusShareCards cards={cards} message={message} onMessage={setMessage}>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:col-start-2 lg:col-start-1 lg:mt-auto">
           <button
             type="button"
             onClick={() => {
@@ -256,12 +192,12 @@ export function VersusEndCard({ summaries, poster, onReplay }: Props) {
           <Link
             href="/"
             onClick={() => interaction.click()}
-            className={`${ACTION} bg-block-signal font-bold text-ink`}
+            className={`${ACTION} bg-block-signal font-bold text-ink max-md:col-span-2`}
           >
             Search again
           </Link>
         </div>
-      </div>
+      </VersusShareCards>
     </section>
   );
 }
