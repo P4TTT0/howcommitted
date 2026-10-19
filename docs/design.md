@@ -71,9 +71,25 @@ Addictive, satisfying incremental sound. Reference: Balatro.
 - Short percussive samples with slight random variation per repeat.
 - A heavy payoff hit on milestones.
 - Tight audio-visual sync.
-- Audio aggregates by week or month and is quantized to tempo with a voice limit. Never one sound per raw commit.
+- Audio aggregates by week or month and is quantized to tempo with a voice limit. Never one sound per raw commit. A pop per drawn block is allowed, quantized with a voice cap.
 - Recorded or curated samples, never default synths.
 - Sound starts only after a user gesture. Mute is always visible.
+
+### Gestures
+
+Scenes use a fixed vocabulary of gestures (`src/playback/sound/engine.ts`) instead of picking samples. Each has its own voice limit and honors mute. Samples are Kenney CC0 (see `public/sounds/CREDITS.md`).
+
+| Gesture | Meaning | When to use it | Sample |
+|---------|---------|----------------|--------|
+| `pop` | A small block appears | One per drawn block, quantized to the beat, about +-10% random pitch; pops in the same grid slot are dropped and voices are capped | Interface `drop_002` |
+| `fill` | A bar loads | Ticks accelerate (about 110ms to 30ms) and rise (rate 0.8 to 1.7) over the bar's duration, then stop | Interface `tick_001` |
+| `stair` | A sequence of items, low to high | Step n plays at a pentatonic interval (0, 2, 4, 7, 9, 12, 14, 16, 19, 21 semitones) | Impact `impactGlass_light_001` |
+| `count` | A number climbs | Ticks with rising pitch, then one closing hit when it settles | Interface `click_003` (ticks), `confirmation_002` (close) |
+| `payoff` | Milestone, "@a passes @b" | Heavy and rare | `payoff-rattle` |
+| `hover` | Pointing at a value | Quiet, throttled; pitch encodes the value (a 0..1 level maps to rate 0.8..1.4). Interaction channel only | UI Audio `rollover2` |
+| `click` | Any press | Interaction channel only | UI Audio `click1` |
+
+`hover` and `click` are not scheduled on the clock: they go through `interaction` (`src/playback/sound/interaction.ts`), which plays only after the first user gesture and only while sound is on.
 
 ## Motion
 
