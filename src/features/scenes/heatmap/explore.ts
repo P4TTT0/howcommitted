@@ -1,5 +1,7 @@
 import { findElement } from "@/features/sequencer/explore";
+import { interaction } from "@/playback/sound/interaction";
 import {
+  hoverLevel,
   positionAfterKey,
   tipDetail,
   tipTitle,
@@ -18,7 +20,8 @@ const ARROW = 6;
  * inward near the edges and drops below when there is no room above. The grid
  * is also one focusable slider: arrows move a week or a year, Page Up/Down a
  * quarter, Home/End the first and last week, and the exact value is spoken.
- * Instant DOM updates only: no sound, no timers.
+ * Instant DOM updates only, no timers; the only sound is the hover pitch
+ * through the interaction channel.
  */
 export function exploreHeatmap(
   root: HTMLElement,
@@ -93,10 +96,12 @@ export function exploreHeatmap(
     const row = picked ? rows[picked.row] : undefined;
     const cell = picked ? row?.weeks[picked.week] : undefined;
     if (!picked || !row || !cell || cell.state !== "past") {
+      interaction.leave();
       tip.hidden = true;
       return;
     }
     current = picked;
+    interaction.hover(hoverLevel(cell), `${picked.row}:${picked.week}`);
     marked = root.querySelector<HTMLElement>(
       `[data-cell="${picked.row * WEEKS + picked.week}"]`,
     );

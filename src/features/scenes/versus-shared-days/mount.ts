@@ -1,18 +1,19 @@
 import { findElement } from "@/features/sequencer/explore";
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { semitonesForDegree } from "@/playback/pitch";
 import { findGrids } from "./paint";
-import { groupsShown, REVEAL_SECONDS, STATS_FADE_SECONDS } from "./plan";
-
-/** One soft tick per month while the year appears. */
-const TICKS = 12;
+import {
+  groupPopTimes,
+  groupsShown,
+  REVEAL_SECONDS,
+  STATS_FADE_SECONDS,
+} from "./plan";
 
 /**
  * Wires the scene to the sequencer's clock: the year appears week by week on
  * wide screens and month by month on phones, then the numbers fade in. Every
  * value is a pure function of clock time, written per frame only when it
- * changes. A tick per month and one accent when the numbers land; no timers
- * of its own. Returns the cleanup.
+ * changes. A pop per week column (or month block) as it draws; no timers of
+ * its own. Returns the cleanup.
  */
 export function mountSharedDays(
   root: HTMLElement,
@@ -21,16 +22,14 @@ export function mountSharedDays(
   const grids = findGrids(root);
   const stats = findElement<HTMLElement>(root, '[data-role="stats"]');
 
-  for (let tick = 0; tick < TICKS; tick++) {
-    clock.at((tick / TICKS) * REVEAL_SECONDS, (time) =>
-      sound()?.playTick({
-        time,
-        semitones: semitonesForDegree(tick % 7),
-        intensity: 0.5,
-      }),
-    );
+  // Only the layout on screen makes sound: the other one is display:none.
+  const audible = grids.find((grid) => grid.container.offsetParent !== null);
+  if (audible) {
+    const groups = Math.ceil(audible.slots.length / audible.groupSize);
+    for (const time of groupPopTimes(groups)) {
+      clock.at(time, (at) => sound()?.pop(at));
+    }
   }
-  clock.at(REVEAL_SECONDS, (time) => sound()?.playAccent(time));
 
   const shown = grids.map(() => 0);
   let statsOpacity = Number.NaN;

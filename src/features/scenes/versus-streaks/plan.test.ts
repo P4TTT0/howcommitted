@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { records } from "@/domain/records";
 import type { VersusProfile } from "@/features/versus/versusProfiles";
-import { dayCount, planStreaks, rangeText } from "./plan";
+import {
+  dayCount,
+  GRID_SECONDS,
+  planStreaks,
+  rangeText,
+  spanLevel,
+  streakPops,
+} from "./plan";
 
 function profile(login: string, index: number, dates: string[]): VersusProfile {
   return {
@@ -79,5 +86,32 @@ describe("planStreaks", () => {
 
   it("is null when nobody has contributed", () => {
     expect(planStreaks([profile("ada", 0, [])])).toBeNull();
+  });
+});
+
+describe("streakPops and spanLevel", () => {
+  const plan = planStreaks([
+    profile("ada", 0, ["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-10"]),
+    profile("bob", 1, ["2023-01-01", "2023-01-10"]),
+  ]);
+
+  it("pops a row, then its quiet block and its streak block, on the grid", () => {
+    const pops = streakPops(plan ?? { rows: [] });
+    const first = pops.filter((pop) => pop.row === 0);
+    expect(first.map((pop) => pop.kind)).toEqual(["row", "quiet", "streak"]);
+    expect(first[1]?.time).toBeCloseTo((first[0]?.time ?? 0) + GRID_SECONDS);
+    expect(first[2]?.time).toBeCloseTo(
+      (first[0]?.time ?? 0) + 2 * GRID_SECONDS,
+    );
+  });
+
+  it("scales the hover level to the longest block", () => {
+    const rows = plan?.rows ?? [];
+    const longest = Math.max(
+      ...rows.flatMap((row) => [row.streak?.days ?? 0, row.quiet?.days ?? 0]),
+    );
+    expect(spanLevel({ rows }, longest)).toBe(1);
+    expect(spanLevel({ rows }, longest / 2)).toBe(0.5);
+    expect(spanLevel({ rows: [] }, 3)).toBe(0);
   });
 });

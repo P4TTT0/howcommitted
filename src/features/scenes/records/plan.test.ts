@@ -12,8 +12,10 @@ import {
   GRID_SECONDS,
   planRecords,
   popAt,
+  STRIP_SECONDS,
   streakTicks,
   stripFillAt,
+  stripPopTimes,
 } from "./plan";
 
 const history = makeHistory("ada", [
@@ -113,5 +115,29 @@ describe("recordsScene", () => {
       history: null,
     });
     expect(instance).toBeNull();
+  });
+});
+
+describe("stripPopTimes", () => {
+  const plan = { stripStart: 1, ticks: new Array<number>(120).fill(1) };
+
+  it("pops on the grid, inside the strip draw, without repeats", () => {
+    const times = stripPopTimes(plan);
+    expect(times.length).toBeGreaterThan(0);
+    expect(times.length).toBeLessThanOrEqual(plan.ticks.length);
+    expect(new Set(times).size).toBe(times.length);
+    for (const time of times) {
+      expect(time).toBeGreaterThan(plan.stripStart);
+      expect(time).toBeLessThanOrEqual(
+        plan.stripStart + STRIP_SECONDS + GRID_SECONDS,
+      );
+      expect(
+        Math.abs(time / GRID_SECONDS - Math.round(time / GRID_SECONDS)),
+      ).toBeLessThan(1e-6);
+    }
+  });
+
+  it("is silent without ticks", () => {
+    expect(stripPopTimes({ stripStart: 1, ticks: [] })).toEqual([]);
   });
 });

@@ -1,5 +1,6 @@
 import { findElement } from "@/features/sequencer/explore";
 import { swatchClass } from "@/features/versus/palette";
+import { interaction } from "@/playback/sound/interaction";
 import {
   daySlots,
   findYearElements,
@@ -11,6 +12,7 @@ import {
   dateTitle,
   dayDetail,
   GRID_DESCRIPTION,
+  presenceLevel,
   type SharedDaysModel,
   type YearData,
 } from "./plan";
@@ -29,9 +31,10 @@ const EMPTY_SWATCH = "bg-[#E4E1D8]";
  * arrows (Left/Right a day, Up/Down a week, Page Up/Down about a month,
  * Home/End the ends), to read who contributed that day in a black tooltip with
  * an arrow. The tooltip is clamped inside the grid and flips below a day near
- * the top of the scene. Instant DOM updates: no timers, no sound, no clock of
- * its own. The arrows stay with the grid while it is focused. The cleanup puts
+ * the top of the scene. Instant DOM updates: no timers, no clock of its own. The arrows stay with the grid while it is focused. The cleanup puts
  * the opening year back and the controls to sleep.
+ * The only sound is the interaction channel: a hover pitched by how many
+ * developers were present, and a click on the year stepper.
  */
 export function exploreSharedDays(
   root: HTMLElement,
@@ -152,6 +155,9 @@ export function exploreSharedDays(
   const select = (next: number | null) => {
     day =
       next === null ? null : Math.min(year.days.length - 1, Math.max(0, next));
+    const picked = day === null ? undefined : year.days[day];
+    if (picked) interaction.hover(presenceLevel(picked, people), picked.date);
+    else interaction.leave();
     showDay();
   };
 
@@ -259,7 +265,9 @@ export function exploreSharedDays(
     if (!button) return;
     const next =
       model.years[model.years.indexOf(year.year) + Number(button.dataset.step)];
-    if (next !== undefined) showYear(next);
+    if (next === undefined) return;
+    interaction.click();
+    showYear(next);
   };
 
   stepper.addEventListener("click", onStepClick);

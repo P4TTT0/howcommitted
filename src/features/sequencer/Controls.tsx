@@ -1,4 +1,5 @@
 import type { Ref } from "react";
+import { interaction } from "@/playback/sound/interaction";
 import { focusRing, labelClass, pressable } from "@/ui/classes";
 import { SHORTCUT_KEYS } from "./shortcuts";
 import { speedLabel } from "./speed";
@@ -84,6 +85,13 @@ export function Controls({
   const explore = view === "explore";
   const finale = view === "finale";
   const replays = explore || finale;
+  /** Every press gets the click, then does its job. */
+  const press =
+    <A extends unknown[]>(action: (...args: A) => void) =>
+    (...args: A) => {
+      interaction.click();
+      action(...args);
+    };
   const upcoming = scenes[index + 1]?.label ?? "Finale";
 
   return (
@@ -95,7 +103,7 @@ export function Controls({
         <button
           type="button"
           className={`${button} flex-1 px-3 md:flex-none md:px-4`}
-          onClick={onCancel}
+          onClick={press(onCancel)}
           aria-keyshortcuts={SHORTCUT_KEYS.cancel}
           aria-label="Cancel and go back"
           title="Cancel and go back (Esc)"
@@ -106,7 +114,7 @@ export function Controls({
           type="button"
           className={`${button} ${disabled} flex-1 md:flex-none`}
           disabled={!canPrev}
-          onClick={onPrev}
+          onClick={press(onPrev)}
           aria-label="Previous scene"
           aria-keyshortcuts={SHORTCUT_KEYS.prev}
           title="Previous scene (←)"
@@ -118,7 +126,7 @@ export function Controls({
           type="button"
           className={`${button} ${disabled} flex-1 md:flex-none`}
           disabled={idle}
-          onClick={replays ? onReplay : onToggle}
+          onClick={press(replays ? onReplay : onToggle)}
           aria-keyshortcuts={SHORTCUT_KEYS.toggle}
           title={
             explore
@@ -162,7 +170,7 @@ export function Controls({
               <button
                 type="button"
                 disabled={idle}
-                onClick={() => onJump(scene)}
+                onClick={press(() => onJump(scene))}
                 aria-label={`Go to scene ${scene + 1}: ${label}`}
                 aria-current={scene === index && !finale ? "step" : undefined}
                 title={label}
@@ -177,7 +185,7 @@ export function Controls({
         <button
           type="button"
           className={`${button} px-3 md:px-4`}
-          onClick={onCycleSpeed}
+          onClick={press(onCycleSpeed)}
           aria-label={`Playback speed ${speedLabel(speed)}. Change speed`}
           title="Playback speed"
         >
@@ -188,7 +196,7 @@ export function Controls({
           className={`${button} px-3 md:px-4`}
           aria-keyshortcuts={SHORTCUT_KEYS.mute}
           title="Mute (M)"
-          onClick={onMute}
+          onClick={press(onMute)}
         >
           {muted ? "Sound off" : "Sound on"}
         </button>
@@ -197,7 +205,7 @@ export function Controls({
           type="button"
           className={`${button} ${primary} ${disabled} min-w-0 flex-1 md:flex-none`}
           disabled={!canNext}
-          onClick={onNext}
+          onClick={press(onNext)}
           aria-keyshortcuts={SHORTCUT_KEYS.next}
           title="Next scene (→)"
         >

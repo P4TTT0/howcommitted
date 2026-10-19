@@ -11,10 +11,13 @@ import {
   dateTitle,
   dayDetail,
   everyoneLabel,
+  groupPopTimes,
   groupsShown,
   MONTH_BLOCK,
   monthColumns,
   monthSlots,
+  presenceLevel,
+  REVEAL_SECONDS,
   weekSlots,
 } from "./plan";
 
@@ -141,5 +144,30 @@ describe("groupsShown", () => {
     expect(groupsShown(0.5, 12)).toBe(6);
     expect(groupsShown(1, 12)).toBe(12);
     expect(groupsShown(2, 12)).toBe(12);
+  });
+});
+
+describe("groupPopTimes", () => {
+  it("pops once per group, ordered and inside the reveal", () => {
+    const times = groupPopTimes(54);
+    expect(times.length).toBeGreaterThan(0);
+    expect(times.length).toBeLessThanOrEqual(54);
+    expect(times).toEqual([...times].sort((a, b) => a - b));
+    expect(new Set(times).size).toBe(times.length);
+    expect(times[0]).toBe(0);
+    expect(times.at(-1) ?? 0).toBeLessThan(REVEAL_SECONDS);
+  });
+
+  it("has no pops without groups", () => {
+    expect(groupPopTimes(0)).toEqual([]);
+  });
+});
+
+describe("presenceLevel", () => {
+  it("is the share of developers present that day", () => {
+    expect(presenceLevel({ people: [] }, 3)).toBe(0);
+    expect(presenceLevel({ people: [0, 2] }, 4)).toBe(0.5);
+    expect(presenceLevel({ people: [0, 1, 2] }, 3)).toBe(1);
+    expect(presenceLevel({ people: [0] }, 0)).toBe(0);
   });
 });

@@ -30,8 +30,6 @@ export type RecordTile = {
   tone: TileTone;
   /** Seconds at which the tile starts to pop in (on the grid). */
   start: number;
-  /** Scale degree of the chip. */
-  degree: number;
 };
 
 export type RecordsPlan = {
@@ -92,9 +90,7 @@ function tilesFor(found: Records, total: number): Omit<RecordTile, "start">[] {
   const year = found.busiestYear;
   const quiet = found.longestQuiet;
   const date = found.yourDate;
-  const degrees = [2, 4, 7, 9, 11, 13, 14, 16];
-  const push = (tile: Omit<RecordTile, "degree" | "start">) =>
-    tiles.push({ ...tile, degree: degrees[tiles.length] ?? 16 });
+  const push = (tile: Omit<RecordTile, "start">) => tiles.push(tile);
 
   if (day) {
     push({
@@ -258,4 +254,21 @@ export function tileReading(tile: RecordTile): string {
 
 export function streakReading(plan: RecordsPlan): string {
   return `Longest streak: ${plural(plan.streakDays, "day", "days")}, ${plan.streakRange}`;
+}
+
+/**
+ * Clock times of the pops for the streak strip: one per tick as it draws,
+ * quantized up to the grid. Ticks sharing a grid slot make one pop.
+ */
+export function stripPopTimes(
+  plan: Pick<RecordsPlan, "stripStart" | "ticks">,
+): number[] {
+  const count = plan.ticks.length;
+  const times = plan.ticks.map((_, index) =>
+    quantizeUp(
+      plan.stripStart + (STRIP_SECONDS * (index + 0.5)) / count,
+      GRID_SECONDS,
+    ),
+  );
+  return [...new Set(times)];
 }
