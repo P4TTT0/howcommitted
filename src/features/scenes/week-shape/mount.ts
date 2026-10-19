@@ -1,12 +1,10 @@
 import { findElement } from "@/features/sequencer/explore";
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { semitonesForDegree } from "@/playback/pitch";
 import { growthAt, rhythmProgressAt, type WeekPlan } from "./plan";
 
 /**
  * Wires the bars and the rhythm marker to the sequencer's clock. Heights are a
- * pure function of clock time; one chip per bar rises in pitch as the days go
- * by. No timers of its own.
+ * pure function of clock time; one fill per bar rises in pitch as it grows. No timers of its own.
  */
 export function mountWeekShape(
   root: HTMLElement,
@@ -20,18 +18,10 @@ export function mountWeekShape(
   const marker = findElement<HTMLElement>(root, '[data-role="rhythm-marker"]');
   const place = plan.position * 100;
 
-  plan.bars.forEach((bar, index) => {
-    const isLast = index === plan.bars.length - 1;
-    clock.at(bar.start, (time) => {
-      const engine = sound();
-      engine?.playTick({
-        time,
-        semitones: semitonesForDegree(bar.degree),
-        intensity: 0.7,
-      });
-      if (isLast) engine?.playAccent(time);
-    });
-  });
+  // Each bar loads as it grows: one fill over its own growth.
+  for (const bar of plan.bars) {
+    clock.at(bar.start, (time) => sound()?.fill(time, bar.land - bar.start));
+  }
 
   const shownBars = plan.bars.map(() => Number.NaN);
   let shownRhythm = Number.NaN;

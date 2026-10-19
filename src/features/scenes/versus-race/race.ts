@@ -1,10 +1,5 @@
 import { type Crossing, findCrossings } from "@/domain/crossings";
-import {
-  BPM,
-  DRAW_SECONDS,
-  GRID_SECONDS,
-  type Plan,
-} from "@/features/sequencer/model/plan";
+import { BPM, DRAW_SECONDS, type Plan } from "@/features/sequencer/model/plan";
 import { dayNumber } from "@/playback/aggregate";
 
 /**
@@ -243,28 +238,52 @@ export function passesLabel(count: number): string {
   return `${count.toLocaleString("en-US")} ${count === 1 ? "pass" : "passes"}`;
 }
 
-/** Seconds between ticks: a quarter note, so the sound stays aggregated. */
-export const TICK_SECONDS = GRID_SECONDS * 4;
+/** Shortest fill worth playing, in seconds. */
+const MIN_FILL_SECONDS = 0.2;
+/** Passes closer than this share one payoff: the chip is replaced anyway. */
+export const MIN_PAYOFF_GAP_SECONDS = 1.5;
 
 /**
- * Which lanes grew during each tick of the drawing window, in lane order. A
- * tick is one aggregated hit per growing developer, never one per contribution.
+ * One fill per calendar year of the race, tied to the leader's growth: it
+ * starts where the year starts and lasts as long as the year takes on the
+ * clock. Years where nobody gained are skipped (the bars do not move).
  */
-export function growthSlots(race: Race): { time: number; lanes: number[] }[] {
-  const count = Math.floor(DRAW_SECONDS / TICK_SECONDS);
-  const slots: { time: number; lanes: number[] }[] = [];
-  let previous = 0;
-  for (let slot = 1; slot <= count; slot++) {
-    const index = indexAtProgress(race, slot / count);
-    const grown: number[] = [];
-    race.lanes.forEach((lane, laneIndex) => {
-      const before = previous > 0 ? (lane.series[previous - 1] ?? 0) : 0;
-      if ((lane.series[index] ?? 0) > before) grown.push(laneIndex);
-    });
-    previous = index + 1;
-    slots.push({ time: (slot - 1) * TICK_SECONDS, lanes: grown });
+export function fillSegments(
+  race: Race,
+): { start: number; duration: number }[] {
+  const marks = yearMarks(race);
+  const leader = (index: number) =>
+    Math.max(0, ...race.lanes.map((lane) => lane.series[index] ?? 0));
+  const segments: { start: number; duration: number }[] = [];
+  marks.forEach((mark, position) => {
+    const end = marks[position + 1]?.startProgress ?? 1;
+    const first = Math.round(mark.startProgress * race.length);
+    const last = Math.min(race.length - 1, Math.round(end * race.length) - 1);
+    const before = first > 0 ? leader(first - 1) : 0;
+    if (leader(last) <= before) return;
+    const duration = (end - mark.startProgress) * DRAW_SECONDS;
+    if (duration < MIN_FILL_SECONDS) return;
+    segments.push({ start: mark.startProgress * DRAW_SECONDS, duration });
+  });
+  return segments;
+}
+
+/**
+ * Clock seconds at which a "@a passes @b" chip appears while playing: the
+ * moment the playing day reaches each crossing, thinned so two passes within
+ * `minGap` seconds make one payoff (the later chip replaces the earlier).
+ */
+export function passTimes(
+  race: Race,
+  minGap = MIN_PAYOFF_GAP_SECONDS,
+): number[] {
+  const times: number[] = [];
+  for (const crossing of race.crossings) {
+    const time = (crossing.index / race.length) * DRAW_SECONDS;
+    const previous = times.at(-1);
+    if (previous === undefined || time - previous >= minGap) times.push(time);
   }
-  return slots;
+  return times;
 }
 
 /** What assistive tech reads for a day: the moment and every lane, in lane order. */

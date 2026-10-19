@@ -64,6 +64,11 @@ describe("planMainRepo", () => {
     expect(plan?.readings).toHaveLength(
       (plan?.bars.length ?? 0) + (plan?.eras.length ?? 0),
     );
+    expect(plan?.levels).toHaveLength(plan?.readings.length ?? -1);
+    for (const level of plan?.levels ?? []) {
+      expect(level).toBeGreaterThan(0);
+      expect(level).toBeLessThanOrEqual(1);
+    }
   });
 
   it("keeps only the last eight years", () => {

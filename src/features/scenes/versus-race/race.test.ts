@@ -8,15 +8,17 @@ import {
 import {
   activePass,
   buildRace,
+  DRAW_SECONDS,
   dateAtIndex,
   dayReading,
-  growthSlots,
+  fillSegments,
   indexAtProgress,
   LEADER_SHARE,
   laneOrder,
   MAX_TICKS,
   niceTicks,
   passesLabel,
+  passTimes,
   scaleFor,
   tickLabel,
   valuesAtIndex,
@@ -213,13 +215,23 @@ describe("race readings", () => {
     expect(yearStartIndex(race, 2030)).toBe(race.length - 1);
   });
 
-  it("grows lanes on the tick grid, only where they gained", () => {
+  it("fills once per growing year, inside the drawing window", () => {
     if (!race) throw new Error("race expected");
-    const slots = growthSlots(race);
-    expect(slots[0]?.time).toBe(0);
-    expect(slots.some((slot) => slot.lanes.length > 0)).toBe(true);
-    for (const slot of slots) {
-      expect(slot.lanes).toEqual([...slot.lanes].sort((a, b) => a - b));
+    const segments = fillSegments(race);
+    expect(segments.length).toBeGreaterThan(0);
+    for (const segment of segments) {
+      expect(segment.start).toBeGreaterThanOrEqual(0);
+      expect(segment.start + segment.duration).toBeLessThanOrEqual(
+        DRAW_SECONDS + 1e-9,
+      );
     }
+  });
+
+  it("times passes at the crossing and thins close ones", () => {
+    if (!race) throw new Error("race expected");
+    const all = passTimes(race, 0);
+    expect(all).toHaveLength(race.crossings.length);
+    expect(passTimes(race, 1000).length).toBeLessThanOrEqual(1);
+    for (const time of all) expect(time).toBeLessThanOrEqual(DRAW_SECONDS);
   });
 });

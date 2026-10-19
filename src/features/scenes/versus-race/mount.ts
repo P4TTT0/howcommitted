@@ -1,15 +1,14 @@
 import type { SceneRuntime } from "@/features/sequencer/types";
 import { cumulativeAt } from "@/playback/aggregate";
 import type { PlaybackClock } from "@/playback/clock";
-import { semitonesForDegree } from "@/playback/pitch";
 import type { SoundEngine } from "@/playback/sound/engine";
 import {
   DRAW_SECONDS,
-  growthSlots,
+  fillSegments,
   indexAtProgress,
+  passTimes,
   playbackPassDays,
   type Race,
-  yearMarks,
 } from "./race";
 import { createReadout } from "./readout";
 
@@ -43,22 +42,14 @@ function scheduleSound(
   getEngine: () => SoundEngine | null,
   race: Race,
 ) {
-  // One aggregated hit per growing lane on each beat; each developer keeps
-  // their own pitch, so lanes can be told apart by ear.
-  for (const slot of growthSlots(race)) {
-    for (const lane of slot.lanes) {
-      const semitones = semitonesForDegree(lane * 2);
-      clock.at(slot.time, (time) =>
-        getEngine()?.playTick({ time, semitones, intensity: 1 }),
-      );
-    }
-  }
-  for (const mark of yearMarks(race).slice(1)) {
-    clock.at(mark.startProgress * DRAW_SECONDS, (time) =>
-      getEngine()?.playAccent(time),
+  // The bars load year by year: one fill per year, tied to the leader.
+  for (const segment of fillSegments(race)) {
+    clock.at(segment.start, (time) =>
+      getEngine()?.fill(time, segment.duration),
     );
   }
-  clock.at(DRAW_SECONDS, (time) =>
-    getEngine()?.playPayoff({ time, kind: "final" }),
-  );
+  // The payoff lands as the "@a passes @b" chip appears.
+  for (const time of passTimes(race)) {
+    clock.at(time, (at) => getEngine()?.payoff(at));
+  }
 }

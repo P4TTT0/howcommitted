@@ -1,18 +1,14 @@
 import { formatCount } from "@/features/sequencer/model/format";
-import {
-  DRAW_SECONDS,
-  GRID_SECONDS,
-  type Plan,
-  stepCueTimes,
-} from "@/features/sequencer/model/plan";
+import { DRAW_SECONDS, type Plan } from "@/features/sequencer/model/plan";
 import type { SceneRuntime } from "@/features/sequencer/types";
 import { cumulativeAt } from "@/playback/aggregate";
 import type { PlaybackClock } from "@/playback/clock";
-import { semitonesForDegree } from "@/playback/pitch";
-import { quantizeUp } from "@/playback/schedule";
 import type { SoundEngine } from "@/playback/sound/engine";
 import { CHART_WIDTH, topPercent } from "./chart";
 import { slotX, type YearSlot, yearFill } from "./years";
+
+/** Shorter than this a fill is just a click; skip it. */
+const MIN_FILL_SECONDS = 0.2;
 
 function find<T extends Element>(root: HTMLElement, selector: string): T {
   const element = root.querySelector<T>(selector);
@@ -36,38 +32,21 @@ export function mountTimeline(
   const render = createRenderer(root, plan, slots);
   const stopRendering = clock.onFrame(render);
   // Last, so nothing is left scheduled if anything above threw.
-  scheduleSound(clock, sound, plan, slots);
+  scheduleSound(clock, sound, slots);
   return stopRendering;
 }
 
+/** A year block builds as the line crosses it: one fill over that growth. */
 function scheduleSound(
   clock: PlaybackClock,
   getEngine: () => SoundEngine | null,
-  plan: Plan,
   slots: readonly YearSlot[],
 ) {
-  const payoffTimes = new Set(plan.milestones.map((m) => m.time));
-  for (const slot of plan.slots) {
-    // A payoff takes over its own beat.
-    if (payoffTimes.has(slot.time)) continue;
-    const semitones = semitonesForDegree(slot.degree);
-    clock.at(slot.time, (time) =>
-      getEngine()?.playTick({ time, semitones, intensity: slot.intensity }),
-    );
-  }
-  for (const milestone of plan.milestones) {
-    clock.at(milestone.time, (time) =>
-      getEngine()?.playPayoff({ time, kind: milestone.kind }),
-    );
-  }
-  // The year accent lands as the line crosses into the next block.
-  for (const slot of slots.slice(1)) {
-    const time = quantizeUp(slot.startProgress * DRAW_SECONDS, GRID_SECONDS);
-    if (payoffTimes.has(time)) continue;
-    clock.at(time, (at) => getEngine()?.playAccent(at));
-  }
-  for (const time of stepCueTimes(plan)) {
-    clock.at(time, (at) => getEngine()?.playUnattributed(at));
+  for (const slot of slots) {
+    const start = slot.startProgress * DRAW_SECONDS;
+    const duration = (slot.endProgress - slot.startProgress) * DRAW_SECONDS;
+    if (slot.contributions <= 0 || duration < MIN_FILL_SECONDS) continue;
+    clock.at(start, (time) => getEngine()?.fill(time, duration));
   }
 }
 

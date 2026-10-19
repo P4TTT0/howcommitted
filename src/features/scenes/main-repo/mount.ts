@@ -1,6 +1,5 @@
 import { findElement } from "@/features/sequencer/explore";
 import type { SceneRuntime } from "@/features/sequencer/types";
-import { semitonesForDegree } from "@/playback/pitch";
 import {
   BAR_SECONDS,
   FLIP_SECONDS,
@@ -12,12 +11,14 @@ import {
 /** How much larger than final size the name starts before it slams in. */
 const SLAM_OVERSHOOT = 0.35;
 const FLIP_DEGREES = 90;
+/** The stair gesture has ten steps (0..9). */
+const MAX_STAIR_INDEX = 9;
 
 /**
  * Wires the scene to the sequencer's clock: the name slams in, the bars grow,
  * then the era tiles flip in one by one. Every value is a pure function of
- * clock time, written per frame only when it changes. One accent for the name
- * and one soft tick per bar and tile are scheduled. No timers of its own.
+ * clock time, written per frame only when it changes. Each bar gets a fill and
+ * a stair step, each tile a stair step. No timers of its own.
  */
 export function mountMainRepo(
   root: HTMLElement,
@@ -32,16 +33,20 @@ export function mountMainRepo(
     findElement<HTMLElement>(root, `[data-item="${plan.bars.length + index}"]`),
   );
 
-  clock.at(plan.slamTime, (time) => sound()?.playAccent(time));
-  for (const entry of [...plan.bars, ...plan.eras]) {
-    clock.at(entry.time, (time) => {
-      sound()?.playTick({
-        time,
-        semitones: semitonesForDegree(entry.degree),
-        intensity: 0.5,
-      });
+  // Each repo bar loads (fill) and steps up the stair as its row appears;
+  // the era tiles run their own stair as each one flips in.
+  plan.bars.forEach((bar, index) => {
+    clock.at(bar.time, (time) => {
+      const engine = sound();
+      engine?.fill(time, BAR_SECONDS);
+      engine?.stair(time, Math.min(MAX_STAIR_INDEX, index));
     });
-  }
+  });
+  plan.eras.forEach((era, index) => {
+    clock.at(era.time, (time) =>
+      sound()?.stair(time, Math.min(MAX_STAIR_INDEX, index)),
+    );
+  });
 
   let nameShown = Number.NaN;
   const barsShown = plan.bars.map(() => Number.NaN);

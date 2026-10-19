@@ -6,6 +6,7 @@ import {
 } from "@/test-support/historyFixture";
 import {
   axisMaxFor,
+  dayLevel,
   dayReading,
   planThenNow,
   progressAt,
@@ -164,5 +165,24 @@ describe("dayReading", () => {
     expect(reading.day).toBe("Tuesday");
     expect(reading.detail).toMatch(/^2023: \d+ \(\d+%\) · 2025: \d+ \(\d+%\)$/);
     expect(reading.label).toBe(`Tuesday. ${reading.detail}`);
+  });
+});
+
+describe("dayLevel", () => {
+  it("is a 0..1 level for every weekday", () => {
+    const plan = planThenNow(
+      history([
+        [2023, 1, 7],
+        [2025, 1, 7],
+      ]),
+      TODAY,
+    );
+    if (!plan) throw new Error("expected a plan");
+    const comparison = plan.compare(2023);
+    for (let day = 0; day < 7; day++) {
+      const level = dayLevel(comparison, day);
+      expect(level).toBeGreaterThanOrEqual(0);
+      expect(level).toBeLessThanOrEqual(1);
+    }
   });
 });

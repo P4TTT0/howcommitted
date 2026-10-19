@@ -3,6 +3,7 @@ import {
   indexAfterKey,
   indexAtPointer,
 } from "@/features/sequencer/explore";
+import { interaction } from "@/playback/sound/interaction";
 import { barDetail, barReading, type WeekPlan } from "./plan";
 
 const SLIDER_ATTRIBUTES = [
@@ -20,7 +21,7 @@ const IDLE_TEXT = "Contributions by day of the week";
 /**
  * Explore phase: the seven bars become one focusable slider over the days.
  * Left/Right and Home/End (or the pointer across the bars) pick a day; the
- * readout shows it and `aria-valuetext` speaks it. Nothing moves or sounds.
+ * readout shows it and `aria-valuetext` speaks it. Nothing moves; the bar under the pointer makes the quiet hover sound.
  */
 export function exploreWeekShape(
   root: HTMLElement,
@@ -57,6 +58,7 @@ export function exploreWeekShape(
       chart.setAttribute("aria-valuetext", IDLE_TEXT);
       return;
     }
+    interaction.hover(bar.ratio, `bar-${picked}`);
     current = picked;
     readout.classList.remove("invisible");
     title.textContent = bar.name;
@@ -78,6 +80,7 @@ export function exploreWeekShape(
   const onPointerLeave = (event: PointerEvent) => {
     if (event.pointerType === "mouse" && document.activeElement !== chart) {
       show(null);
+      interaction.leave();
     }
   };
   const onKeyDown = (event: KeyboardEvent) => {
