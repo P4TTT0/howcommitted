@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { actionClass, focusRing } from "@/ui/classes";
 import { cardToBlob, drawCard } from "./cardCanvas";
 import { type CardFonts, loadCardFonts, readCardFonts } from "./cardPrimitives";
@@ -11,7 +11,11 @@ const THUMB_WIDTH = 270;
 /** The saved image's object URL lives this long, so a slow download still finds it. */
 const REVOKE_AFTER_MS = 30_000;
 
-type ShareCardsProps = { cards: readonly ShareCard[] };
+type ShareCardsProps = {
+  cards: readonly ShareCard[];
+  /** The poster actions (share, replay, search), placed under the save button. */
+  children?: ReactNode;
+};
 
 type Prepared = { card: ShareCard; blob: Blob | null };
 
@@ -40,7 +44,7 @@ function startDownload(blob: Blob, filename: string) {
  * click, so saving starts inside the user's gesture (mobile browsers drop a
  * share or download that waits on async work).
  */
-export function ShareCards({ cards }: ShareCardsProps) {
+export function ShareCards({ cards, children }: ShareCardsProps) {
   const [selected, setSelected] = useState(0);
   const [status, setStatus] = useState("");
   const [fonts, setFonts] = useState<CardFonts | null>(null);
@@ -109,7 +113,7 @@ export function ShareCards({ cards }: ShareCardsProps) {
   return (
     <section
       aria-labelledby="take-it-heading"
-      className="flex min-w-0 shrink-0 flex-col gap-3 lg:w-[26rem] lg:overflow-y-auto"
+      className="flex min-w-0 shrink-0 flex-col gap-3 lg:w-[460px] lg:overflow-y-auto"
     >
       <h2
         id="take-it-heading"
@@ -117,7 +121,7 @@ export function ShareCards({ cards }: ShareCardsProps) {
       >
         Take it with you.
       </h2>
-      <ul className="grid grid-cols-3 gap-3 md:max-w-[22rem] lg:max-w-none">
+      <ul className="grid grid-cols-3 gap-3 md:max-w-[20rem] lg:max-w-none">
         {cards.map((item, index) => {
           const isSelected = index === selected;
           return (
@@ -151,11 +155,12 @@ export function ShareCards({ cards }: ShareCardsProps) {
         disabled={!blob}
         className={`${actionClass} min-h-14 bg-ink text-paper disabled:border-dashed disabled:bg-transparent disabled:text-ink`}
       >
-        Save image
+        Save {card.label.toLowerCase()} image
       </button>
       <p role="status" className="min-h-4 font-mono text-xs">
         {failed ? "Could not prepare this card. Try another one." : status}
       </p>
+      {children}
     </section>
   );
 }

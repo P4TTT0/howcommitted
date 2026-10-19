@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   challengeHref,
   FIXED_LINE,
-  posterLabel,
+  posterTopLine,
   privateNote,
+  privateTag,
   shareMessage,
   shareProfile,
   yearBars,
@@ -12,13 +13,14 @@ import {
 const data = { title: "t", text: "x", url: "https://e.test/ada" };
 
 describe("poster copy", () => {
-  it("folds totals, span and the private share into one label", () => {
-    expect(posterLabel("ada", 1029, 2022, 2026, 456)).toBe(
-      "@ada · 1,029 contributions · 2022–2026 · 456 private",
-    );
-    expect(posterLabel("ada", 1, 2024, 2024, 0)).toBe(
-      "@ada · 1 contribution · 2024",
-    );
+  it("states the login and the span, never a commit count", () => {
+    expect(posterTopLine("ada", 2022, 2026)).toBe("@ada · 2022 — 2026");
+    expect(posterTopLine("ada", 2024, 2024)).toBe("@ada · 2024");
+  });
+
+  it("tags the private share only when there is one", () => {
+    expect(privateTag(456)).toBe("Includes 456 private");
+    expect(privateTag(0)).toBeNull();
   });
 
   it("shows the card private note only when above zero", () => {

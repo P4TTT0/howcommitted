@@ -7,8 +7,9 @@ type Case = {
   login: string;
   official: number;
   privateContributions: number;
-  label: RegExp;
-  hasPrivate: boolean;
+  top: RegExp;
+  tag: string | null;
+  repo?: string;
 };
 
 const CASES: Case[] = [
@@ -17,24 +18,25 @@ const CASES: Case[] = [
     login: "ada",
     official: 1029,
     privateContributions: 456,
-    label: /@ada · 1,029 contributions · 2025 · 456 private/,
-    hasPrivate: true,
+    top: /^@ada · 2025$/,
+    tag: "Includes 456 private",
   },
   {
     name: "a profile with zero private contributions",
     login: "grace",
     official: 1029,
     privateContributions: 0,
-    label: /@grace · 1,029 contributions · 2025$/,
-    hasPrivate: false,
+    top: /^@grace · 2025$/,
+    tag: null,
   },
   {
     name: "a 39-character login and an 11-digit total",
     login: "a".repeat(39),
     official: 99_999_999_999,
     privateContributions: 12_345,
-    label: /^@a{39} · 99,999,999,999 contributions · 2025 · 12,345 private$/,
-    hasPrivate: true,
+    top: /^@a{39} · 2025$/,
+    tag: "Includes 12,345 private",
+    repo: `portfolio-${"x".repeat(100)}`.slice(0, 100),
   },
 ];
 
@@ -43,12 +45,26 @@ async function openPoster(page: Page, item: Case) {
   for (let day = 1; day <= 28; day += 1) {
     days.push({ date: `2025-03-${String(day).padStart(2, "0")}`, count: 3 });
   }
-  const history = makeHistory(item.login, [
-    makeYear(2025, days, {
-      official: item.official,
-      privateContributions: item.privateContributions,
-    }),
-  ]);
+  const year = makeYear(2025, days, {
+    official: item.official,
+    privateContributions: item.privateContributions,
+  });
+  const history = {
+    ...makeHistory(item.login, [
+      {
+        ...year,
+        repoCommits: [
+          {
+            repo: `ada/${item.repo ?? "Portfolio-Flor-Frontend"}`,
+            commits: 50,
+            days: 10,
+          },
+        ],
+      },
+    ]),
+    longestStreak: { length: 13, start: "2025-03-01", end: "2025-03-13" },
+    languages: [{ name: "TypeScript", size: 90, share: 0.9, isOther: false }],
+  };
   await page.route("**/api/user/*", (route) =>
     route.fulfill({
       json: {
@@ -77,9 +93,9 @@ async function openPoster(page: Page, item: Case) {
   await expect(
     page.getByRole("heading", { name: "Take it with you." }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save image" })).toBeEnabled({
-    timeout: 10_000,
-  });
+  await expect(
+    page.getByRole("button", { name: "Save poster image" }),
+  ).toBeEnabled({ timeout: 10_000 });
 }
 
 for (const viewport of VIEWPORTS) {
@@ -90,9 +106,23 @@ for (const viewport of VIEWPORTS) {
       test(`the poster fits for ${item.name}`, async ({ page }) => {
         await openPoster(page, item);
 
-        const label = page.getByText(item.label);
-        await expect(label).toBeVisible();
-        if (!item.hasPrivate) await expect(label).not.toContainText("private");
+        await expect(page.getByText(item.top)).toBeVisible();
+        if (item.tag) await expect(page.getByText(item.tag)).toBeVisible();
+        else await expect(page.getByText(/private/)).toHaveCount(0);
+        await expect(
+          page.getByText("Contributions.", { exact: true }),
+        ).toBeVisible();
+        for (const fact of [
+          "Longest streak",
+          "Rhythm",
+          "Kept coming back to",
+          "Built with",
+        ]) {
+          await expect(
+            page.locator("dt").getByText(fact, { exact: true }),
+          ).toBeVisible();
+        }
+        await expect(page.getByText("TypeScript")).toBeVisible();
         // Decluttered: no year bars, no helper sentence.
         await expect(page.getByRole("img", { name: /per year/ })).toHaveCount(
           0,
@@ -116,12 +146,9 @@ for (const viewport of VIEWPORTS) {
         if (viewport.width < 768) {
           expect(box?.width ?? 0).toBeGreaterThan(viewport.width * 0.2);
         }
-        await page
-          .getByRole("button", { name: "Save image" })
-          .scrollIntoViewIfNeeded();
-        await expect(
-          page.getByRole("button", { name: "Save image" }),
-        ).toBeInViewport();
+        const save = page.getByRole("button", { name: "Save poster image" });
+        await save.scrollIntoViewIfNeeded();
+        await expect(save).toBeInViewport();
       });
     }
   });
