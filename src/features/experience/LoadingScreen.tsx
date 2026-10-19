@@ -188,7 +188,9 @@ function Lineup({ logins }: { logins: string[] }) {
           {logins.map((login, index) => (
             <span key={login.toLowerCase()}>
               {index > 0 && <span className="px-[0.3em]">vs</span>}
-              <span className={`inline-block px-[0.15em] ${playerBlockClass(index)}`}>
+              <span
+                className={`inline-block px-[0.15em] ${playerBlockClass(index)}`}
+              >
                 @{login}
               </span>
             </span>
@@ -202,7 +204,9 @@ function Lineup({ logins }: { logins: string[] }) {
               <span className="font-mono text-xs font-bold uppercase">vs</span>
             )}
             <FitText className={`${LINEUP_TEXT} text-[min(11vw,5.5dvh)]`}>
-              <span className={`inline-block px-[0.15em] ${playerBlockClass(index)}`}>
+              <span
+                className={`inline-block px-[0.15em] ${playerBlockClass(index)}`}
+              >
                 @{login}
               </span>
             </FitText>
