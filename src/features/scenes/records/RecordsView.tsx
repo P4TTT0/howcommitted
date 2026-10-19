@@ -37,7 +37,7 @@ export function RecordsView({ plan }: RecordsViewProps) {
               className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1"
             >
               <div className="flex flex-wrap items-baseline gap-x-4">
-                <p className="font-display text-[clamp(3rem,13vw,4rem)] font-black leading-[1.05] md:text-[clamp(3rem,5vw,5rem)]">
+                <p className="font-display text-[clamp(3rem,13vw,4rem)] font-black leading-[1.05] md:text-[clamp(2.5rem,min(5vw,8dvh),5rem)]">
                   {formatCount(plan.streakDays)}{" "}
                   {plan.streakDays === 1 ? "day" : "days"}
                 </p>
@@ -63,14 +63,14 @@ export function RecordsView({ plan }: RecordsViewProps) {
           </section>
           <ul
             aria-label="Records"
-            className="grid grid-cols-2 gap-3 md:min-h-0 md:flex-1 md:grid-cols-4 md:grid-rows-2 md:gap-4"
+            className="grid grid-cols-2 gap-3 md:min-h-0 md:flex-1 md:grid-cols-4 md:grid-rows-[repeat(2,minmax(min-content,1fr))] md:gap-4"
           >
             {plan.tiles.map((tile, index) => (
               <li
                 key={tile.key}
                 data-tile={index}
                 aria-label={tileReading(tile)}
-                className={`flex min-h-[104px] min-w-0 flex-col justify-between gap-2 border-2 border-ink px-3 py-3 data-[picked]:bg-ink data-[picked]:text-paper md:px-4 md:py-3 ${TONES[tile.tone]} ${focusRing}`}
+                className={`flex min-h-[104px] min-w-0 flex-col items-start justify-between gap-2 border-2 text-left border-ink px-3 py-3 data-[picked]:bg-ink data-[picked]:text-paper md:px-4 md:py-3 ${TONES[tile.tone]} ${focusRing}`}
               >
                 <p
                   aria-hidden="true"
@@ -80,7 +80,7 @@ export function RecordsView({ plan }: RecordsViewProps) {
                 </p>
                 <p
                   aria-hidden="true"
-                  className="font-display text-[clamp(1.75rem,8vw,2.75rem)] font-black leading-[1] [overflow-wrap:anywhere] md:text-[clamp(1.75rem,3.4vw,4.5rem)]"
+                  className="font-display text-[clamp(1.75rem,8vw,2.75rem)] font-black leading-[1] [overflow-wrap:anywhere] md:text-[clamp(1.5rem,min(3.4vw,6dvh),4.5rem)]"
                 >
                   {tile.value}
                   {tile.unit ? (
