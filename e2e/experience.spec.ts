@@ -312,7 +312,9 @@ test("going past the last scene shows the total and the principle", async ({
     ),
   ).toBeVisible();
   await expect(
-    page.getByText(`@ada: ${TOTAL} contributions, 2022 to 2024`),
+    page.getByText(
+      new RegExp(`^@ada · ${TOTAL} contributions · 2022–2024( · .+ private)?$`),
+    ),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Replay" }).first(),
