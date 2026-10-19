@@ -3,6 +3,7 @@ import { formatCount } from "@/features/sequencer/model/format";
 import type { SceneRuntime } from "@/features/sequencer/types";
 import { semitonesForDegree } from "@/playback/pitch";
 import {
+  type Comparison,
   PANEL_SECONDS,
   type PanelModel,
   progressAt,
@@ -10,9 +11,10 @@ import {
   type ThenNowPlan,
 } from "./plan";
 
-/** The elements of one panel that the animation and the picker both write. */
+/** The elements of one side that the animation and the picker both write. */
 export type PanelElements = {
-  root: HTMLElement;
+  /** Blocks painted with the side's background and foreground. */
+  tones: HTMLElement[];
   year: HTMLElement;
   tag: HTMLElement;
   total: HTMLElement;
@@ -25,36 +27,50 @@ export function panelElements(
   root: HTMLElement,
   side: "then" | "now",
 ): PanelElements {
-  const panel = findElement<HTMLElement>(root, `[data-panel="${side}"]`);
   const role = (name: string) =>
-    findElement<HTMLElement>(panel, `[data-role="${name}"]`);
+    findElement<HTMLElement>(
+      root,
+      `[data-side="${side}"][data-role="${name}"]`,
+    );
   return {
-    root: panel,
+    tones: [...root.querySelectorAll<HTMLElement>(`[data-tone="${side}"]`)],
     year: role("year"),
     tag: role("tag"),
     total: role("total"),
     days: role("days"),
     streak: role("streak"),
     bars: Array.from({ length: 7 }, (_, index) =>
-      findElement<HTMLElement>(panel, `[data-bar="${index}"]`),
+      findElement<HTMLElement>(
+        root,
+        `[data-side="${side}"][data-bar="${index}"]`,
+      ),
     ),
   };
 }
 
-/** Writes a finished panel: colors, numbers, week shape and its spoken form. */
+/** Writes a finished side: colors, numbers and week shape. */
 export function writePanel(elements: PanelElements, model: PanelModel): void {
-  elements.root.style.backgroundColor = model.background;
-  elements.root.style.color = model.foreground;
-  elements.root.setAttribute("aria-label", model.reading);
+  for (const tone of elements.tones) {
+    tone.style.backgroundColor = model.background;
+    tone.style.color = model.foreground;
+  }
   elements.year.textContent = String(model.year);
   elements.tag.textContent = model.tag;
   elements.total.textContent = formatCount(model.total);
   elements.days.textContent = formatCount(model.activeDays);
   elements.streak.textContent = `${formatCount(model.longestStreak)}d`;
-  model.week.forEach((ratio, index) => {
-    const bar = elements.bars[index];
-    if (bar) bar.style.height = `${Math.round(ratio * 100)}%`;
+  elements.bars.forEach((bar, index) => {
+    bar.style.backgroundColor = model.background;
+    bar.style.height = `${Math.round((model.week[index] ?? 0) * 100)}%`;
   });
+}
+
+/** Writes the spoken form of the whole pair. */
+export function writeReading(root: HTMLElement, comparison: Comparison): void {
+  findElement<HTMLElement>(root, '[data-role="reading"]').setAttribute(
+    "aria-label",
+    `${comparison.earlier.reading} ${comparison.now.reading}`,
+  );
 }
 
 /**

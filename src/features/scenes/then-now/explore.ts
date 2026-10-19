@@ -1,10 +1,10 @@
 import { findElement, indexAfterKey } from "@/features/sequencer/explore";
-import { panelElements, writePanel } from "./mount";
+import { panelElements, writePanel, writeReading } from "./mount";
 import type { ThenNowPlan } from "./plan";
 
 /**
  * Explore phase: the year buttons come alive. Click, tap or Left/Right/Home/End
- * pick the "then" year; both panels and the summary line are rewritten at once
+ * pick the "then" year; both sides and the summary line are rewritten at once
  * (instant DOM updates, no sound, no clock). The arrows are kept from the
  * scene navigation while a picker button is focused. The cleanup puts the
  * default comparison and the disabled buttons back.
@@ -23,6 +23,7 @@ export function exploreThenNow(
     const comparison = plan.compare(year);
     writePanel(thenPanel, comparison.earlier);
     writePanel(nowPanel, comparison.now);
+    writeReading(root, comparison);
     summary.textContent = comparison.summary;
     for (const button of buttons) {
       const selected = Number(button.dataset.year) === year;
