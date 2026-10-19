@@ -13,15 +13,7 @@ const year = (y: number, commits: number, priv: number) =>
       issues: 0,
       privateContributions: priv,
     },
-    commitContributionsByRepo: [
-      [{ occurredAt: `${y}-12-31T00:00:00Z`, commitCount: commits }],
-    ],
-    publicRepoContributions: [
-      {
-        repo: "ada/engine",
-        nodes: [{ occurredAt: `${y}-12-31T00:00:00Z`, commitCount: commits }],
-      },
-    ],
+    publicRepoContributions: [{ repo: "ada/engine", commits }],
     calendar: [{ date: `${y}-12-31`, count: commits, weekday: 1 }],
     totalContributions: commits + priv,
   });
@@ -85,7 +77,6 @@ describe("buildHistory", () => {
             issues: 0,
             privateContributions: 1912,
           },
-          commitContributionsByRepo: [],
           publicRepoContributions: [],
           calendar: [
             { date: "2026-03-02", count: 900, weekday: 1 },
@@ -102,7 +93,6 @@ describe("buildHistory", () => {
       { date: "2026-03-03", count: 1012 },
     ]);
     expect(only?.totalContributions).toBe(1912);
-    expect(only?.dailyCommits).toEqual([]);
     expect(history.totals.commits).toBe(0);
     expect(history.totals.privateContributions).toBe(1912);
     expect(history.totalContributions).toBe(1912);
@@ -138,7 +128,6 @@ describe("buildHistory", () => {
           issues: 0,
           privateContributions: 0,
         },
-        commitContributionsByRepo: [],
         publicRepoContributions: [],
         calendar: days.map(([date, count, weekday]) => ({
           date,

@@ -10,15 +10,15 @@ import { expectSceneFits, VIEWPORTS } from "./support/fit";
 type Profile = {
   login: string;
   years: number[];
-  repos: { repo: string; commits: number; days: number }[];
+  repos: { repo: string; commits: number }[];
 };
 
 const REPOS = [
-  { repo: "ada/analytical-engine", commits: 400, days: 120 },
-  { repo: "ada/notes", commits: 150, days: 60 },
-  { repo: "ada/difference", commits: 90, days: 30 },
-  { repo: "ada/bernoulli", commits: 40, days: 12 },
-  { repo: "ada/punch-cards", commits: 10, days: 4 },
+  { repo: "ada/analytical-engine", commits: 400 },
+  { repo: "ada/notes", commits: 150 },
+  { repo: "ada/difference", commits: 90 },
+  { repo: "ada/bernoulli", commits: 40 },
+  { repo: "ada/punch-cards", commits: 10 },
 ];
 
 const RICH: Profile = {
@@ -31,7 +31,7 @@ const STRESS: Profile = {
   login: `ada${"-lovelace".repeat(4)}`.slice(0, 39),
   years: RICH.years,
   repos: [
-    { repo: `ada/${"x".repeat(100)}`, commits: 4_000_000, days: 900 },
+    { repo: `ada/${"x".repeat(100)}`, commits: 4_000_000 },
     ...REPOS.slice(1),
   ],
 };

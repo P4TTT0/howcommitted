@@ -3,8 +3,6 @@ import { type LanguageShare, languageShares } from "./languages";
 import { type RepoFlag, repoCreationFlags } from "./repo-flags";
 import { longestStreak, type Streak } from "./streaks";
 import type {
-  CommitReconciliation,
-  DailyCommits,
   DailyContributions,
   ProfileData,
   RepoCommits,
@@ -16,11 +14,8 @@ import { type YearBlock, yearBlocks } from "./year-summary";
 export type HistoryYear = {
   year: number;
   totals: YearTotals;
-  /** True commits per day. May be incomplete when `reconciliation.matches` is false. */
-  dailyCommits: DailyCommits[];
   /** Commits to public repositories, per repository. Private repositories are never listed. */
   repoCommits: RepoCommits[];
-  reconciliation: CommitReconciliation;
   /** Calendar contributions per day (all types, public and shared private). Days with none are omitted. */
   dailyContributions: DailyContributions[];
   /** The calendar's total for the year: the number the experience shows. */
@@ -77,9 +72,7 @@ export function buildHistory({ user, years, repos }: ProfileData): History {
     years: years.map((year) => ({
       year: year.year,
       totals: year.totals,
-      dailyCommits: year.dailyCommits,
       repoCommits: year.repoCommits,
-      reconciliation: year.reconciliation,
       dailyContributions: year.calendar
         .filter((day) => day.count > 0)
         .map((day) => ({ date: day.date, count: day.count }))

@@ -57,7 +57,6 @@ async function openPoster(page: Page, item: Case) {
           {
             repo: `ada/${item.repo ?? "Portfolio-Flor-Frontend"}`,
             commits: 50,
-            days: 10,
           },
         ],
       },

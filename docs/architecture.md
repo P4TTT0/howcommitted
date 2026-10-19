@@ -93,10 +93,10 @@ GitHub GraphQL with a server token. Costs measured live in October 2026 against 
 | Step | Query | Cost | Time |
 |------|-------|------|------|
 | Preview | `user(login){login name avatarUrl createdAt contributionsCollection{contributionYears}}`. Exact lookup, no search API | 1 point | ~0.6 s |
-| Contributions | One request per contribution year, in parallel (concurrency cap ~6): totals (commits, PRs, reviews, issues, restricted/private count) and the calendar from a full-year window, plus, from four quarter windows, `commitContributionsByRepository(maxRepositories:100){contributions(first:100){nodes{occurredAt commitCount}}}`, summed by date for true commits per day | 1 point each | ~1.8 s each |
+| Contributions | One request per contribution year, in parallel (concurrency cap ~6): totals (commits, PRs, reviews, issues, restricted/private count) and the calendar from a full-year window, plus, inside the same window, `commitContributionsByRepository(maxRepositories:100){repository{nameWithOwner isPrivate visibility} contributions{totalCount}}` for yearly commits per public repo | 1 point each | ~1.8 s each |
 | Repos | `repositories(ownerAffiliations:OWNER, isFork:false, privacy:PUBLIC, orderBy CREATED_AT, first:100)`, paginated, with `createdAt`, `stargazerCount`, `languages(first:10 by SIZE)` | 1 point | ~2.2 s |
 
-For the measured year (2023), summed daily commits matched `totalCommitContributions` exactly (4,458).
+The query asks for no per-day commit nodes. They were dropped because heavy profiles (for example frenck) exceeded the 10 s GitHub timeout: four quarter windows with up to 100 repos and 100 nodes each meant up to ~40,000 nodes per year. They only fed an unused payload field and one UI stat ("days with a commit"), so per-repo data is now yearly commits only.
 
 Profile cost is about contribution years + 2 points, so about 280 uncached profiles per hour for a 16-year profile, and about 500 for an 8-year profile (per 5,000-point token).
 
@@ -107,14 +107,14 @@ Public repositories only: the repos query filters `privacy: PUBLIC`, so no token
 - A single 16-year query timed out (502 after about 11 s). GitHub kills requests over 10 s and deducts extra points. Hence one request per year.
 - `contributionsCollection` `from`/`to` spans at most 1 year.
 - `contributionCalendar` counts all contribution types (2023 example: calendar 4,924 vs commits 4,458). Never label it as commits.
-- Per-repo daily nodes cap at 100 per `contributionsCollection` window, so a repo with commits on more than 100 days in a year was under-counted (torvalds 2024: 888 summed vs 2,888 official). Each year is therefore fetched as 4 quarters in one query (same 1-point cost), with totals and calendar from a full-year alias.
-- `maxRepositories` caps at 100 repos per quarter window, so a repo outside the top 100 in a quarter can still cause a mismatch. Compare summed daily commits against the official total; if they differ, show the real total with a notice.
+- `maxRepositories` caps at 100 repos for the year window, so a repo outside the yearly top 100 is not counted in the per-repo data. `totals.commits` (`totalCommitContributions`) is still the official yearly number.
+- Keep the year query light: request `contributions { totalCount }`, never `contributions { nodes }`. Day-level nodes made every request time out on heavy profiles.
 - Live check (2026-10-17): for torvalds, mngobbi and gaearon in 2016, 2023 and 2025, the sum of the in-range calendar `contributionCount` equals `contributionCalendar.totalContributions` exactly (for example gaearon 2016: 7,009 = 7,009; mngobbi 2025: 1,002 = 1,002), and the calendar returned no days outside the requested year with a full-year `from`/`to`. `fetchYear` still drops days outside the year defensively, and the "not attributed to a day" step stays as a safety net.
 - Private contributions appear only if the user enabled sharing them. They are inside the calendar's daily counts and total (as an unknown type); never invent their dates or types. The experience plays the calendar, so `restrictedContributionsCount` is only used to state the private share honestly.
 
 ### History response (contributions)
 
-Each year of `History` carries the experience's data from the calendar: `dailyContributions: {date, count}[]` (days with at least one contribution) and `totalContributions` (the calendar's own yearly total). `History.totalContributions` sums them and each `yearBlocks` entry is `{year, contributions}`. The public-commit data (`dailyCommits`, `reconciliation`, `totals.commits` and the PR/review/issue/private breakdown) stays in the payload for later scenes, but the line, counter, year blocks and milestones no longer depend on it.
+Each year of `History` carries the experience's data from the calendar: `dailyContributions: {date, count}[]` (days with at least one contribution) and `totalContributions` (the calendar's own yearly total). `History.totalContributions` sums them and each `yearBlocks` entry is `{year, contributions}`. The public-commit data (`repoCommits` per year, `totals.commits` and the PR/review/issue/private breakdown) stays in the payload for later scenes, but the line, counter, year blocks and milestones no longer depend on it.
 
 ### GraphQL limits
 
@@ -137,10 +137,10 @@ Upstash Redis, with a versioned key prefix.
 | Repos | 24 h | New repos are infrequent |
 | "User not found" | 1 h | Negative cache |
 
-Key format (bumping the version in `cache.ts` invalidates cached data; v2 dropped entries with truncated daily commits; v3 added the calendar total per year (`totalContributions`), so older entries without it are never read. Lock, breaker and quota keys are versioned separately and stay `v1`):
+Key format (bumping the version in `cache.ts` invalidates cached data; v2 dropped entries with truncated daily commits; v3 added the calendar total per year (`totalContributions`), so older entries without it are never read; the year kind is v5 because v4 entries carry per-day commits, a reconciliation and per-repo day counts that no longer exist. Lock, breaker and quota keys are versioned separately and stay `v1`):
 
 - `v3:user:{login}`
-- `v3:year:{login}:{year}`
+- `v5:year:{login}:{year}`
 - `v4:repos:{login}` (v4 because v3 entries came from a query without the public-only filter)
 
 Logins are lowercased in keys. Supporting keys: `v3:missing:{login}` (negative cache, 1 h), `v3:failed:{login}` (last failed generation, 30 s), `v1:lock:{login}` (coalescing lock, 75 s, released with a compare-and-delete script), `v1:budget:server` (last token budget for the circuit breaker) and `v1:quota:*` (quota counters and rate limits). The optional `CACHE_KEY_PREFIX` env var is prepended to every key (for example `preview:v3:user:{login}`).

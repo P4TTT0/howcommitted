@@ -49,7 +49,7 @@ function Stat({ value, label: text }: { value: string; label: string }) {
  * repositories; private repos are never named.
  *
  * On a phone it is a compact stack that fits without scrolling: the hero
- * (label, name, three stats), the top three bars and the eras as a strip of
+ * (label, name, two stats), the top three bars and the eras as a strip of
  * year tiles. Names are ellipsized there; from the desktop up they scale.
  */
 export function MainRepoView({ plan }: MainRepoViewProps) {
@@ -60,7 +60,7 @@ export function MainRepoView({ plan }: MainRepoViewProps) {
         <div className="absolute inset-0 flex flex-col gap-3 xl:gap-5">
           <div className="flex min-h-0 flex-1 flex-col gap-3 xl:flex-row xl:gap-12">
             <section
-              aria-label={`Most commits to public repositories: ${repo.repo}, ${formatCount(repo.commits)} commits on ${formatCount(repo.days)} days, ${plan.span}`}
+              aria-label={`Most commits to public repositories: ${repo.repo}, ${formatCount(repo.commits)} commits, ${plan.span}`}
               className="relative flex min-h-0 min-w-0 flex-1 flex-col justify-between gap-3 p-4 xl:gap-8 xl:px-9 xl:py-8"
               style={{
                 backgroundColor: plan.background,
@@ -97,7 +97,6 @@ export function MainRepoView({ plan }: MainRepoViewProps) {
                 className={`${MONO} flex justify-between gap-x-3 text-[11px] xl:flex-wrap xl:justify-start xl:gap-x-8 xl:gap-y-3 xl:text-[13px]`}
               >
                 <Stat value={formatCount(repo.commits)} label="commits" />
-                <Stat value={formatCount(repo.days)} label="days" />
                 <Stat value={plan.span.replace(" to ", " — ")} label="years" />
               </div>
               <div
