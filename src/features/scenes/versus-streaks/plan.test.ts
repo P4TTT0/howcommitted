@@ -7,6 +7,7 @@ function profile(login: string, index: number, dates: string[]): VersusProfile {
   return {
     login,
     index,
+    days: dates.map((date) => ({ date, count: 1 })),
     records: records(dates.map((date) => ({ date, count: 1 }))),
   } as VersusProfile;
 }
@@ -65,6 +66,15 @@ describe("planStreaks", () => {
       "2023-02-03",
     ]);
     expect(planStreaks([ada, level])?.callout).toBeNull();
+  });
+
+  it("draws each developer's months scaled to their own busiest one", () => {
+    const busy = profile("busy", 0, ["2023-01-01", "2023-02-01", "2023-02-02"]);
+    const bars = planStreaks([busy, ada])?.rows[0]?.months;
+    expect(bars?.map((bar) => bar.month)).toEqual(["2023-01", "2023-02"]);
+    expect(bars?.[1]?.level).toBe(1);
+    expect(bars?.[0]?.level).toBeCloseTo(0.5);
+    expect(bars?.[0]?.left).toBe(0);
   });
 
   it("is null when nobody has contributed", () => {
