@@ -1,6 +1,30 @@
 # Contributing
 
-Read [AGENTS.md](AGENTS.md) first. It holds the project rules; this file only covers the workflow.
+Read [AGENTS.md](AGENTS.md) first. It holds the project rules; this file covers setup and the workflow.
+
+## Development
+
+Requires Node 22 (see `.nvmrc`) and pnpm.
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Copy `.env.example` to `.env.local` for the GitHub and Upstash variables. Other commands are listed in [AGENTS.md](AGENTS.md#commands).
+
+## Stack
+
+Next.js (App Router) and TypeScript on Vercel, Upstash Redis cache, d3-scale/d3-shape for math, SVG/Canvas, GSAP for animation, Tone.js for audio, Tailwind CSS v4, pnpm, Biome, Vitest, Playwright. Rationale in [docs/architecture.md](docs/architecture.md).
+
+## Documentation
+
+| Doc | Contents |
+|-----|----------|
+| [docs/product.md](docs/product.md) | Vision, experience flow, scenes, MVP scope |
+| [docs/design.md](docs/design.md) | Aesthetic, typography, colors, motion and sound, prohibitions |
+| [docs/architecture.md](docs/architecture.md) | Stack, structure, data pipeline, caching, quotas, auth |
+| [AGENTS.md](AGENTS.md) | Rules for contributors and AI coding agents |
 
 ## Workflow
 
