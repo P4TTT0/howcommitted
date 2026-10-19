@@ -20,6 +20,12 @@ type Side = "then" | "now";
 const MONO = "font-mono [font-stretch:87.5%]";
 const GRID_STEPS = [0, 1, 2, 3] as const;
 
+/** Phone stepper: moves the "then" year one step through the picker's years. */
+const STEPS = [
+  { step: -1, label: "Earlier year", arrow: "←" },
+  { step: 1, label: "Later year", arrow: "→" },
+] as const;
+
 function Chip({ side, model }: { side: Side; model: PanelModel }) {
   return (
     <div
@@ -263,26 +269,48 @@ export function ThenNowView({ plan }: ThenNowViewProps) {
         sceneLabel="Then vs now"
         title="Then vs now."
         note={
-          <span
-            role="toolbar"
-            aria-label="Choose the year to compare with"
-            data-role="picker"
-            className="flex flex-wrap gap-1.5 md:max-w-[620px] md:justify-end"
-          >
-            {plan.years.map((year) => (
-              <button
-                key={year}
-                type="button"
-                disabled
-                data-year={year}
-                data-selected={year === plan.defaultThen}
-                aria-pressed={year === plan.defaultThen}
-                className={pickerButtonClass()}
-              >
-                {year}
-              </button>
-            ))}
-          </span>
+          <>
+            {/* biome-ignore lint/a11y/useSemanticElements: a fieldset cannot sit inside the note paragraph */}
+            <span
+              role="group"
+              aria-label="Move the year to compare with"
+              data-role="stepper"
+              className="flex gap-1 md:hidden"
+            >
+              {STEPS.map(({ step, label, arrow }) => (
+                <button
+                  key={step}
+                  type="button"
+                  disabled
+                  data-step={step}
+                  aria-label={label}
+                  className={`size-11 border-2 border-ink text-sm font-bold disabled:cursor-default disabled:opacity-40 ${MONO} ${pressable} ${focusRing}`}
+                >
+                  {arrow}
+                </button>
+              ))}
+            </span>
+            <span
+              role="toolbar"
+              aria-label="Choose the year to compare with"
+              data-role="picker"
+              className="hidden flex-wrap gap-1.5 md:flex md:max-w-[620px] md:justify-end"
+            >
+              {plan.years.map((year) => (
+                <button
+                  key={year}
+                  type="button"
+                  disabled
+                  data-year={year}
+                  data-selected={year === plan.defaultThen}
+                  aria-pressed={year === plan.defaultThen}
+                  className={pickerButtonClass()}
+                >
+                  {year}
+                </button>
+              ))}
+            </span>
+          </>
         }
       >
         <div className="absolute inset-0 flex flex-col gap-1.5 md:gap-4">
@@ -324,7 +352,7 @@ export function ThenNowView({ plan }: ThenNowViewProps) {
           <p
             data-role="summary"
             aria-live="polite"
-            className="bg-ink px-4 py-1.5 font-display text-sm font-extrabold uppercase leading-tight text-paper md:px-[18px] md:py-3 md:text-[28px]"
+            className="hidden bg-ink px-4 py-1.5 font-display text-sm [@media(min-height:800px)]:block md:block font-extrabold uppercase leading-tight text-paper md:px-[18px] md:py-3 md:text-[28px]"
           >
             {initial.summary}
           </p>
