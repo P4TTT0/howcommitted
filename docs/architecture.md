@@ -37,7 +37,7 @@ src/features/         search (landing lookup), experience (/{login} states), seq
                       contract, player, shared plan model), scenes (registry, one folder per
                       scene), stats, versus
 src/ui/               Shared presentational components
-public/sounds/        Kenney CC0 chip samples as .ogg with .mp3 fallback, CREDITS.md
+public/sounds/        Kenney CC0 gesture samples as .ogg with .mp3 fallback, CREDITS.md
 e2e/                  Playwright
 .github/              workflows/ci.yml, pull_request_template.md, ISSUE_TEMPLATE (planned)
 .env.example          Required env vars

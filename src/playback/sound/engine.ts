@@ -1,29 +1,20 @@
 /**
- * Sound engine: pitched Kenney casino chips (CC0, see
- * public/sounds/CREDITS.md), never synths.
+ * Sound engine: curated Kenney samples (CC0, see public/sounds/CREDITS.md),
+ * never synths. Scenes call one gesture per kind of motion on screen, on the
+ * clock grid (see docs/design.md, Sound):
  *
- * Hits arrive pre-aggregated and pre-quantized from the schedule; this module
- * only decides how each one sounds.
+ * - pop: a small block appears.
+ * - fill: a bar loads.
+ * - stair: the next item in a sequence appears, low to high.
+ * - count: a number climbs, then settles.
+ * - payoff: a milestone or a pass, heavy and rare.
  *
- * - Ticks: a chip sample shifted up the scale by the semitone offset the
- *   caller computed, with small random pitch and volume variation.
- * - Payoff: a thud and a rattle, both pitched down and layered; the final one
- *   drops lower and louder.
- * - Year accent: the thud, pitched down, quiet.
- * - Voice limit: each group caps simultaneous voices; past it the oldest is
- *   cut.
- * - Speed: samples are never resampled for speed (that would pitch-shift the
- *   chips off the scale). Ticks only arrive sooner; above 1x they also get a
- *   little quieter, because twice the hits per second read as louder.
+ * Each gesture caps its simultaneous voices; past the cap the oldest is cut.
+ * Hover and click are not here: they live on the interaction channel.
  */
 
 import * as Tone from "tone";
-import {
-  microVariation,
-  rateForCents,
-  rateForSemitones,
-  tickDbForSpeed,
-} from "../pitch";
+import { rateForSemitones, tickDbForSpeed } from "../pitch";
 import {
   acceptPop,
   countRate,
@@ -33,67 +24,41 @@ import {
 } from "./gestures";
 import { disposePools, loadSamples, type Pool, playSample } from "./samples";
 
-const TICK_FILES = ["chip-1", "chip-2", "chip-3"] as const;
-const PAYOFF_FILES = ["payoff-thud", "payoff-rattle"] as const;
-
-const GESTURE_FILES = [
+const FILES = [
   "pop",
   "fill-tick",
   "stair",
   "count-tick",
   "count-close",
+  "payoff-rattle",
 ] as const;
 
-const TICK_VOICE_LIMIT = 6;
 const POP_VOICE_LIMIT = 4;
 const FILL_VOICE_LIMIT = 4;
 const STAIR_VOICE_LIMIT = 4;
 const COUNT_VOICE_LIMIT = 4;
+const PAYOFF_VOICE_LIMIT = 4;
 const POP_DB = -10;
 const FILL_DB = -14;
 const STAIR_DB = -8;
 const COUNT_TICK_DB = -14;
 const COUNT_CLOSE_DB = -8;
-const PAYOFF_VOICE_LIMIT = 4;
-const ACCENT_VOICE_LIMIT = 2;
-const MARKER_VOICE_LIMIT = 2;
-/** Tick pitch offset so the climb starts a little below the sample root. */
-const TICK_BASE_SEMITONES = -4;
-const TICK_BASE_DB = -9;
-const PAYOFF_BASE_DB = -2;
-const ACCENT = { semitones: -5, db: -11 };
-/** Softer and higher than a payoff, so it reads as a different kind of event. */
-const UNATTRIBUTED = { semitones: 3, db: -8 };
+/** The rattle pitched down a little so it lands heavier than the gestures. */
+const PAYOFF = { semitones: -4, db: -3 };
 const LIMITER_DB = -1;
-export type TickHit = {
-  /** Audio time from the Transport callback. */
-  time: number;
-  /** Semitones above the run's root. */
-  semitones: number;
-  /** 0..1 */
-  intensity: number;
-};
-
-export type PayoffHit = {
-  time: number;
-  kind: "step" | "final";
-};
 
 export class SoundEngine {
   private readonly limiter: Tone.Limiter;
   private readonly pools = {
-    tick: [] as Pool,
-    payoff: [] as Pool,
-    accent: [] as Pool,
-    marker: [] as Pool,
     pop: [] as Pool,
     fill: [] as Pool,
     stair: [] as Pool,
     count: [] as Pool,
+    payoff: [] as Pool,
   };
   private lastPop = Number.NEGATIVE_INFINITY;
-  private lastTick = -1;
-  private tickSpeedDb = 0;
+  /** Quieter repeats above 1x: more hits per second read as louder. */
+  private speedDb = 0;
 
   private constructor(
     private readonly buffers: Tone.ToneAudioBuffers,
@@ -104,64 +69,16 @@ export class SoundEngine {
 
   /** Loads the samples. Rejects if any file fails to load. */
   static async load(random: () => number = Math.random): Promise<SoundEngine> {
-    const buffers = await loadSamples([
-      ...TICK_FILES,
-      ...PAYOFF_FILES,
-      ...GESTURE_FILES,
-    ]);
-    return new SoundEngine(buffers, random);
+    return new SoundEngine(await loadSamples(FILES), random);
   }
 
   setMuted(muted: boolean): void {
     Tone.getDestination().mute = muted;
   }
 
-  /** Follows the playback rate; only the density of ticks is adjusted. */
+  /** Follows the playback rate; samples are never resampled for speed. */
   setSpeed(speed: number): void {
-    this.tickSpeedDb = tickDbForSpeed(speed);
-  }
-
-  playTick({ time, semitones, intensity }: TickHit): void {
-    const variation = microVariation(this.random);
-    playSample(
-      this.pools.tick,
-      TICK_VOICE_LIMIT,
-      this.limiter,
-      this.buffers.get(this.pickTick()),
-      {
-        time,
-        rate:
-          rateForSemitones(TICK_BASE_SEMITONES + semitones) *
-          rateForCents(variation.cents),
-        db:
-          TICK_BASE_DB + (intensity - 1) * 6 + variation.db + this.tickSpeedDb,
-      },
-    );
-  }
-
-  playPayoff({ time, kind }: PayoffHit): void {
-    const final = kind === "final";
-    const variation = microVariation(this.random, { cents: 20, db: 1 });
-    // A low thud with a rattle on top; the final one drops lower and louder.
-    const layers = [
-      { file: PAYOFF_FILES[0], semitones: -9, db: 0 },
-      { file: PAYOFF_FILES[1], semitones: -4, db: -3 },
-    ];
-    for (const { file, semitones, db } of layers) {
-      playSample(
-        this.pools.payoff,
-        PAYOFF_VOICE_LIMIT,
-        this.limiter,
-        this.buffers.get(file),
-        {
-          time,
-          rate:
-            rateForSemitones(semitones - (final ? 5 : 0)) *
-            rateForCents(variation.cents),
-          db: PAYOFF_BASE_DB + db + (final ? 3 : 0) + variation.db,
-        },
-      );
-    }
+    this.speedDb = tickDbForSpeed(speed);
   }
 
   /**
@@ -181,7 +98,7 @@ export class SoundEngine {
       {
         time,
         rate: 1 + (this.random() * 2 - 1) * 0.1,
-        db: POP_DB + db + (this.random() * 2 - 1),
+        db: POP_DB + db + this.speedDb + (this.random() * 2 - 1),
       },
     );
   }
@@ -201,7 +118,7 @@ export class SoundEngine {
         FILL_VOICE_LIMIT,
         this.limiter,
         this.buffers.get("fill-tick"),
-        { time: startTime + offset, rate, db: FILL_DB + db },
+        { time: startTime + offset, rate, db: FILL_DB + db + this.speedDb },
       );
     }
   }
@@ -228,7 +145,7 @@ export class SoundEngine {
       COUNT_VOICE_LIMIT,
       this.limiter,
       this.buffers.get("count-tick"),
-      { time, rate: countRate(progress), db: COUNT_TICK_DB },
+      { time, rate: countRate(progress), db: COUNT_TICK_DB + this.speedDb },
     );
   }
 
@@ -256,31 +173,15 @@ export class SoundEngine {
 
   /** Gesture: a milestone ("@a passes @b"). Heavy and rare. */
   payoff(time: number): void {
-    this.playPayoff({ time, kind: "step" });
-  }
-
-  /** A soft marker so a year change is heard, not just seen. */
-  playAccent(time: number): void {
     playSample(
-      this.pools.accent,
-      ACCENT_VOICE_LIMIT,
+      this.pools.payoff,
+      PAYOFF_VOICE_LIMIT,
       this.limiter,
-      this.buffers.get(PAYOFF_FILES[0]),
-      { time, rate: rateForSemitones(ACCENT.semitones), db: ACCENT.db },
-    );
-  }
-
-  /** The step for commits not attributed to a day: one soft, distinct thud. */
-  playUnattributed(time: number): void {
-    playSample(
-      this.pools.marker,
-      MARKER_VOICE_LIMIT,
-      this.limiter,
-      this.buffers.get(PAYOFF_FILES[0]),
+      this.buffers.get("payoff-rattle"),
       {
         time,
-        rate: rateForSemitones(UNATTRIBUTED.semitones),
-        db: UNATTRIBUTED.db,
+        rate: rateForSemitones(PAYOFF.semitones),
+        db: PAYOFF.db + (this.random() * 2 - 1),
       },
     );
   }
@@ -291,13 +192,5 @@ export class SoundEngine {
     this.limiter.dispose();
     this.buffers.dispose();
     Tone.getDestination().mute = false;
-  }
-
-  /** Random chip sample that never repeats the previous one. */
-  private pickTick(): string {
-    let index = Math.floor(this.random() * TICK_FILES.length);
-    if (index === this.lastTick) index = (index + 1) % TICK_FILES.length;
-    this.lastTick = index;
-    return TICK_FILES[index] ?? TICK_FILES[0];
   }
 }

@@ -15,7 +15,8 @@ export function mountHeatmap(
     columns[Number(element.dataset.week)]?.push(element);
   }
 
-  for (const time of plan.pops) {
+  // Under reduced motion every week shows at once, so one pop stands for all.
+  for (const time of reducedMotion ? plan.pops.slice(0, 1) : plan.pops) {
     clock.at(time, (at) => sound()?.pop(at));
   }
 

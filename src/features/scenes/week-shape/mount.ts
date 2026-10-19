@@ -19,7 +19,8 @@ export function mountWeekShape(
   const place = plan.position * 100;
 
   // Each bar loads as it grows: one fill over its own growth.
-  for (const bar of plan.bars) {
+  // Under reduced motion the bars show at once: one fill stands for all.
+  for (const bar of reducedMotion ? plan.bars.slice(0, 1) : plan.bars) {
     clock.at(bar.start, (time) => sound()?.fill(time, bar.land - bar.start));
   }
 

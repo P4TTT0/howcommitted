@@ -26,7 +26,9 @@ export function mountSharedDays(
   const audible = grids.find((grid) => grid.container.offsetParent !== null);
   if (audible) {
     const groups = Math.ceil(audible.slots.length / audible.groupSize);
-    for (const time of groupPopTimes(groups)) {
+    const popTimes = groupPopTimes(groups);
+    // Under reduced motion the grid shows at once: one pop stands for all.
+    for (const time of reducedMotion ? popTimes.slice(0, 1) : popTimes) {
       clock.at(time, (at) => sound()?.pop(at));
     }
   }
