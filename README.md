@@ -21,6 +21,8 @@ Committed shows rhythm and habits, never value. Versus is a game, not a job rank
 
 Public data only. Private contributions appear only if you share them on your GitHub profile. Signing in with GitHub is optional, asks for no extra permissions and only shows up after the free runs are used.
 
+Visits are counted with Vercel Web Analytics: no cookies, no cross-site tracking, only page views with referrer, country and device.
+
 ## Contributing
 
 Setup, stack and project docs live in [CONTRIBUTING.md](CONTRIBUTING.md).

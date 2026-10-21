@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { Big_Shoulders, Martian_Mono } from "next/font/google";
 import { resolveSiteOrigin } from "@/og/origin";
@@ -32,7 +33,10 @@ export default function RootLayout({
       lang="en"
       className={`${bigShoulders.variable} ${martianMono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }

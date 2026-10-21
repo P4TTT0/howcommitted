@@ -13,6 +13,7 @@ Scaffolding is in place (Next.js, Tailwind, Biome, Vitest, Playwright, CI). `dom
 | Animation | GSAP | Precise timeline control |
 | Audio | Tone.js | Its Transport clock syncs visuals and sound |
 | Styling | Tailwind CSS v4 | Utility CSS with design tokens, no runtime |
+| Analytics | Vercel Web Analytics | Cookieless page views (referrer, country, device); no extra service or database |
 | Tooling | pnpm, Biome, Vitest, Playwright | |
 
 Not in the MVP (deliberate scope decision): Three.js/WebGL, a database, a global state library.
