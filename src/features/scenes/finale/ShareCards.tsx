@@ -95,7 +95,7 @@ export function ShareCards({ cards, children }: ShareCardsProps) {
 
     if (prefersShareSheet() && navigator.canShare?.({ files: [file] })) {
       navigator
-        .share({ files: [file], title: `@${card.login} | Committed` })
+        .share({ files: [file], title: `@${card.login} | How Committed` })
         .then(() => setStatus(`Shared the ${card.label.toLowerCase()} card.`))
         .catch((error: unknown) => {
           // Closing the sheet is a choice, not a failure.

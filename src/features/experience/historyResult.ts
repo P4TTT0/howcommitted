@@ -153,7 +153,7 @@ export function failureCopy(
       };
     case "network":
       return {
-        message: "Could not reach Committed. Check your connection.",
+        message: "Could not reach How Committed. Check your connection.",
         retry: true,
       };
     case "server":

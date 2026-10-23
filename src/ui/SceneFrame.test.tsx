@@ -9,7 +9,7 @@ describe("SceneFrame", () => {
         <p>content</p>
       </SceneFrame>,
     );
-    expect(html).toContain("Committed");
+    expect(html).toContain("How Committed");
     expect(html).toContain("<h2");
     expect(html).toContain("content");
   });

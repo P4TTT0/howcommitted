@@ -3,7 +3,7 @@ import { blocks } from "@/ui/tokens";
 
 export const IMAGE_SIZE = { width: 1200, height: 630 } as const;
 export const IMAGE_ALT =
-  "A Committed poster: how committed is this GitHub user? Contributions are not productivity. This is rhythm, not value.";
+  "A How Committed poster: how committed is this GitHub user? Contributions are not productivity. This is rhythm, not value.";
 
 /** The line every share card carries (docs/product.md, Core principle). */
 export const FIXED_LINE =
@@ -99,7 +99,7 @@ export function contributionsLabel(total: number): string {
 }
 
 export function pageTitle(login: string): string {
-  return `@${login} | Committed`;
+  return `@${login} | How Committed`;
 }
 
 /** Description for a login whose profile is not cached (or unknown): no numbers. */

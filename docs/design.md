@@ -6,7 +6,7 @@ Flat color blocks, giant kinetic typography, numbers as protagonists. It avoids 
 
 ## Landing
 
-The landing is the question, "How committed is @[username]?", set as a Signal yellow poster. The question is the brand: there is no giant title above it, only a small "Committed" wordmark top-left.
+The landing is the question, "How committed is @[username]?", set as a Signal yellow poster. The question is the brand: there is no giant title above it, only a small "How Committed" wordmark top-left.
 
 - The username input sits inside the sentence. It inherits the display font, has no box, only an ink bottom border that turns Ultramarine and thicker on focus (never color alone). The visible label is the sentence itself ("How committed"), and the accessible name continues it ("is GitHub username").
 - Two intentional lines on desktop ("How committed" / "is @name?"), three on phones ("How" / "committed" / "is @name?", the last at 0.55em). Words never break by accident.

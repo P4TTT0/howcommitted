@@ -189,7 +189,9 @@ test("a reserved login is refused before any request", async ({ page }) => {
   });
   await page.goto("/");
   await page.getByLabel("GitHub username").fill("lab");
-  await expect(page.getByText(/collides with a Committed page/)).toBeVisible();
+  await expect(
+    page.getByText(/collides with a How Committed page/),
+  ).toBeVisible();
   expect(lookups).toBe(0);
 });
 
@@ -429,7 +431,7 @@ test("an unreachable server gets a connection message", async ({ page }) => {
   await expect(
     page
       .getByRole("main")
-      .getByText("Could not reach Committed. Check your connection."),
+      .getByText("Could not reach How Committed. Check your connection."),
   ).toBeVisible();
 });
 

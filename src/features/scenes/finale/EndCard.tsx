@@ -62,7 +62,7 @@ export function EndCard({
     const url = `${window.location.origin}/${encodeURIComponent(login)}`;
     const outcome: ShareOutcome = await shareProfile(
       {
-        title: `@${login} | Committed`,
+        title: `@${login} | How Committed`,
         text: `How committed is @${login}?`,
         url,
       },

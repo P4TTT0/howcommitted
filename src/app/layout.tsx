@@ -19,10 +19,16 @@ const description = "Your contribution history as an audio-visual experience.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(resolveSiteOrigin(process.env)),
-  title: "Committed",
+  applicationName: "How Committed",
+  title: "How Committed",
   description,
-  openGraph: { title: "Committed", description, siteName: "Committed" },
-  twitter: { card: "summary_large_image", title: "Committed", description },
+  openGraph: {
+    title: "How Committed",
+    description,
+    siteName: "How Committed",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image", title: "How Committed", description },
 };
 
 export default function RootLayout({

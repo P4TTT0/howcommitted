@@ -124,7 +124,7 @@ describe("failureCopy", () => {
       failureCopy({ kind: "busy", retryAfterSeconds: 300 }, "ada").message,
     ).toBe("Too many requests right now. Try again in 5 minutes.");
     expect(failureCopy({ kind: "network" }, "ada").message).toBe(
-      "Could not reach Committed. Check your connection.",
+      "Could not reach How Committed. Check your connection.",
     );
   });
 

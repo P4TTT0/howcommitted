@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [login] = logins;
   if (logins.length > 1) {
     return {
-      title: `${logins.map((name) => `@${name}`).join(" vs ")} | Committed`,
+      title: `${logins.map((name) => `@${name}`).join(" vs ")} | How Committed`,
       robots: NOT_INDEXED,
     };
   }

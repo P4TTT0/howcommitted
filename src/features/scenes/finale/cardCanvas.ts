@@ -73,14 +73,14 @@ const label = (fonts: CardFonts, color: string, size = 13): TextStyle => ({
 
 function header(ctx: Ctx, card: ShareCard, fonts: CardFonts) {
   const name = { ...display(fonts, 30, card.foreground), upper: true };
-  drawText(ctx, "Committed", PAD_X, HEADER_BASELINE, name);
+  drawText(ctx, "How Committed", PAD_X, HEADER_BASELINE, name);
   const login = {
     ...mono(fonts, 12, card.foreground),
     align: "right" as const,
   };
   // The wordmark keeps its room; a long login is cut, never overlapped.
   setFont(ctx, name);
-  const room = INNER - ctx.measureText("COMMITTED").width - BLOCK_GAP;
+  const room = INNER - ctx.measureText("HOW COMMITTED").width - BLOCK_GAP;
   drawText(
     ctx,
     ellipsize(ctx, `@${card.login}`, room, login),

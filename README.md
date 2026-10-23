@@ -4,7 +4,7 @@
 
 **[Try it at howcommitted.com](https://www.howcommitted.com/)**
 
-<img width="960" alt="A contribution history playing back in Committed" src="docs/assets/readme.gif" />
+<img width="960" alt="A contribution history playing back in How Committed" src="docs/assets/readme.gif" />
 
 ## What you get
 
@@ -15,7 +15,7 @@
 
 ## Contributions are not productivity
 
-Committed shows rhythm and habits, never value. Versus is a game, not a job ranking.
+How Committed shows rhythm and habits, never value. Versus is a game, not a job ranking.
 
 ## Privacy
 

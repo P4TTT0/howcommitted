@@ -40,8 +40,8 @@ export function SceneFrame({
       className={`flex h-full min-w-0 flex-col gap-[18px] px-4 pt-6 pb-4 md:px-16 md:pt-12 ${className}`}
     >
       <header className="flex items-baseline justify-between gap-4">
-        <p className="font-display text-[22px] font-black uppercase tracking-[0.02em] md:text-[28px]">
-          Committed
+        <p className="font-display whitespace-nowrap text-[22px] font-black uppercase tracking-[0.02em] md:text-[28px]">
+          How Committed
         </p>
         <p className={`text-right ${labelClass}`}>{headerLabel}</p>
       </header>

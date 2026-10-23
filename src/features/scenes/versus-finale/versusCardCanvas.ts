@@ -77,9 +77,9 @@ function header(
 ): number {
   const baseline = PAD + 22;
   const name = { ...display(fonts, 26, color), upper: true };
-  drawText(ctx, "Committed", PAD, baseline, name);
+  drawText(ctx, "How Committed", PAD, baseline, name);
   setFont(ctx, name);
-  const room = INNER - ctx.measureText("COMMITTED").width - GAP;
+  const room = INNER - ctx.measureText("HOW COMMITTED").width - GAP;
   const style = { ...mono(fonts, 12, color), align: "right" as const };
   drawText(ctx, ellipsize(ctx, right, room, style), W - PAD, baseline, style);
   return baseline;

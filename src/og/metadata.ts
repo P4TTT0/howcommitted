@@ -9,7 +9,7 @@ import {
   pageTitle,
 } from "./poster";
 
-export const SITE_NAME = "Committed";
+export const SITE_NAME = "How Committed";
 
 /**
  * Per-user page metadata. `model` is the cached poster data, or null when the

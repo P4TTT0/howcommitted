@@ -77,7 +77,7 @@ export function VersusEndCard({ summaries, poster, onReplay }: Props) {
     const url = `${window.location.origin}/${logins.map(encodeURIComponent).join("/")}`;
     const outcome: ShareOutcome = await shareProfile(
       {
-        title: `${logins.map((login) => `@${login}`).join(" vs ")} | Committed`,
+        title: `${logins.map((login) => `@${login}`).join(" vs ")} | How Committed`,
         text: "Contribution history, side by side.",
         url,
       },
