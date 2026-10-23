@@ -94,7 +94,7 @@ describe("copy", () => {
 
   it("builds a numberless description and a title for unknown profiles", () => {
     expect(genericDescription("octo")).not.toMatch(/\d/);
-    expect(pageTitle("octo")).toBe("@octo | Committed");
+    expect(pageTitle("octo")).toBe("@octo | How Committed");
   });
 });
 

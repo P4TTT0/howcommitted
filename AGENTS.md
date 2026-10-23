@@ -4,7 +4,7 @@ Rules for contributors and AI coding agents. Detail lives in `docs/`; this file 
 
 ## Core principle
 
-CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value. Canonical statement: [docs/product.md](docs/product.md#core-principle).
+CONTRIBUTIONS != PRODUCTIVITY. How Committed shows rhythm and habits, never value. Canonical statement: [docs/product.md](docs/product.md#core-principle).
 
 ## Project state
 
@@ -46,7 +46,7 @@ Not in the MVP (deliberate scope decision): Three.js/WebGL, a database, a global
 
 ## Spelling
 
-Brand **Committed**, domain **howcommitted.com**, repo `P4TTT0/howcommitted`. Always double "t".
+Brand **How Committed**, domain **howcommitted.com**, repo `P4TTT0/howcommitted`. Always double "t".
 
 ## Workflow
 

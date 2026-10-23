@@ -144,7 +144,7 @@ export function lookupMessage(
     case "invalid":
       return "GitHub usernames use letters, numbers and single hyphens, up to 39 characters.";
     case "reserved":
-      return `@${state.login} collides with a Committed page and cannot be opened yet.`;
+      return `@${state.login} collides with a How Committed page and cannot be opened yet.`;
     case "looking":
       return `Looking up @${state.login}`;
     case "not_found":
@@ -156,7 +156,7 @@ export function lookupMessage(
         : `Too many requests right now. Try again in ${wait}.`;
     }
     case "network":
-      return "Could not reach Committed. Check your connection.";
+      return "Could not reach How Committed. Check your connection.";
     case "failed":
       return "The lookup failed. Try again.";
   }

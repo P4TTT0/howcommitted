@@ -107,7 +107,7 @@ export function VersusShareCards({
 
     if (prefersShareSheet() && navigator.canShare?.({ files: [file] })) {
       navigator
-        .share({ files: [file], title: `${card.lineup} | Committed` })
+        .share({ files: [file], title: `${card.lineup} | How Committed` })
         .then(() => onMessage(`Shared the ${name} card.`))
         .catch((error: unknown) => {
           // Closing the sheet is a choice, not a failure.

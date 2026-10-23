@@ -66,15 +66,19 @@ function Wordmark({ right }: { right?: string }) {
         letterSpacing: 2,
       }}
     >
-      <span>Committed</span>
+      <span>How Committed</span>
       {right ? <span>{right}</span> : null}
     </div>
   );
 }
 
-/** "How committed is @login?" on Signal yellow, like the landing. */
+/**
+ * "How committed is @login?" on Signal yellow, like the landing. With no
+ * login (the site-level card) the question is addressed to the reader.
+ */
 function GenericPoster({ login }: { login: string | null }) {
-  const name = `@${login ?? "username"}`;
+  const name = login ? `@${login}` : null;
+  const line = name ? `is ${name}?` : "are you?";
   const width = IMAGE_SIZE.width - PADDING * 2;
   return (
     <div
@@ -108,8 +112,10 @@ function GenericPoster({ login }: { login: string | null }) {
         >
           How committed
         </span>
-        <span style={{ fontSize: loginFontSize(name, width, 160) }}>
-          {`is ${name}?`}
+        <span
+          style={{ fontSize: name ? loginFontSize(name, width, 160) : 160 }}
+        >
+          {line}
         </span>
       </div>
       <div style={{ display: "flex", fontFamily: MONO, fontSize: 22 }}>

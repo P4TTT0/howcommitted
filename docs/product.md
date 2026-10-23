@@ -2,7 +2,7 @@
 
 ## Vision
 
-Committed turns your GitHub contribution history into a chronological audio-visual animation with the satisfaction of an incremental game: every contribution adds up, every streak climbs, every milestone pops.
+How Committed turns your GitHub contribution history into a chronological audio-visual animation with the satisfaction of an incremental game: every contribution adds up, every streak climbs, every milestone pops.
 
 It is an experience, not a professional metrics dashboard and not a narrative.
 
@@ -10,7 +10,7 @@ Quality bar: sound is addictive and satisfying (sample-based, incremental, Balat
 
 ## Core principle
 
-CONTRIBUTIONS != PRODUCTIVITY. Committed shows rhythm and habits, never value.
+CONTRIBUTIONS != PRODUCTIVITY. How Committed shows rhythm and habits, never value.
 
 - Versus is a game, not a job ranking.
 - Copy describes habits ("night owl", "weekend dev", "longest streak"), never merit ("best", "most productive", "winner").

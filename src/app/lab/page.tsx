@@ -4,7 +4,7 @@ import { LabScenes } from "@/features/experience/LabScenes";
 import { isLabEnabled } from "@/features/experience/labGate";
 
 export const metadata: Metadata = {
-  title: "Lab | Committed",
+  title: "Lab | How Committed",
   robots: { index: false, follow: false },
 };
 

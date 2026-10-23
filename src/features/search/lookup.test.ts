@@ -178,7 +178,7 @@ describe("copy", () => {
       }),
     ).toBe("Too many requests right now. Try again in 3 minutes.");
     expect(lookupMessage({ kind: "network" })).toBe(
-      "Could not reach Committed. Check your connection.",
+      "Could not reach How Committed. Check your connection.",
     );
   });
 

@@ -358,7 +358,7 @@ test.describe("versus on the landing", () => {
     const rival = page.getByLabel("Rival login");
     await rival.fill("lab");
     await expect(
-      page.getByText(/collides with a Committed page/),
+      page.getByText(/collides with a How Committed page/),
     ).toBeVisible();
     await rival.fill("ADA");
     await expect(
